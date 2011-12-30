@@ -44,6 +44,16 @@ __FBSDID("$FreeBSD$");
 
 #include "setfacl.h"
 
+/*
+ * Shawn Webb's recursive patch
+ * Version 0.1
+ *
+ * New flags:
+ *     -R: recurse directory
+ *     -L: Follow symbolic links
+ *     -H: Recurse follwed symbolic links
+ */
+
 static void	add_filename(const char *filename);
 static void	usage(void);
 static void	recurse_directory(char *const *paths, int r_flag, int l_flag, int big_h_flag);
