@@ -39,6 +39,7 @@ MAN=	aac.4 \
 	${_amdtemp.4} \
 	amr.4 \
 	an.4 \
+	${_apic.4} \
 	arcmsr.4 \
 	${_asmc.4} \
 	asr.4 \
@@ -117,6 +118,7 @@ MAN=	aac.4 \
 	epair.4 \
 	esp.4 \
 	et.4 \
+	eventtimers.4 \
 	exca.4 \
 	faith.4 \
 	fatm.4 \
@@ -442,6 +444,7 @@ MAN=	aac.4 \
 	termios.4 \
 	textdump.4 \
 	ti.4 \
+	timecounters.4 \
 	tl.4 \
 	tnt4882.4 \
 	${_tpm.4} \
@@ -670,6 +673,7 @@ _acpi_sony.4=	acpi_sony.4
 _acpi_toshiba.4=acpi_toshiba.4
 _acpi_wmi.4=	acpi_wmi.4
 _aesni.4=	aesni.4
+_apic.4=	apic.4
 _atrtc.4=	atrtc.4
 _attimer.4=	attimer.4
 _aibs.4=	aibs.4

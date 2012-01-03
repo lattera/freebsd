@@ -291,6 +291,9 @@ static struct {
 #define RECOVERY_REQUEST_SENSE	2
 #define recovery_slot		spriv_field1
 
+static int force_ahci = 1;
+TUNABLE_INT("hw.ahci.force", &force_ahci);
+
 static int
 ahci_probe(device_t dev)
 {
@@ -308,7 +311,8 @@ ahci_probe(device_t dev)
 	for (i = 0; ahci_ids[i].id != 0; i++) {
 		if (ahci_ids[i].id == devid &&
 		    ahci_ids[i].rev <= revid &&
-		    (valid || !(ahci_ids[i].quirks & AHCI_Q_NOFORCE))) {
+		    (valid || (force_ahci == 1 &&
+		     !(ahci_ids[i].quirks & AHCI_Q_NOFORCE)))) {
 			/* Do not attach JMicrons with single PCI function. */
 			if (pci_get_vendor(dev) == 0x197b &&
 			    (pci_read_config(dev, 0xdf, 1) & 0x40) == 0)
@@ -498,13 +502,14 @@ ahci_attach(device_t dev)
 	}
 	/* Attach all channels on this controller */
 	for (unit = 0; unit < ctlr->channels; unit++) {
-		if ((ctlr->ichannels & (1 << unit)) == 0)
-			continue;
 		child = device_add_child(dev, "ahcich", -1);
-		if (child == NULL)
+		if (child == NULL) {
 			device_printf(dev, "failed to add channel device\n");
-		else
-			device_set_ivars(child, (void *)(intptr_t)unit);
+			continue;
+		}
+		device_set_ivars(child, (void *)(intptr_t)unit);
+		if ((ctlr->ichannels & (1 << unit)) == 0)
+			device_disable(child);
 	}
 	bus_generic_attach(dev);
 	return 0;
