@@ -1,11 +1,10 @@
 /*-
- * Copyright (c) 2003 The FreeBSD Project
+ * Copyright (c) 2011 Fabien Thomas <fabient@FreeBSD.org>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
@@ -26,29 +25,39 @@
  * $FreeBSD$
  */
 
-#ifndef _MACHINE_PROC_H_
-#define	_MACHINE_PROC_H_
+#ifndef VIA_H
+#define	VIA_H
 
-struct mdthread {
-	int	md_spinlock_count;	/* (k) */
-	int	md_saved_intr;		/* (k) */
-};
+/*
+ * Prototypes.
+ */
+ucode_probe_t	via_probe;
+ucode_update_t	via_update;
 
-struct mdproc {
-	int		__dummy;	/* Avoid having an empty struct. */
-};
+typedef struct via_fw_header {
+	uint32_t	signature;		/* Signature. */
+	int32_t		revision;		/* Unique version number. */
+	uint32_t	date;			/* Date of creation in BCD. */
+	uint32_t	cpu_signature;		/* Extended family, extended
+						   model, type, family, model
+						   and stepping. */
+	uint32_t	checksum;		/* Sum of all DWORDS should
+						   be 0. */
+	uint32_t	loader_revision;	/* Version of the loader
+						   required to load update. */
+	uint32_t	reserverd1;		/* Platform IDs encoded in
+						   the lower 8 bits. */
+	uint32_t	data_size;
+	uint32_t	total_size;
+	uint8_t		reserved2[12];
+} via_fw_header_t;
 
-#define	KINFO_PROC_SIZE 1088
-#define	KINFO_PROC32_SIZE 768
+typedef struct via_cpu_signature {
+	uint32_t	cpu_signature;
+	uint32_t	checksum;
+} via_cpu_signature_t;
 
-#ifdef _KERNEL
-struct syscall_args {
-	u_int code;
-	struct sysent *callp;
-	register_t *args;
-	register_t args32[8];
-	int narg;
-};
-#endif
+#define VIA_HEADER_SIGNATURE	0x53415252
+#define VIA_LOADER_REVISION	0x00000001
 
-#endif /* !_MACHINE_PROC_H_ */
+#endif /* !VIA_H */
