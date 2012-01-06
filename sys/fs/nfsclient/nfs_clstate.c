@@ -64,8 +64,8 @@ __FBSDID("$FreeBSD$");
  *     the granularity of the OpenOwner, then code must be added to
  *     serialize Ops on the OpenOwner.)
  * - When to get rid of OpenOwners and LockOwners.
- *   - When a process exits, it calls nfscl_cleanup(), which goes
- *     through the client list looking for all Open and Lock Owners.
+ *   - The function nfscl_cleanup_common() is executed after a process exits.
+ *     It goes through the client list looking for all Open and Lock Owners.
  *     When one is found, it is marked "defunct" or in the case of
  *     an OpenOwner without any Opens, freed.
  *     The renew thread scans for defunct Owners and gets rid of them,
@@ -1630,33 +1630,9 @@ nfscl_expireclient(struct nfsclclient *clp, struct nfsmount *nmp,
 	}
 }
 
-#ifndef	__FreeBSD__
 /*
- * Called from exit() upon process termination.
- */
-APPLESTATIC void
-nfscl_cleanup(NFSPROC_T *p)
-{
-	struct nfsclclient *clp;
-	u_int8_t own[NFSV4CL_LOCKNAMELEN];
-
-	if (!nfscl_inited)
-		return;
-	nfscl_filllockowner(p->td_proc, own, F_POSIX);
-
-	NFSLOCKCLSTATE();
-	/*
-	 * Loop through all the clientids, looking for the OpenOwners.
-	 */
-	LIST_FOREACH(clp, &nfsclhead, nfsc_list)
-		nfscl_cleanup_common(clp, own);
-	NFSUNLOCKCLSTATE();
-}
-#endif	/* !__FreeBSD__ */
-
-/*
- * Common code used by nfscl_cleanup() and nfscl_cleanupkext().
- * Must be called with CLSTATE lock held.
+ * This function must be called after the process represented by "own" has
+ * exited. Must be called with CLSTATE lock held.
  */
 static void
 nfscl_cleanup_common(struct nfsclclient *clp, u_int8_t *own)
@@ -1705,11 +1681,8 @@ nfscl_cleanup_common(struct nfsclclient *clp, u_int8_t *own)
 	}
 }
 
-#if defined(APPLEKEXT) || defined(__FreeBSD__)
 /*
- * Simulate the call nfscl_cleanup() by looking for open owners associated
- * with processes that no longer exist, since a call to nfscl_cleanup()
- * can't be patched into exit().
+ * Find open/lock owners for processes that have exited.
  */
 static void
 nfscl_cleanupkext(struct nfsclclient *clp)
@@ -1725,7 +1698,6 @@ nfscl_cleanupkext(struct nfsclclient *clp)
 	NFSUNLOCKCLSTATE();
 	NFSPROCLISTUNLOCK();
 }
-#endif	/* APPLEKEXT || __FreeBSD__ */
 
 static int	fake_global;	/* Used to force visibility of MNTK_UNMOUNTF */
 /*
@@ -2367,6 +2339,8 @@ nfscl_renewthread(struct nfsclclient *clp, NFSPROC_T *p)
 	u_int32_t clidrev;
 	int error, cbpathdown, islept, igotlock, ret, clearok;
 	uint32_t recover_done_time = 0;
+	struct timespec mytime;
+	static time_t prevsec = 0;
 
 	cred = newnfs_getcred();
 	NFSLOCKCLSTATE();
@@ -2554,22 +2528,15 @@ tryagain:
 			FREE((caddr_t)dp, M_NFSCLDELEG);
 		}
 
-#if defined(APPLEKEXT) || defined(__FreeBSD__)
 		/*
-		 * Simulate the calls to nfscl_cleanup() when a process
-		 * exits, since the call can't be patched into exit().
+		 * Call nfscl_cleanupkext() once per second to check for
+		 * open/lock owners where the process has exited.
 		 */
-		{
-			struct timespec mytime;
-			static time_t prevsec = 0;
-
-			NFSGETNANOTIME(&mytime);
-			if (prevsec != mytime.tv_sec) {
-				prevsec = mytime.tv_sec;
-				nfscl_cleanupkext(clp);
-			}
+		NFSGETNANOTIME(&mytime);
+		if (prevsec != mytime.tv_sec) {
+			prevsec = mytime.tv_sec;
+			nfscl_cleanupkext(clp);
 		}
-#endif	/* APPLEKEXT || __FreeBSD__ */
 
 		NFSLOCKCLSTATE();
 		if ((clp->nfsc_flags & NFSCLFLAGS_RECOVER) == 0)
