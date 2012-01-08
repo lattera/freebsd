@@ -184,6 +184,14 @@
   <sect2 id="kernel">
     <title>Kernel Changes</title>
 
+      <para revision="217152,217396" arch="amd64,i386,powerpc">&os; ELF image
+	activator now supports <literal>PT_GNU_STACK</literal> program
+	header.  This is disabled by default.  New &man.sysctl.8;
+	variables <varname>kern.elf32.nxstack</varname> and
+	<varname>kern.elf64.nxstack</varname> allow to enable
+	<literal>PT_GNU_STACK</literal> for the specified ABIs
+	(e.g. <literal>elf32</literal> for 32-bit ABI).</para>
+
     <sect3 id="boot">
       <title>Boot Loader Changes</title>
 
@@ -192,6 +200,10 @@
 
     <sect3 id="proc">
       <title>Hardware Support</title>
+
+	<para revision="217044" arch="powerpc">&os;/powerpc now
+	  supports Sony Playstation 3 using the OtherOS feature
+	  available on firmwares 3.15 and earlier.</para>
 
       <sect4 id="mm">
 	<title>Multimedia Support</title>
@@ -202,12 +214,78 @@
       <sect4 id="net-if">
 	<title>Network Interface Support</title>
 
+	  <para revision="217649">A bug in &man.alc.4; driver which
+	    could make AR8152-based network interfaces stop working
+	    has been fixed.</para>
+
+	  <para revision="217593">The &man.ixgbe.4; driver has been
+	    updated to version 2.3.8.</para>
+
 	  <para revision="216860">A bug in &man.msk.4; driver has been
 	    fixed.  It could prevent the RX checksum offloading from
 	    working.</para>
 
+	  <para revision="217794">A bug in &man.nfe.4; driver which
+	    could prevent reinitialization after changing the MTU has
+	    been fixed.</para>
+
+	  <para revision="217511">A bug in &man.ral.4; and &man.run.4;
+	    drivers which could prevent <literal>hostap</literal> mode
+	    from working has been fixed.</para>
+
 	  <para revision="216828">A rdcphy(4) driver for RDC Semiconductor
 	    R6040 10/100 PHY has been added.</para>
+
+	  <para revision="217498">The &man.re.4; driver now supports
+	    RTL8168E/8111E-VL PCIe Gigabit Ethernet controllers.</para>
+
+	  <para revision="217766">The &man.re.4; driver now supports
+	    TX interrupt moderation on RTL810xE PCIe Fast Ethernet
+	    controllers.</para>
+
+	  <para revision="217902">The &man.re.4; driver now supports
+	    another mechanism for RX interrupt moderation because of
+	    performance problem.  A &man.sysctl.8; variable
+	    <varname>dev.re.<replaceable>N</replaceable>.int_rx_mod</varname>
+	    has been added to control amount of time to delay RX
+	    interrupt processing in units of microsecond.  Setting it
+	    to <literal>0</literal> completely disables RX interrupt
+	    moderation.  A &man.loader.8; tunable
+	    <varname>hw.re.intr_filter</varname> controls whether the
+	    old mechanism utilizing MSI/MSI-X capability on the
+	    supported controllers is used or not.  When setting it to
+	    a non-zero value, the &man.re.4; driver uses the old
+	    mechanism.  The default value is <literal>0</literal> and
+	    this tunable has no effect on controllers without MSI/MSI-X
+	    capability.</para>
+
+	  <para revision="217246,217832">The &man.re.4; driver now
+	    supports TSO (TCP Segmentation Offload) on RealTek
+	    RTL8168/8111 C or later controllers.  Note that this is
+	    disabled by default because broken frames can be sent
+	    under certain conditions.</para>
+
+	  <para revision="217381">The &man.re.4; driver now supports
+	    enabling TX and/or RX checksum offloading independently
+	    from each other.</para>
+
+	  <para revision="217296">A bug in the &man.re.4; driver has
+	    been fixed.  It could cause a panic when receiving a jumbo
+	    frame on an RTL8169C, 8169D, or 8169E controller-based
+	    network interface.</para>
+
+	  <para revision="217911">The &man.re.4; driver now support
+	    RTL8105E PCIe Fast Ethernet controller.</para>
+
+	  <para revision="217910">The rlphy(4) driver now support
+	    Realtek RTL8201E 10/100 PHY found in RTL8105E
+	    controller.</para>
+
+	  <para revision="217548">A bug in the &man.sis.4; driver has
+	    been changed.  It could prevent a proper reinitialization
+	    on DP83815, DP83816, and SiS 900/7016 controllers when
+	    configuration of multicast packet handling and/or
+	    promiscuous mode is changed.</para>
 
 	  <para revision="216650">A bug in &man.vlan.4; pseudo interface
 	    han been fixed.  It could have a random interface
@@ -233,7 +311,10 @@ wpi0: wpi_rx_intr: bus_dmamap_load failed, error 12</screen>
     <sect3 id="net-proto">
       <title>Network Protocols</title>
 
-      <para></para>
+	<para revision="217169">A bug in &os; TCP/IP network stack has
+	  been fixed.  The source address selection could not being
+	  performed when multicast options were present but without an
+	  interface being specified.</para>
     </sect3>
 
     <sect3 id="disks">
@@ -250,8 +331,8 @@ wpi0: wpi_rx_intr: bus_dmamap_load failed, error 12</screen>
 	  <varname>M_NOWAIT</varname> for memory allocation.  The
 	  default value is <literal>0</literal>.</para>
 
-	<para revision="216941">A bug in the &man.mmc.4; driver that could
-	  fail in device detection has been fixed.</para>
+	<para revision="216941,217509">A bug in the &man.mmc.4; driver
+	  that could fail in device detection has been fixed.</para>
     </sect3>
 
     <sect3 id="fs">
@@ -274,6 +355,31 @@ wpi0: wpi_rx_intr: bus_dmamap_load failed, error 12</screen>
   <sect2 id="userland">
     <title>Userland Changes</title>
 
+      <para revision="217416">The &man.cpuset.1; utility now supports
+	a <option>-C</option> flag to create a new cpuset and assign
+	an existing process into that set, and an
+	<literal>all</literal> keyword in <option>-l
+	<replaceable>cpu-list</replaceable></option> option to specify
+	all CPUs in the system.</para>
+
+      <para revision="217505">A bug in the &man.fetch.1; utility which
+	could prevent <command>STAT</command> FTP command from working
+	properly has been fixed.</para>
+
+      <para revision="217013">The &man.ifconfig.8; utility now
+	supports <literal>fdx</literal>, <literal>flow</literal>,
+	<literal>hdx</literal>, and <literal>loop</literal> keywords
+	as aliases of <literal>full-duplex</literal>,
+	<literal>flowcontrol</literal>,
+	<literal>half-duplex</literal>,
+	and <literal>loopback</literal>, respectively.</para>
+
+      <para revision="217642">The &man.netstat.1; utility now does not
+	expose internal scope address representation used in the &os;
+	kernel, which is derived from KAME IPv6 stack, in the results
+	of <command>netstat -ani</command> and <command>netstat
+	  -nr</command>.</para>
+
       <para revision="216823">A &man.poweroff.8; utility has been added.
 	This is equivalent to:</para>
 
@@ -281,12 +387,17 @@ wpi0: wpi_rx_intr: bus_dmamap_load failed, error 12</screen>
 
       <para revision="216695">The &man.rtld.1; runtime linker now supports
 	shared objects as filters in ELF shared libraries.  Both
-	standard and auxillary filtering have been supported.  The
+	standard and auxiliary filtering have been supported.  The
 	&man.rtld.1; linker's processing of a filter defers loading a
 	filtee until a filter symbol is referenced unless
 	<varname>LD_LOADFLTR</varname> environment variable is defined
 	or a <literal>-z loadfltr</literal> option was specified when
 	the filter was created.</para>
+
+      <para revision="217133">A race condition in the &man.sed.1;
+	utility has been fixed.  When an <option>-i</option> option is
+	specified, it could cause a short time window with no file
+	with the original file name.</para>
 
       <para revision="216629">The &man.sh.1; program now supports
 	<command>kill</command> as a built-in command.  This allows
@@ -295,6 +406,32 @@ wpi0: wpi_rx_intr: bus_dmamap_load failed, error 12</screen>
 	that this built-in command returns the exit status
 	<literal>2</literal> instead of <literal>1</literal> if an
 	fatal error occurs as other built-in commands do.</para>
+
+      <para revision="217176,217472">A bug in the &man.sh.1; program has been
+	fixed for POSIX conformance.  It could return an wrong exit
+	status when an <command>exit</command> command with no
+	parameter is specified in the <literal>EXIT trap</literal>
+	handler, which is triggered when the shell terminates.
+	In trap actions for other signals, <command>exit</command>
+	command with no parameter returns an exit status corresponding
+	to the received signal.</para>
+
+      <para revision="217557">A bug in the &man.sh.1; program has been
+	fixed.  When a foreground job exits on a signal, a message is
+	printed to <filename>stdout</filename> about this. The buffer
+	was not flushed after this which could result in the message
+	being written to the wrong file if the next command was a
+	builtin and had <filename>stdout</filename> redirected.</para>
+
+      <para revision="217461">The &man.sh.1; program now supports a
+	<option>--</option> flag in <command>trap</command> command to
+	stop the option processing.</para>
+
+      <para revision="217206"><literal>%builtin</literal> keyword
+	support in <varname>$PATH</varname> variable has been removed
+	in the &man.sh.1; program.  All built-in commands are always
+	found before looking up directories in
+	<varname>$PATH</varname>.</para>
 
     <sect3 id="rc-scripts">
       <title><filename>/etc/rc.d</filename> Scripts</title>
@@ -306,7 +443,14 @@ wpi0: wpi_rx_intr: bus_dmamap_load failed, error 12</screen>
   <sect2 id="contrib">
     <title>Contributed Software</title>
 
-    <para></para>
+      <para revision="222544"><literal>ACPI CA</literal> has been
+	updated to version 20110527.</para>
+
+      <para revision="224014"><literal>dialog</literal> has been
+	updated to version 1.1-20110707.</para>
+
+      <para revision="217698">&man.unifdef.1; utility has been updated
+	to version 2.5.6.</para>
   </sect2>
 
   <sect2 id="ports">
@@ -363,8 +507,23 @@ wpi0: wpi_rx_intr: bus_dmamap_load failed, error 12</screen>
     <sect2>
       <title id="upgrade-pitfalls">User-visible incompatibilities</title>
 
-      <para>This section describes notable incompatibilities which
-	your should know before upgrading your system.</para>
+      <para>This section describes notable incompatibilities which you
+	might want to know before upgrading your system.</para>
+
+      <sect3>
+	<title>Update of <literal>dialog</literal></title>
+
+	<para>The <literal>dialog</literal> library is used in &os;
+	  new installer and &os; Ports Collection to display a dialog
+	  window and allow users to select various options.  Note that
+	  it is updated in &release.current; and there is several
+	  differences in the key operation which might confuse users
+	  who are familiar with releases prior to &release.current;.
+	  For example, pushing enter key in a check list window is no
+	  longer able to be used to check an item.  The new version
+	  consistently supports space bar for selecting an item and
+	  enter key for OK/Cancel selection.</para>
+      </sect3>
     </sect2>
 </sect1>
 </article>
