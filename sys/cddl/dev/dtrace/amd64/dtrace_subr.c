@@ -456,8 +456,7 @@ dtrace_gethrtime()
 uint64_t
 dtrace_gethrestime(void)
 {
-	printf("%s(%d): XXX\n",__func__,__LINE__);
-	return (0);
+	return time_second;
 }
 
 /* Function to handle DTrace traps during probes. See amd64/amd64/trap.c */
