@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008 Marius Strobl <marius@FreeBSD.org>
+ * Copyright (c) 2011 Marius Strobl <marius@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,24 +28,47 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
-#include <geom/geom_disk.h>
+#include <sys/systm.h>
+
+#include <cam/cam.h>
+#include <cam/cam_ccb.h>
+
 #include <machine/md_var.h>
 
-void
-sparc64_ata_disk_firmware_geom_adjust(struct disk *disk)
+int
+scsi_da_bios_params(struct ccb_calc_geometry *ccg)
 {
+	uint32_t secs_per_cylinder, size_mb;
 
 	/*
 	 * The VTOC8 disk label only uses 16-bit fields for cylinders, heads
 	 * and sectors so the geometry of large disks has to be adjusted.
-	 * If the disk is > 32GB at 16 heads and 63 sectors, adjust to 255
-	 * sectors (this matches what the OpenSolaris dad(7D) driver does).
-	 * If the the disk is even > 128GB, additionally adjust the heads to
-	 * 255.  This allows disks up to the 2TB limit of the extended VTOC8.
-	 * XXX the OpenSolaris dad(7D) driver limits the mediasize to 128GB.
+	 * We generally use the sizing used by cam_calc_geometry(9), except
+	 * when it would overflow the cylinders, in which case we use 255
+	 * heads and sectors.  This allows disks up to the 2TB limit of the
+	 * extended VTOC8.
+	 * XXX this doesn't match the sizing used by OpenSolaris, as that
+	 * would exceed the 8-bit ccg->heads and ccg->secs_per_track.
 	 */
-	if (disk->d_mediasize > (off_t)65535 * 16 * 63 * disk->d_sectorsize)
-		disk->d_fwsectors = 255;
-	if (disk->d_mediasize > (off_t)65535 * 16 * 255 * disk->d_sectorsize)
-		disk->d_fwheads = 255;
+	if (ccg->block_size == 0)
+		return (0);
+	size_mb = (1024L * 1024L) / ccg->block_size;
+	if (size_mb == 0)
+		return (0);
+	size_mb = ccg->volume_size / size_mb;
+	if (ccg->volume_size > (uint64_t)65535 * 255 * 63) {
+		ccg->heads = 255;
+		ccg->secs_per_track = 255;
+	} else if (size_mb > 1024) {
+		ccg->heads = 255;
+		ccg->secs_per_track = 63;
+	} else {
+		ccg->heads = 64;
+		ccg->secs_per_track = 32;
+	}
+	secs_per_cylinder = ccg->heads * ccg->secs_per_track;
+	if (secs_per_cylinder == 0)
+		return (0);
+	ccg->cylinders = ccg->volume_size / secs_per_cylinder;
+	return (1);
 }
