@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2007 Robert N. M. Watson
+ * Copyright (c) 2011 LSI Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,69 +23,49 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ * LSI MPT-Fusion Host Adapter FreeBSD
+ *
  * $FreeBSD$
  */
 
-#include <sys/param.h>
-#include <sys/sysctl.h>
-#include <sys/user.h>
+#ifndef _MPS_MAPPING_H
+#define _MPS_MAPPING_H
 
-#include <err.h>
-#include <errno.h>
-#include <libprocstat.h>
-#include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+/**
+ * struct _map_phy_change - PHY entries recieved in Topology change list
+ * @physical_id: SAS address of the device attached with the associate PHY
+ * @device_info: bitfield provides detailed info about the device
+ * @dev_handle: device handle for the device pointed by this entry
+ * @slot: slot ID
+ * @is_processed: Flag to indicate whether this entry is processed or not
+ */
+struct _map_phy_change {
+	uint64_t	physical_id;
+	uint32_t	device_info;
+	uint16_t	dev_handle;
+	uint16_t	slot;
+	uint8_t	reason;
+	uint8_t	is_processed;
+};
 
-#include "procstat.h"
+/**
+ * struct _map_topology_change - entries to be removed from mapping table
+ * @dpm_entry_num: index of this device in device persistent map table
+ * @dev_handle: device handle for the device pointed by this entry
+ */
+struct _map_topology_change {
+	uint16_t	enc_handle;
+	uint16_t	exp_handle;
+	uint8_t	num_entries;
+	uint8_t	start_phy_num;
+	uint8_t	num_phys;
+	uint8_t	exp_status;
+	struct _map_phy_change *phy_details;
+};
 
-static char args[ARG_MAX];
 
-static void
-do_args(struct kinfo_proc *kipp, int env)
-{
-	int error, name[4];
-	size_t len;
-	char *cp;
+extern int
+mpssas_get_sas_address_for_sata_disk(struct mps_softc *ioc,
+    u64 *sas_address, u16 handle, u32 device_info);
 
-	if (!hflag)
-		printf("%5s %-16s %-53s\n", "PID", "COMM",
-		    env ? "ENVIRONMENT" : "ARGS");
-
-	name[0] = CTL_KERN;
-	name[1] = KERN_PROC;
-	name[2] = env ? KERN_PROC_ENV : KERN_PROC_ARGS;
-	name[3] = kipp->ki_pid;
-	len = sizeof(args);
-	error = sysctl(name, 4, args, &len, NULL, 0);
-	if (error < 0 && errno != ESRCH && errno != EPERM) {
-		warn("sysctl: kern.proc.%s: %d: %d", env ? "env" : "args",
-		    kipp->ki_pid, errno);
-		return;
-	}
-	if (error < 0)
-		return;
-	if (len == 0 || strlen(args) == 0) {
-		strcpy(args, "-");
-		len = strlen(args) + 1;
-	}
-
-	printf("%5d ", kipp->ki_pid);
-	printf("%-16s ", kipp->ki_comm);
-	for (cp = args; cp < args + len; cp += strlen(cp) + 1)
-		printf("%s%s", cp != args ? " " : "", cp);
-	printf("\n");
-}
-
-void
-procstat_args(struct kinfo_proc *kipp)
-{
-	do_args(kipp, 0);
-}
-
-void
-procstat_env(struct kinfo_proc *kipp)
-{
-	do_args(kipp, 1);
-}
+#endif
