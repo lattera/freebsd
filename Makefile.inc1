@@ -830,6 +830,7 @@ buildkernel:
 	@echo ">>> stage 2.3: build tools"
 	@echo "--------------------------------------------------------------"
 	cd ${KRNLOBJDIR}/${_kernel}; \
+	    PATH=${BPATH}:${PATH} \
 	    MAKESRCPATH=${KERNSRCDIR}/dev/aic7xxx/aicasm \
 	    ${MAKE} SSP_CFLAGS= -DNO_CPU_CFLAGS -DNO_CTF \
 	    -f ${KERNSRCDIR}/dev/aic7xxx/aicasm/Makefile
@@ -837,6 +838,7 @@ buildkernel:
 .if !defined(MODULES_WITH_WORLD) && !defined(NO_MODULES) && exists(${KERNSRCDIR}/modules)
 .for target in obj depend all
 	cd ${KERNSRCDIR}/modules/aic7xxx/aicasm; \
+	    PATH=${BPATH}:${PATH} \
 	    MAKEOBJDIRPREFIX=${KRNLOBJDIR}/${_kernel}/modules \
 	    ${MAKE} SSP_CFLAGS= -DNO_CPU_CFLAGS -DNO_CTF ${target}
 .endfor
@@ -1029,7 +1031,8 @@ _yacc=		usr.bin/yacc
 _awk=		usr.bin/awk
 .endif
 
-.if ${BOOTSTRAPPING} < 700018
+.if ${MK_BSNMP} != "no" && \
+    (${BOOTSTRAPPING} < 700018 || !exists(/usr/sbin/gensnmptree))
 _gensnmptree=	usr.sbin/bsnmpd/gensnmptree
 .endif
 
