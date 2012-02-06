@@ -7,11 +7,11 @@
  * modification, are permitted provided that the following conditions are met:
  *
  * a) Redistributions of source code must retain the above copyright notice,
- *   this list of conditions and the following disclaimer.
+ *    this list of conditions and the following disclaimer.
  *
  * b) Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
- *   the documentation and/or other materials provided with the distribution.
+ *    the documentation and/or other materials provided with the distribution.
  *
  * c) Neither the name of Cisco Systems, Inc. nor the names of its
  *    contributors may be used to endorse or promote products derived
@@ -669,6 +669,12 @@ struct sctp_timeouts {
 	uint32_t stimo_heartbeat;
 	uint32_t stimo_cookie;
 	uint32_t stimo_shutdownack;
+};
+
+struct sctp_udpencaps {
+	struct sockaddr_storage sue_address;
+	sctp_assoc_t sue_assoc_id;
+	uint16_t sue_port;
 };
 
 struct sctp_cwnd_args {
