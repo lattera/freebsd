@@ -683,7 +683,7 @@ run_rc_command()
 		fi
 	fi
 
-	eval $_pidcmd			# determine the pid if necessary
+	[ -z "$autoboot" ] && eval $_pidcmd	# determine the pid if necessary
 
 	for _elem in $_keywords; do
 		if [ "$_elem" != "$rc_arg" ]; then
@@ -1117,7 +1117,7 @@ load_rc_config_var()
 #
 rc_usage()
 {
-	echo -n 1>&2 "Usage: $0 [fast|force|one]("
+	echo -n 1>&2 "Usage: $0 [fast|force|one|quiet]("
 
 	_sep=
 	for _elem; do
