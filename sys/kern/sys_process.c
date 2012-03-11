@@ -545,9 +545,6 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		wrap32 = 1;
 #endif
-
-    return EPERM;
-
 	AUDIT_ARG_PID(uap->pid);
 	AUDIT_ARG_CMD(uap->req);
 	AUDIT_ARG_VALUE(uap->data);
