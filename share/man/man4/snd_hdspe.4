@@ -1,5 +1,5 @@
-.\" Copyright (c) 1990, 1991, 1993
-.\"	The Regents of the University of California.  All rights reserved.
+.\" Copyright (c) 2012 Ruslan Bukin <br@bsdpad.com>
+.\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
@@ -9,14 +9,11 @@
 .\" 2. Redistributions in binary form must reproduce the above copyright
 .\"    notice, this list of conditions and the following disclaimer in the
 .\"    documentation and/or other materials provided with the distribution.
-.\" 4. Neither the name of the University nor the names of its contributors
-.\"    may be used to endorse or promote products derived from this software
-.\"    without specific prior written permission.
 .\"
-.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
 .\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 .\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
 .\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 .\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
 .\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -25,43 +22,55 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     @(#)swab.3	8.1 (Berkeley) 6/4/93
 .\" $FreeBSD$
 .\"
-.Dd March 4, 2012
-.Dt SWAB 3
+.Dd February 13, 2012
+.Dt SND_HDSPE 4
 .Os
 .Sh NAME
-.Nm swab
-.Nd swap adjacent bytes
-.Sh LIBRARY
-.Lb libc
+.Nm snd_hdspe
+.Nd "RME HDSPe brigde device driver"
 .Sh SYNOPSIS
-.In unistd.h
-.Ft void
-.Fn swab "const void * restrict src" "void * restrict dst" "ssize_t len"
-.Sh DESCRIPTION
-The function
-.Fn swab
-copies
-.Fa len
-bytes from the location referenced by
-.Fa src
-to the location referenced by
-.Fa dst ,
-swapping adjacent bytes.
+To compile this driver into the kernel, place the following lines in your
+kernel configuration file:
+.Bd -ragged -offset indent
+.Cd "device sound"
+.Cd "device snd_hdspe"
+.Ed
 .Pp
-The argument
-.Fa len
-must be an even number.
-If
-.Fa len
-is less than zero, nothing will be done.
+Alternatively, to load the driver as a module at boot time, place the
+following line in
+.Xr loader.conf 5 :
+.Bd -literal -offset indent
+snd_hdspe_load="YES"
+.Ed
+.Sh DESCRIPTION
+The
+.Nm
+bridge driver allows the generic audio driver
+.Xr sound 4
+to attach to RME HDSPe audio devices.
+.Sh HARDWARE
+The
+.Nm
+driver supports the following audio devices:
+.Pp
+.Bl -bullet -compact
+.It
+RME HDSPe AIO
+.It
+RME HDSPe RayDAT
+.El
 .Sh SEE ALSO
-.Xr bzero 3 ,
-.Xr memset 3
+.Xr sound 4
 .Sh HISTORY
-A
-.Fn swab
-function appeared in
-.At v7 .
+The
+.Nm
+device driver first appeared in
+.Fx 10.0 .
+.Sh AUTHORS
+.An -nosplit
+The
+.Nm
+driver was written by
+.An Ruslan Bukin <br@bsdpad.com> .
