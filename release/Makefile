@@ -47,6 +47,7 @@ OSRELEASE=	${TYPE}-${REVISION}-${BRANCH}-${TARGET}-${TARGET_ARCH}
 .endif
 .endfor
 .endif
+KERNCONF?=	GENERIC
 
 .if !exists(${DOCDIR})
 NODOC= true
@@ -91,7 +92,7 @@ base.txz:
 
 kernel.txz:
 	mkdir -p ${DISTDIR}
-	cd ${WORLDDIR} && ${IMAKE} distributekernel packagekernel DISTDIR=${.OBJDIR}/${DISTDIR}
+	cd ${WORLDDIR} && ${IMAKE} distributekernel packagekernel DISTDIR=${.OBJDIR}/${DISTDIR} KERNCONF=${KERNCONF}
 	mv ${DISTDIR}/kernel*.txz .
 
 src.txz:
@@ -122,7 +123,7 @@ system: packagesystem
 # Install system
 	mkdir -p release
 	cd ${WORLDDIR} && ${IMAKE} installkernel installworld distribution \
-	    DESTDIR=${.OBJDIR}/release WITHOUT_RESCUE=1 WITHOUT_KERNEL_SYMBOLS=1
+	    DESTDIR=${.OBJDIR}/release WITHOUT_RESCUE=1 WITHOUT_KERNEL_SYMBOLS=1 KERNCONF=${KERNCONF}
 # Copy distfiles
 	mkdir -p release/usr/freebsd-dist
 	cp *.txz MANIFEST release/usr/freebsd-dist
@@ -147,7 +148,8 @@ bootonly: packagesystem
 	    WITHOUT_INSTALLLIB=1 WITHOUT_LIB32=1 WITHOUT_MAIL=1 \
 	    WITHOUT_NCP=1 WITHOUT_TOOLCHAIN=1 WITHOUT_PROFILE=1 \
 	    WITHOUT_INSTALLIB=1 WITHOUT_RESCUE=1 WITHOUT_DICT=1 \
-	    WITHOUT_KERNEL_SYMBOLS=1
+	    WITHOUT_KERNEL_SYMBOLS=1 \
+		KERNCONF=${KERNCONF}
 # Copy manifest only (no distfiles) to get checksums
 	mkdir -p bootonly/usr/freebsd-dist
 	cp MANIFEST bootonly/usr/freebsd-dist
