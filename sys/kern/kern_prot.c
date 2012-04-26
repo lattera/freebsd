@@ -1612,9 +1612,42 @@ p_cansched(struct thread *td, struct proc *p)
  * XXX: data declarations should be together near the beginning of the file.
  */
 static int	unprivileged_proc_debug = 1;
+#if 0
 SYSCTL_INT(_security_bsd, OID_AUTO, unprivileged_proc_debug, CTLFLAG_RW,
     &unprivileged_proc_debug, 0,
     "Unprivileged processes may use process debugging facilities");
+#endif
+
+int
+sysctl_unprivileged_proc_debug(SYSCTL_HANDLER_ARGS);
+
+SYSCTL_PROC(_security_bsd, OID_AUTO, unprivileged_proc_debug,
+    CTLTYPE_INT | CTLFLAG_RW, &unprivileged_proc_debug, 0,
+    sysctl_unprivileged_proc_debug, "I",
+    "Unprivileged processes may use process debugging facilities");
+
+int
+sysctl_unprivileged_proc_debug(SYSCTL_HANDLER_ARGS)
+{
+    static int set=0;
+    int error = 0;
+    int debug=unprivileged_proc_debug;
+
+    error = sysctl_handle_int(oidp, &debug, 0, req);
+    if (error == 0 && req->newptr) {
+        if (debug < 0 || debug > 1)
+            return (EPERM);
+
+        if (debug != unprivileged_proc_debug && set == 0) {
+            unprivileged_proc_debug = debug;
+            set++;
+        } else {
+            return (EPERM);
+        }
+    }
+
+    return (error);
+}
 
 /*-
  * Determine whether td may debug p.
@@ -1631,11 +1664,9 @@ p_candebug(struct thread *td, struct proc *p)
 
 	KASSERT(td == curthread, ("%s: td not curthread", __func__));
 	PROC_LOCK_ASSERT(p, MA_OWNED);
-	if (!unprivileged_proc_debug) {
-		error = priv_check(td, PRIV_DEBUG_UNPRIV);
-		if (error)
-			return (error);
-	}
+	if (!unprivileged_proc_debug)
+			return (EPERM);
+
 	if (td->td_proc == p)
 		return (0);
 	if ((error = prison_check(td->td_ucred, p->p_ucred)))
