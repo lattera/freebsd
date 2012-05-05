@@ -1680,10 +1680,11 @@ usbd_pipe_enter(struct usb_xfer *xfer)
 
 	DPRINTF("enter\n");
 
+	/* the transfer can now be cancelled */
+	xfer->flags_int.can_cancel_immed = 1;
+
 	/* enter the transfer */
 	(ep->methods->enter) (xfer);
-
-	xfer->flags_int.can_cancel_immed = 1;
 
 	/* check for transfer error */
 	if (xfer->error) {
@@ -2417,13 +2418,15 @@ usbd_transfer_start_cb(void *arg)
 #if USB_HAVE_PF
 	usbpf_xfertap(xfer, USBPF_XFERTAP_SUBMIT);
 #endif
+
+	/* the transfer can now be cancelled */
+	xfer->flags_int.can_cancel_immed = 1;
+
 	/* start USB transfer, if no error */
 	if (xfer->error == 0)
 		(ep->methods->start) (xfer);
 
-	xfer->flags_int.can_cancel_immed = 1;
-
-	/* check for error */
+	/* check for transfer error */
 	if (xfer->error) {
 		/* some error has happened */
 		usbd_transfer_done(xfer, 0);
@@ -2598,13 +2601,14 @@ usbd_pipe_start(struct usb_xfer_queue *pq)
 #if USB_HAVE_PF
 	usbpf_xfertap(xfer, USBPF_XFERTAP_SUBMIT);
 #endif
+	/* the transfer can now be cancelled */
+	xfer->flags_int.can_cancel_immed = 1;
+
 	/* start USB transfer, if no error */
 	if (xfer->error == 0)
 		(ep->methods->start) (xfer);
 
-	xfer->flags_int.can_cancel_immed = 1;
-
-	/* check for error */
+	/* check for transfer error */
 	if (xfer->error) {
 		/* some error has happened */
 		usbd_transfer_done(xfer, 0);
@@ -2699,7 +2703,8 @@ usbd_callback_wrapper_sub(struct usb_xfer *xfer)
 				(bus->methods->start_dma_delay) (xfer);
 			} else {
 				usbd_transfer_timeout_ms(xfer,
-				    (void *)&usb_dma_delay_done_cb, temp);
+				    (void (*)(void *))&usb_dma_delay_done_cb,
+				    temp);
 			}
 			USB_BUS_UNLOCK(bus);
 			return (1);	/* wait for new callback */
