@@ -69,6 +69,8 @@ options     VIMAGE
 options		IPFIREWALL
 options		IPDIVERT
 options		IPFIREWALL_DEFAULT_TO_ACCEPT
+options     IPSEC
+device crypto
 
 # Make an SMP-capable kernel by default
 options 	SMP			# Symmetric MultiProcessor Kernel
