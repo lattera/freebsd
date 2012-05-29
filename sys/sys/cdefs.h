@@ -230,7 +230,8 @@
 #define	_Alignof(e)		alignof(e)
 #define	_Noreturn		[[noreturn]]
 #define	_Static_assert(e, s)	static_assert(e, s)
-#define	_Thread_local		thread_local
+/* FIXME: change this to thread_local when clang in base supports it */
+#define	_Thread_local		__thread
 #elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
 /* Do nothing.  They are language keywords. */
 #else
@@ -292,6 +293,12 @@
 #define __nonnull(x)
 #endif
 
+#if __GNUC_PREREQ__(4, 1)
+#define	__returns_twice	__attribute__((__returns_twice__))
+#else
+#define	__returns_twice
+#endif
+
 /* XXX: should use `#if __STDC_VERSION__ < 199901'. */
 #if !__GNUC_PREREQ__(2, 7) && !defined(__INTEL_COMPILER)
 #define	__func__	NULL
@@ -299,6 +306,17 @@
 
 #if (defined(__INTEL_COMPILER) || (defined(__GNUC__) && __GNUC__ >= 2)) && !defined(__STRICT_ANSI__) || __STDC_VERSION__ >= 199901
 #define	__LONG_LONG_SUPPORTED
+#endif
+
+/* C++11 exposes a load of C99 stuff */
+#if defined(__cplusplus) && __cplusplus >= 201103L
+#define	__LONG_LONG_SUPPORTED
+#ifndef	__STDC_LIMIT_MACROS
+#define	__STDC_LIMIT_MACROS
+#endif
+#ifndef	__STDC_CONSTANT_MACROS
+#define	__STDC_CONSTANT_MACROS
+#endif
 #endif
 
 /*
@@ -389,12 +407,18 @@
 #define	__printflike(fmtarg, firstvararg)
 #define	__scanflike(fmtarg, firstvararg)
 #define	__format_arg(fmtarg)
+#define	__strfmonlike(fmtarg, firstvararg)
+#define	__strftimelike(fmtarg, firstvararg)
 #else
 #define	__printflike(fmtarg, firstvararg) \
 	    __attribute__((__format__ (__printf__, fmtarg, firstvararg)))
 #define	__scanflike(fmtarg, firstvararg) \
 	    __attribute__((__format__ (__scanf__, fmtarg, firstvararg)))
 #define	__format_arg(fmtarg)	__attribute__((__format_arg__ (fmtarg)))
+#define	__strfmonlike(fmtarg, firstvararg) \
+	    __attribute__((__format__ (__strfmon__, fmtarg, firstvararg)))
+#define	__strftimelike(fmtarg, firstvararg) \
+	    __attribute__((__format__ (__strftime__, fmtarg, firstvararg)))
 #endif
 
 /* Compiler-dependent macros that rely on FreeBSD-specific extensions. */
@@ -631,6 +655,10 @@
 #endif
 #ifndef	__has_builtin
 #define	__has_builtin(x) 0
+#endif
+
+#if defined(__mips) || defined(__powerpc64__) || defined(__arm__)
+#define __NO_TLS 1
 #endif
 
 #endif /* !_SYS_CDEFS_H_ */

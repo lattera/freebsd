@@ -79,12 +79,16 @@ SRCF=	absvdi2 \
 	floatuntidf \
 	floatuntisf \
 	floatuntixf \
+	int_util \
 	lshrdi3 \
 	lshrti3 \
 	moddi3 \
 	modti3 \
 	muldc3 \
 	muldi3 \
+	mulodi4 \
+	mulosi4 \
+	muloti4 \
 	mulsc3 \
 	multi3 \
 	mulvdi3 \
@@ -144,6 +148,26 @@ SRCF+=	adddf3 \
 	umodsi3
 .endif
 
+# FreeBSD-specific atomic intrinsics.
+.if ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "mips"
+SRCF+=	__sync_fetch_and_add_4 \
+	__sync_fetch_and_and_4 \
+	__sync_fetch_and_or_4 \
+	__sync_fetch_and_sub_4 \
+	__sync_fetch_and_xor_4 \
+	__sync_lock_test_and_set_4 \
+	__sync_val_compare_and_swap_4
+.endif
+.if ${MACHINE_ARCH:Mmips64*} != ""
+SRCF+=	__sync_fetch_and_add_8 \
+	__sync_fetch_and_and_8 \
+	__sync_fetch_and_or_8 \
+	__sync_fetch_and_sub_8 \
+	__sync_fetch_and_xor_8 \
+	__sync_lock_test_and_set_8 \
+	__sync_val_compare_and_swap_8
+.endif
+
 .for file in ${SRCF}
 . if ${MACHINE_CPUARCH} != "arm" && exists(${CRTSRC}/${CRTARCH}/${file}.S)
 SRCS+=	${file}.S
@@ -152,7 +176,7 @@ SRCS+=	${file}.c
 . endif
 .endfor
 
-.if ${MACHINE_CPUARCH} != "sparc64" && ${MACHINE_CPUARCH} != "mips"
+.if ${MACHINE_CPUARCH} != "mips"
 . if ${MK_INSTALLLIB} != "no"
 SYMLINKS+=libcompiler_rt.a ${LIBDIR}/libgcc.a
 . endif

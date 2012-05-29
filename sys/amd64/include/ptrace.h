@@ -35,7 +35,12 @@
 
 #define	__HAVE_PTRACE_MACHDEP
 
-#define PT_GETXSTATE	(PT_FIRSTMACH + 0)
-#define PT_SETXSTATE	(PT_FIRSTMACH + 1)
+/*
+ * On amd64 (PT_FIRSTMACH + 0) and (PT_FIRSTMACH + 1) are old values for
+ * PT_GETXSTATE and PT_SETXSTATE.  They should not be (re)used.
+ */
+
+#define	PT_GETXSTATE	(PT_FIRSTMACH + 2)
+#define	PT_SETXSTATE	(PT_FIRSTMACH + 3)
 
 #endif
