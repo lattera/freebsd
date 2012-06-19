@@ -1962,6 +1962,7 @@ kern_sendfile(struct thread *td, struct sendfile_args *uap,
 	 * and takes care of the overall progress.
 	 */
 	for (off = uap->offset, rem = uap->nbytes; ; ) {
+		struct mbuf *mtail = NULL;
 		int loopbytes = 0;
 		int space = 0;
 		int done = 0;
@@ -2181,10 +2182,13 @@ retry_space:
 			m0->m_len = xfsize;
 
 			/* Append to mbuf chain. */
-			if (m != NULL)
-				m_cat(m, m0);
+			if (mtail != NULL)
+				mtail->m_next = m0;
+			else if (m != NULL)
+				m_last(m)->m_next = m0;
 			else
 				m = m0;
+			mtail = m0;
 
 			/* Keep track of bits processed. */
 			loopbytes += xfsize;
@@ -2323,11 +2327,11 @@ sys_sctp_peeloff(td, uap)
 		goto done2;
 	if (head->so_proto->pr_protocol != IPPROTO_SCTP) {
 		error = EOPNOTSUPP;
-		goto done2;
+		goto done;
 	}
 	error = sctp_can_peel_off(head, (sctp_assoc_t)uap->name);
 	if (error)
-		goto done2;
+		goto done;
 	/*
 	 * At this point we know we do have a assoc to pull
 	 * we proceed to get the fd setup. This may block

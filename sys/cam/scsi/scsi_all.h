@@ -1267,6 +1267,8 @@ struct scsi_vpd_id_descriptor
 #define	SCSI_PROTO_RDMA		0x04
 #define SCSI_PROTO_iSCSI	0x05
 #define	SCSI_PROTO_SAS		0x06
+#define	SCSI_PROTO_ADT		0x07
+#define	SCSI_PROTO_ATA		0x08
 #define	SVPD_ID_PROTO_SHIFT	4
 #define	SVPD_ID_CODESET_BINARY	0x01
 #define	SVPD_ID_CODESET_ASCII	0x02
@@ -1398,6 +1400,13 @@ struct scsi_service_action_in
 	uint8_t service_action;
 	uint8_t action_dependent[13];
 	uint8_t control;
+};
+
+struct scsi_diag_page {
+	uint8_t page_code;
+	uint8_t page_specific_flags;
+	uint8_t length[2];
+	uint8_t params[0];
 };
 
 struct scsi_read_capacity
@@ -2163,12 +2172,6 @@ int		scsi_sense_sbuf(struct ccb_scsiio *csio, struct sbuf *sb,
 char *		scsi_sense_string(struct ccb_scsiio *csio,
 				  char *str, int str_len);
 void		scsi_sense_print(struct ccb_scsiio *csio);
-int		scsi_interpret_sense(union ccb *ccb, 
-				     u_int32_t sense_flags,
-				     u_int32_t *relsim_flags, 
-				     u_int32_t *reduction,
-				     u_int32_t *timeout,
-				     scsi_sense_action error_action);
 #else /* _KERNEL */
 int		scsi_command_string(struct cam_device *device,
 				    struct ccb_scsiio *csio, struct sbuf *sb);
@@ -2180,13 +2183,6 @@ char *		scsi_sense_string(struct cam_device *device,
 				  char *str, int str_len);
 void		scsi_sense_print(struct cam_device *device, 
 				 struct ccb_scsiio *csio, FILE *ofile);
-int		scsi_interpret_sense(struct cam_device *device,
-				     union ccb *ccb,
-				     u_int32_t sense_flags,
-				     u_int32_t *relsim_flags, 
-				     u_int32_t *reduction,
-				     u_int32_t *timeout,
-				     scsi_sense_action error_action);
 #endif /* _KERNEL */
 
 #define	SF_RETRY_UA	0x01
@@ -2341,6 +2337,20 @@ void scsi_send_diagnostic(struct ccb_scsiio *csio, u_int32_t retries,
 			  int self_test_code, uint8_t *data_ptr,
 			  uint16_t param_list_length, uint8_t sense_len,
 			  uint32_t timeout);
+
+void scsi_read_buffer(struct ccb_scsiio *csio, u_int32_t retries,
+			void (*cbfcnp)(struct cam_periph *, union ccb*),
+			uint8_t tag_action, int mode,
+			uint8_t buffer_id, u_int32_t offset,
+			uint8_t *data_ptr, uint32_t allocation_length,
+			uint8_t sense_len, uint32_t timeout);
+
+void scsi_write_buffer(struct ccb_scsiio *csio, u_int32_t retries,
+			void (*cbfcnp)(struct cam_periph *, union ccb *),
+			uint8_t tag_action, int mode,
+			uint8_t buffer_id, u_int32_t offset,
+			uint8_t *data_ptr, uint32_t param_list_length,
+			uint8_t sense_len, uint32_t timeout);
 
 void scsi_read_write(struct ccb_scsiio *csio, u_int32_t retries,
 		     void (*cbfcnp)(struct cam_periph *, union ccb *),
