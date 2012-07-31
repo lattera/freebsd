@@ -97,15 +97,13 @@ typedef enum {
 	CD_FLAG_NEW_DISC	= 0x0002,
 	CD_FLAG_DISC_LOCKED	= 0x0004,
 	CD_FLAG_DISC_REMOVABLE	= 0x0008,
-	CD_FLAG_TAGGED_QUEUING	= 0x0010,
 	CD_FLAG_CHANGER		= 0x0040,
 	CD_FLAG_ACTIVE		= 0x0080,
 	CD_FLAG_SCHED_ON_COMP	= 0x0100,
 	CD_FLAG_RETRY_UA	= 0x0200,
 	CD_FLAG_VALID_MEDIA	= 0x0400,
 	CD_FLAG_VALID_TOC	= 0x0800,
-	CD_FLAG_SCTX_INIT	= 0x1000,
-	CD_FLAG_OPEN		= 0x2000
+	CD_FLAG_SCTX_INIT	= 0x1000
 } cd_flags;
 
 typedef enum {
@@ -358,6 +356,20 @@ cdinit(void)
 	}
 }
 
+/*
+ * Callback from GEOM, called when it has finished cleaning up its
+ * resources.
+ */
+static void
+cddiskgonecb(struct disk *dp)
+{
+	struct cam_periph *periph;
+
+	periph = (struct cam_periph *)dp->d_drv1;
+
+	cam_periph_release(periph);
+}
+
 static void
 cdoninvalidate(struct cam_periph *periph)
 {
@@ -389,7 +401,7 @@ cdoninvalidate(struct cam_periph *periph)
 		camq_remove(&softc->changer->devq, softc->pinfo.index);
 
 	disk_gone(softc->disk);
-	xpt_print(periph->path, "lost device\n");
+	xpt_print(periph->path, "lost device, %d refs\n", periph->refcount);
 }
 
 static void
@@ -652,8 +664,6 @@ cdregister(struct cam_periph *periph, void *arg)
 	bioq_init(&softc->bio_queue);
 	if (SID_IS_REMOVABLE(&cgd->inq_data))
 		softc->flags |= CD_FLAG_DISC_REMOVABLE;
-	if ((cgd->inq_data.flags & SID_CmdQue) != 0)
-		softc->flags |= CD_FLAG_TAGGED_QUEUING;
 
 	periph->softc = softc;
 	softc->periph = periph;
@@ -728,6 +738,7 @@ cdregister(struct cam_periph *periph, void *arg)
 	softc->disk->d_open = cdopen;
 	softc->disk->d_close = cdclose;
 	softc->disk->d_strategy = cdstrategy;
+	softc->disk->d_gone = cddiskgonecb;
 	softc->disk->d_ioctl = cdioctl;
 	softc->disk->d_name = "cd";
 	cam_strvis(softc->disk->d_descr, cgd->inq_data.vendor,
@@ -749,6 +760,19 @@ cdregister(struct cam_periph *periph, void *arg)
 	softc->disk->d_hba_device = cpi.hba_device;
 	softc->disk->d_hba_subvendor = cpi.hba_subvendor;
 	softc->disk->d_hba_subdevice = cpi.hba_subdevice;
+
+	/*
+	 * Acquire a reference to the periph before we register with GEOM.
+	 * We'll release this reference once GEOM calls us back (via
+	 * dadiskgonecb()) telling us that our provider has been freed.
+	 */
+	if (cam_periph_acquire(periph) != CAM_REQ_CMP) {
+		xpt_print(periph->path, "%s: lost periph during "
+			  "registration!\n", __func__);
+		cam_periph_lock(periph);
+		return (CAM_REQ_CMP_ERR);
+	}
+
 	disk_create(softc->disk, DISK_VERSION);
 	cam_periph_lock(periph);
 
@@ -1002,16 +1026,19 @@ cdopen(struct disk *dp)
 	cam_periph_lock(periph);
 
 	if (softc->flags & CD_FLAG_INVALID) {
+		cam_periph_release_locked(periph);
 		cam_periph_unlock(periph);
-		cam_periph_release(periph);
 		return(ENXIO);
 	}
 
 	if ((error = cam_periph_hold(periph, PRIBIO | PCATCH)) != 0) {
+		cam_periph_release_locked(periph);
 		cam_periph_unlock(periph);
-		cam_periph_release(periph);
 		return (error);
 	}
+
+	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE | CAM_DEBUG_PERIPH,
+	    ("cdopen\n"));
 
 	/*
 	 * Check for media, and set the appropriate flags.  We don't bail
@@ -1023,14 +1050,7 @@ cdopen(struct disk *dp)
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, ("leaving cdopen\n"));
 	cam_periph_unhold(periph);
 
-	/* Closes aren't symmetrical with opens, so fix up the refcounting. */
-	if ((softc->flags & CD_FLAG_OPEN) == 0) {
-		softc->flags |= CD_FLAG_OPEN;
-		cam_periph_unlock(periph);
-	} else {
-		cam_periph_unlock(periph);
-		cam_periph_release(periph);
-	}
+	cam_periph_unlock(periph);
 
 	return (0);
 }
@@ -1048,7 +1068,14 @@ cdclose(struct disk *dp)
 	softc = (struct cd_softc *)periph->softc;
 
 	cam_periph_lock(periph);
-	cam_periph_hold(periph, PRIBIO);
+	if (cam_periph_hold(periph, PRIBIO) != 0) {
+		cam_periph_unlock(periph);
+		cam_periph_release(periph);
+		return (0);
+	}
+
+	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE | CAM_DEBUG_PERIPH,
+	    ("cdclose\n"));
 
 	if ((softc->flags & CD_FLAG_DISC_REMOVABLE) != 0)
 		cdprevent(periph, PR_ALLOW);
@@ -1062,11 +1089,11 @@ cdclose(struct disk *dp)
 	/*
 	 * We'll check the media and toc again at the next open().
 	 */
-	softc->flags &= ~(CD_FLAG_VALID_MEDIA|CD_FLAG_VALID_TOC|CD_FLAG_OPEN);
+	softc->flags &= ~(CD_FLAG_VALID_MEDIA|CD_FLAG_VALID_TOC);
 
 	cam_periph_unhold(periph);
+	cam_periph_release_locked(periph);
 	cam_periph_unlock(periph);
-	cam_periph_release(periph);
 
 	return (0);
 }
@@ -1394,7 +1421,8 @@ cdstrategy(struct bio *bp)
 	}
 
 	cam_periph_lock(periph);
-	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, ("entering cdstrategy\n"));
+	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE,
+	    ("cdstrategy(%p)\n", bp));
 
 	softc = (struct cd_softc *)periph->softc;
 
@@ -1860,12 +1888,11 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 		return(ENXIO);	
 
 	cam_periph_lock(periph);
-	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, ("entering cdioctl\n"));
 
 	softc = (struct cd_softc *)periph->softc;
 
-	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, 
-		  ("trying to do ioctl %#lx\n", cmd));
+	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE,
+	    ("cdioctl(%#lx)\n", cmd));
 
 	if ((error = cam_periph_hold(periph, PRIBIO | PCATCH)) != 0) {
 		cam_periph_unlock(periph);

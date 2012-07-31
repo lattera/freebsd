@@ -298,8 +298,7 @@ decrease_reservation(unsigned long nr_pages)
 		nr_pages = ARRAY_SIZE(frame_list);
 
 	for (i = 0; i < nr_pages; i++) {
-		int color = 0;
-		if ((page = vm_page_alloc(NULL, color++, 
+		if ((page = vm_page_alloc(NULL, 0, 
 			    VM_ALLOC_NORMAL | VM_ALLOC_NOOBJ | 
 			    VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL) {
 			nr_pages = i;
@@ -436,6 +435,9 @@ static void
 balloon_init_watcher(void *arg)
 {
 	int err;
+
+	if (!is_running_on_xen())
+		return;
 
 	err = xs_register_watch(&target_watch);
 	if (err)

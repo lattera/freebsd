@@ -38,6 +38,11 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20120713: auth.conf removed
+OLD_FILES+=etc/auth.conf
+OLD_FILES+=usr/share/examples/etc/auth.conf
+OLD_FILES+=usr/share/man/man3/auth.3.gz
+OLD_FILES+=usr/share/man/man5/auth.conf.5.gz
 # 20120415: new clang import which bumps version from 3.0 to 3.1
 OLD_FILES+=usr/include/clang/3.0/altivec.h
 OLD_FILES+=usr/include/clang/3.0/avxintrin.h
@@ -677,6 +682,8 @@ OLD_LIBS+=usr/lib32/pam_tacplus.so.4
 OLD_LIBS+=usr/lib32/pam_unix.so.4
 # 20090718: the gdm pam.d file is no longer required.
 OLD_FILES+=etc/pam.d/gdm
+# 20090714: net_add_domain(9) renamed to domain_add(9)
+OLD_FILES+=usr/share/man/man9/net_add_domain.9.gz
 # 20090713: vimage container structs removed.
 OLD_FILES+=usr/include/netinet/vinet.h
 OLD_FILES+=usr/include/netinet6/vinet6.h

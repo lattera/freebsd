@@ -559,6 +559,7 @@ vendor APACER		0x1005	Apacer
 vendor MOTOROLA4	0x100d	Motorola
 vendor AIRPLUS		0x1011  Airplus
 vendor DESKNOTE		0x1019	Desknote
+vendor NEC3		0x1033	NEC
 vendor GIGABYTE		0x1044	GIGABYTE
 vendor WESTERN		0x1058	Western Digital
 vendor MOTOROLA		0x1063	Motorola
@@ -1604,8 +1605,9 @@ product FTDI SERIAL_8U232AM	0x6001	8U232AM Serial
 product FTDI SERIAL_8U232AM4	0x6004	8U232AM Serial
 product FTDI SERIAL_2232C	0x6010	FT2232C Dual port Serial
 product FTDI SERIAL_2232D	0x9e90	FT2232D Dual port Serial
-product FTDI BEAGLEBONE		0xA6D0  BeagleBone
 product FTDI SERIAL_4232H	0x6011	FT4232H Quad port Serial
+product FTDI BEAGLEBONE		0xa6d0	BeagleBone
+product FTDI TURTELIZER2	0xbdc8	egnite Turtelizer 2 JTAG/RS232 Adapter
 /* Gude Analog- und Digitalsysteme products also uses FTDI's id: */
 product FTDI TACTRIX_OPENPORT_13M 0xcc48 OpenPort 1.3 Mitsubishi
 product FTDI TACTRIX_OPENPORT_13S 0xcc49 OpenPort 1.3 Subaru
@@ -1915,6 +1917,7 @@ product INSYSTEM STORAGE_V2	0x5701	USB Storage Adapter V2
 product INTEL EASYPC_CAMERA	0x0110	Easy PC Camera
 product INTEL TESTBOARD		0x9890	82930 test board
 product INTEL2 IRMH        	0x0020	Integrated Rate Matching Hub
+product INTEL2 IRMH2        	0x0024	Integrated Rate Matching Hub
 
 /* Intersil products */
 product INTERSIL PRISM_GT	0x1000	PrismGT USB 2.0 WLAN

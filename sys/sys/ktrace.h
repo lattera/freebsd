@@ -135,9 +135,15 @@ struct ktr_psig {
  * KTR_CSW - trace context switches
  */
 #define KTR_CSW		6
+struct ktr_csw_old {
+	int	out;	/* 1 if switch out, 0 if switch in */
+	int	user;	/* 1 if usermode (ivcsw), 0 if kernel (vcsw) */
+};
+
 struct ktr_csw {
 	int	out;	/* 1 if switch out, 0 if switch in */
 	int	user;	/* 1 if usermode (ivcsw), 0 if kernel (vcsw) */
+	char	wmesg[8];
 };
 
 /*
@@ -178,6 +184,23 @@ struct ktr_proc_ctor {
 #define KTR_PROCDTOR	11
 
 /*
+ * KTR_FAULT - page fault record
+ */
+#define KTR_FAULT	13
+struct ktr_fault {
+	vm_offset_t vaddr;
+	int type;
+};
+
+/*
+ * KTR_FAULTEND - end of page fault record
+ */
+#define KTR_FAULTEND	14
+struct ktr_faultend {
+	int result;
+};
+
+/*
  * KTR_DROP - If this bit is set in ktr_type, then at least one event
  * between the previous record and this record was dropped.
  */
@@ -198,6 +221,8 @@ struct ktr_proc_ctor {
 #define KTRFAC_SYSCTL	(1<<KTR_SYSCTL)
 #define KTRFAC_PROCCTOR	(1<<KTR_PROCCTOR)
 #define KTRFAC_PROCDTOR	(1<<KTR_PROCDTOR)
+#define KTRFAC_FAULT	(1<<KTR_FAULT)
+#define KTRFAC_FAULTEND	(1<<KTR_FAULTEND)
 
 /*
  * trace flags (also in p_traceflags)
@@ -208,8 +233,10 @@ struct ktr_proc_ctor {
 
 #ifdef	_KERNEL
 void	ktrnamei(char *);
-void	ktrcsw(int, int);
+void	ktrcsw(int, int, const char *);
 void	ktrpsig(int, sig_t, sigset_t *, int);
+void	ktrfault(vm_offset_t, int);
+void	ktrfaultend(int);
 void	ktrgenio(int, enum uio_rw, struct uio *, int);
 void	ktrsyscall(int, int narg, register_t args[]);
 void	ktrsysctl(int *name, u_int namelen);

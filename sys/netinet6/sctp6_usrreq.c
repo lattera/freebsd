@@ -1,7 +1,7 @@
 /*-
  * Copyright (c) 2001-2007, by Cisco Systems, Inc. All rights reserved.
- * Copyright (c) 2008-2011, by Randall Stewart. All rights reserved.
- * Copyright (c) 2008-2011, by Michael Tuexen. All rights reserved.
+ * Copyright (c) 2008-2012, by Randall Stewart. All rights reserved.
+ * Copyright (c) 2008-2012, by Michael Tuexen. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -29,17 +29,17 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*	$KAME: sctp6_usrreq.c,v 1.38 2005/08/24 08:08:56 suz Exp $	*/
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
 #include <netinet/sctp_os.h>
+#ifdef INET6
 #include <sys/proc.h>
 #include <netinet/sctp_pcb.h>
 #include <netinet/sctp_header.h>
 #include <netinet/sctp_var.h>
-#if defined(INET6)
+#ifdef INET6
 #include <netinet6/sctp6_var.h>
 #endif
 #include <netinet/sctp_sysctl.h>
@@ -58,7 +58,7 @@ __FBSDID("$FreeBSD$");
 
 #ifdef IPSEC
 #include <netipsec/ipsec.h>
-#if defined(INET6)
+#ifdef INET6
 #include <netipsec/ipsec6.h>
 #endif				/* INET6 */
 #endif				/* IPSEC */
@@ -85,6 +85,8 @@ sctp6_input(struct mbuf **i_pak, int *offp, int proto)
 	uint8_t ecn_bits;
 	struct sctp_tcb *stcb = NULL;
 	int pkt_len = 0;
+	uint32_t mflowid;
+	uint8_t use_mflowid;
 
 #if !defined(SCTP_WITH_NO_CSUM)
 	uint32_t check, calc_check;
@@ -104,6 +106,13 @@ sctp6_input(struct mbuf **i_pak, int *offp, int proto)
 #ifdef  SCTP_PACKET_LOGGING
 	sctp_packet_log(m, pkt_len);
 #endif
+	if (m->m_flags & M_FLOWID) {
+		mflowid = m->m_pkthdr.flowid;
+		use_mflowid = 1;
+	} else {
+		mflowid = 0;
+		use_mflowid = 0;
+	}
 	ip6 = mtod(m, struct ip6_hdr *);
 	/* Ensure that (sctphdr + sctp_chunkhdr) in a row. */
 	IP6_EXTHDR_GET(sh, struct sctphdr *, m, off,
@@ -151,11 +160,6 @@ sctp6_input(struct mbuf **i_pak, int *offp, int proto)
 		goto sctp_skip_csum;
 	}
 	check = sh->checksum;	/* save incoming checksum */
-	if ((check == 0) && (SCTP_BASE_SYSCTL(sctp_no_csum_on_loopback)) &&
-	    (IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, &ip6->ip6_dst))) {
-		SCTP_STAT_INCR(sctps_recvnocrc);
-		goto sctp_skip_csum;
-	}
 	sh->checksum = 0;	/* prepare for calc */
 	calc_check = sctp_calculate_cksum(m, iphlen);
 	SCTP_STAT_INCR(sctps_recvswcrc);
@@ -170,8 +174,8 @@ sctp6_input(struct mbuf **i_pak, int *offp, int proto)
 			}
 			net->port = port;
 		}
-		if ((net != NULL) && (m->m_flags & M_FLOWID)) {
-			net->flowid = m->m_pkthdr.flowid;
+		if ((net != NULL) && (use_mflowid != 0)) {
+			net->flowid = mflowid;
 #ifdef INVARIANTS
 			net->flowidset = 1;
 #endif
@@ -204,8 +208,8 @@ sctp_skip_csum:
 		}
 		net->port = port;
 	}
-	if ((net != NULL) && (m->m_flags & M_FLOWID)) {
-		net->flowid = m->m_pkthdr.flowid;
+	if ((net != NULL) && (use_mflowid != 0)) {
+		net->flowid = mflowid;
 #ifdef INVARIANTS
 		net->flowidset = 1;
 #endif
@@ -230,7 +234,9 @@ sctp_skip_csum:
 				sh->v_tag = 0;
 		}
 		if (ch->chunk_type == SCTP_SHUTDOWN_ACK) {
-			sctp_send_shutdown_complete2(m, sh, vrf_id, port);
+			sctp_send_shutdown_complete2(m, sh,
+			    use_mflowid, mflowid,
+			    vrf_id, port);
 			goto bad;
 		}
 		if (ch->chunk_type == SCTP_SHUTDOWN_COMPLETE) {
@@ -240,7 +246,9 @@ sctp_skip_csum:
 			if ((SCTP_BASE_SYSCTL(sctp_blackhole) == 0) ||
 			    ((SCTP_BASE_SYSCTL(sctp_blackhole) == 1) &&
 			    (ch->chunk_type != SCTP_INIT))) {
-				sctp_send_abort(m, iphlen, sh, 0, NULL, vrf_id, port);
+				sctp_send_abort(m, iphlen, sh, 0, NULL,
+				    use_mflowid, mflowid,
+				    vrf_id, port);
 			}
 		}
 		goto bad;
@@ -270,7 +278,9 @@ sctp_skip_csum:
 
 	/* sa_ignore NO_NULL_CHK */
 	sctp_common_input_processing(&m, iphlen, offset, length, sh, ch,
-	    in6p, stcb, net, ecn_bits, vrf_id, port);
+	    in6p, stcb, net, ecn_bits,
+	    use_mflowid, mflowid,
+	    vrf_id, port);
 	/* inp's ref-count reduced && stcb unlocked */
 	/* XXX this stuff below gets moved to appropriate parts later... */
 	if (m)
@@ -388,10 +398,8 @@ sctp6_notify(struct sctp_inpcb *inp,
 	struct socket *so;
 
 #endif
+
 	/* protection */
-	int reason;
-
-
 	if ((inp == NULL) || (stcb == NULL) || (net == NULL) ||
 	    (sh == NULL) || (to == NULL)) {
 		if (stcb)
@@ -428,8 +436,7 @@ sctp6_notify(struct sctp_inpcb *inp,
 			net->dest_state &= ~SCTP_ADDR_REACHABLE;
 			net->dest_state &= ~SCTP_ADDR_PF;
 			sctp_ulp_notify(SCTP_NOTIFY_INTERFACE_DOWN,
-			    stcb, SCTP_FAILED_THRESHOLD,
-			    (void *)net, SCTP_SO_NOT_LOCKED);
+			    stcb, 0, (void *)net, SCTP_SO_NOT_LOCKED);
 		}
 		SCTP_TCB_UNLOCK(stcb);
 	} else if ((icmph->icmp6_code == ICMP_UNREACH_PROTOCOL) ||
@@ -441,8 +448,7 @@ sctp6_notify(struct sctp_inpcb *inp,
 		 * now is dead. In either case treat it like a OOTB abort
 		 * with no TCB
 		 */
-		reason = SCTP_PEER_FAULTY;
-		sctp_abort_notification(stcb, reason, SCTP_SO_NOT_LOCKED);
+		sctp_abort_notification(stcb, 1, 0, NULL, SCTP_SO_NOT_LOCKED);
 #if defined (__APPLE__) || defined(SCTP_SO_LOCK_TESTING)
 		so = SCTP_INP_SO(inp);
 		atomic_add_int(&stcb->asoc.refcnt, 1);
@@ -1349,3 +1355,5 @@ struct pr_usrreqs sctp6_usrreqs = {
 	.pru_sosend = sctp_sosend,
 	.pru_soreceive = sctp_soreceive
 };
+
+#endif

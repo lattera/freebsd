@@ -179,7 +179,6 @@ struct pfr_walktree {
 VNET_DEFINE(uma_zone_t,			pfr_ktable_pl);
 VNET_DEFINE(uma_zone_t,			pfr_kentry_pl);
 VNET_DEFINE(uma_zone_t,			pfr_kcounters_pl);
-#define	V_pfr_kcounters_pl		VNET(pfr_kcounters_pl)
 VNET_DEFINE(struct sockaddr_in,		pfr_sin);
 #define	V_pfr_sin			VNET(pfr_sin)
 VNET_DEFINE(struct sockaddr_in6,	pfr_sin6);
@@ -927,16 +926,12 @@ pfr_create_kentry(struct pfr_addr *ad, int intr)
 {
 	struct pfr_kentry	*ke;
 
+#ifdef __FreeBSD__
+	ke =  pool_get(&V_pfr_kentry_pl, PR_NOWAIT | PR_ZERO);
+#else
 	if (intr)
-#ifdef __FreeBSD__
-		ke = pool_get(&V_pfr_kentry_pl, PR_NOWAIT | PR_ZERO);
-#else
 		ke = pool_get(&pfr_kentry_pl, PR_NOWAIT | PR_ZERO);
-#endif
 	else
-#ifdef __FreeBSD__
-		ke = pool_get(&V_pfr_kentry_pl, PR_WAITOK|PR_ZERO);
-#else
 		ke = pool_get(&pfr_kentry_pl, PR_WAITOK|PR_ZERO|PR_LIMITFAIL);
 #endif
 	if (ke == NULL)
@@ -2081,16 +2076,12 @@ pfr_create_ktable(struct pfr_table *tbl, long tzero, int attachruleset,
 	struct pfr_ktable	*kt;
 	struct pf_ruleset	*rs;
 
+#ifdef __FreeBSD__
+	kt = pool_get(&V_pfr_ktable_pl, PR_NOWAIT|PR_ZERO);
+#else
 	if (intr)
-#ifdef __FreeBSD__
-		kt = pool_get(&V_pfr_ktable_pl, PR_NOWAIT|PR_ZERO);
-#else
 		kt = pool_get(&pfr_ktable_pl, PR_NOWAIT|PR_ZERO|PR_LIMITFAIL);
-#endif
 	else
-#ifdef __FreeBSD__
-		kt = pool_get(&V_pfr_ktable_pl, PR_WAITOK|PR_ZERO);
-#else
 		kt = pool_get(&pfr_ktable_pl, PR_WAITOK|PR_ZERO|PR_LIMITFAIL);
 #endif
 	if (kt == NULL)

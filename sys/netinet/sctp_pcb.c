@@ -1,7 +1,7 @@
 /*-
  * Copyright (c) 2001-2008, by Cisco Systems, Inc. All rights reserved.
- * Copyright (c) 2008-2011, by Randall Stewart. All rights reserved.
- * Copyright (c) 2008-2011, by Michael Tuexen. All rights reserved.
+ * Copyright (c) 2008-2012, by Randall Stewart. All rights reserved.
+ * Copyright (c) 2008-2012, by Michael Tuexen. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -29,8 +29,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-/* $KAME: sctp_pcb.c,v 1.38 2005/03/06 16:04:18 itojun Exp $	 */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -2189,8 +2187,6 @@ sctp_findassociation_addr(struct mbuf *m, int offset,
 			from6->sin6_addr = ip6->ip6_src;
 			from6->sin6_port = sh->src_port;
 			/* Get the scopes in properly to the sin6 addr's */
-			/* we probably don't need these operations */
-			(void)sa6_recoverscope(from6);
 			sa6_embedscope(from6, MODULE_GLOBAL(ip6_use_defzone));
 			break;
 		}
@@ -2232,8 +2228,6 @@ sctp_findassociation_addr(struct mbuf *m, int offset,
 			to6->sin6_addr = ip6->ip6_dst;
 			to6->sin6_port = sh->dest_port;
 			/* Get the scopes in properly to the sin6 addr's */
-			/* we probably don't need these operations */
-			(void)sa6_recoverscope(to6);
 			sa6_embedscope(to6, MODULE_GLOBAL(ip6_use_defzone));
 			break;
 		}
@@ -3131,6 +3125,7 @@ continue_anyway:
 
 		memset(&store_sa, 0, sizeof(store_sa));
 		switch (addr->sa_family) {
+#ifdef INET
 		case AF_INET:
 			{
 				struct sockaddr_in *sin;
@@ -3140,6 +3135,8 @@ continue_anyway:
 				sin->sin_port = 0;
 				break;
 			}
+#endif
+#ifdef INET6
 		case AF_INET6:
 			{
 				struct sockaddr_in6 *sin6;
@@ -3149,6 +3146,7 @@ continue_anyway:
 				sin6->sin6_port = 0;
 				break;
 			}
+#endif
 		default:
 			break;
 		}
@@ -4986,30 +4984,25 @@ sctp_free_assoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb, int from_inpcbfre
 		/* now clean up any chunks here */
 		TAILQ_FOREACH_SAFE(sp, &outs->outqueue, next, nsp) {
 			TAILQ_REMOVE(&outs->outqueue, sp, next);
+			sctp_free_spbufspace(stcb, asoc, sp);
 			if (sp->data) {
 				if (so) {
 					/* Still an open socket - report */
 					sctp_ulp_notify(SCTP_NOTIFY_SPECIAL_SP_FAIL, stcb,
-					    SCTP_NOTIFY_DATAGRAM_UNSENT,
-					    (void *)sp, SCTP_SO_LOCKED);
+					    0, (void *)sp, SCTP_SO_LOCKED);
 				}
 				if (sp->data) {
 					sctp_m_freem(sp->data);
 					sp->data = NULL;
 					sp->tail_mbuf = NULL;
+					sp->length = 0;
 				}
 			}
 			if (sp->net) {
 				sctp_free_remote_addr(sp->net);
 				sp->net = NULL;
 			}
-			sctp_free_spbufspace(stcb, asoc, sp);
-			if (sp->holds_key_ref)
-				sctp_auth_key_release(stcb, sp->auth_keyid, SCTP_SO_LOCKED);
-			/* Free the zone stuff  */
-			SCTP_ZONE_FREE(SCTP_BASE_INFO(ipi_zone_strmoq), sp);
-			SCTP_DECR_STRMOQ_COUNT();
-			/* sa_ignore FREED_MEMORY */
+			sctp_free_a_strmoq(stcb, sp, SCTP_SO_LOCKED);
 		}
 	}
 	/* sa_ignore FREED_MEMORY */
@@ -5051,8 +5044,8 @@ sctp_free_assoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb, int from_inpcbfre
 		if (chk->data) {
 			if (so) {
 				/* Still a socket? */
-				sctp_ulp_notify(SCTP_NOTIFY_DG_FAIL, stcb,
-				    SCTP_NOTIFY_DATAGRAM_UNSENT, chk, SCTP_SO_LOCKED);
+				sctp_ulp_notify(SCTP_NOTIFY_UNSENT_DG_FAIL, stcb,
+				    0, chk, SCTP_SO_LOCKED);
 			}
 			if (chk->data) {
 				sctp_m_freem(chk->data);
@@ -5075,8 +5068,8 @@ sctp_free_assoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb, int from_inpcbfre
 		if (chk->data) {
 			if (so) {
 				/* Still a socket? */
-				sctp_ulp_notify(SCTP_NOTIFY_DG_FAIL, stcb,
-				    SCTP_NOTIFY_DATAGRAM_SENT, chk, SCTP_SO_LOCKED);
+				sctp_ulp_notify(SCTP_NOTIFY_SENT_DG_FAIL, stcb,
+				    0, chk, SCTP_SO_LOCKED);
 			}
 			if (chk->data) {
 				sctp_m_freem(chk->data);
@@ -5311,12 +5304,16 @@ sctp_destination_is_reachable(struct sctp_tcb *stcb, struct sockaddr *destaddr)
 	}
 	/* NOTE: all "scope" checks are done when local addresses are added */
 	switch (destaddr->sa_family) {
+#ifdef INET6
 	case AF_INET6:
 		answer = inp->ip_inp.inp.inp_vflag & INP_IPV6;
 		break;
+#endif
+#ifdef INET
 	case AF_INET:
 		answer = inp->ip_inp.inp.inp_vflag & INP_IPV4;
 		break;
+#endif
 	default:
 		/* invalid family, so it's unreachable */
 		answer = 0;
@@ -5407,7 +5404,7 @@ sctp_add_local_addr_ep(struct sctp_inpcb *inp, struct sctp_ifa *ifa, uint32_t ac
 			inp->ip_inp.inp.inp_vflag |= INP_IPV6;
 			break;
 #endif
-#ifdef INET6
+#ifdef INET
 		case AF_INET:
 			inp->ip_inp.inp.inp_vflag |= INP_IPV4;
 			break;
@@ -6347,7 +6344,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb, struct mbuf *m,
 							 * abort this guy
 							 */
 							sctp_abort_an_association(stcb_tmp->sctp_ep,
-							    stcb_tmp, 1, NULL, 0);
+							    stcb_tmp, NULL, SCTP_SO_NOT_LOCKED);
 							goto add_it_now;
 						}
 						SCTP_TCB_UNLOCK(stcb_tmp);
@@ -6438,7 +6435,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb, struct mbuf *m,
 							 * abort this guy
 							 */
 							sctp_abort_an_association(stcb_tmp->sctp_ep,
-							    stcb_tmp, 1, NULL, 0);
+							    stcb_tmp, NULL, SCTP_SO_NOT_LOCKED);
 							goto add_it_now6;
 						}
 					SCTP_TCB_UNLOCK(stcb_tmp);

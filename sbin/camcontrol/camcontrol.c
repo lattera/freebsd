@@ -86,7 +86,8 @@ typedef enum {
 	CAM_CMD_SMP_RG		= 0x00000018,
 	CAM_CMD_SMP_PC		= 0x00000019,
 	CAM_CMD_SMP_PHYLIST	= 0x0000001a,
-	CAM_CMD_SMP_MANINFO	= 0x0000001b
+	CAM_CMD_SMP_MANINFO	= 0x0000001b,
+	CAM_CMD_DOWNLOAD_FW	= 0x0000001c
 } cam_cmdmask;
 
 typedef enum {
@@ -122,6 +123,7 @@ typedef enum {
 	CAM_ARG_DEBUG_CDB	= 0x08000000,
 	CAM_ARG_DEBUG_XPT	= 0x10000000,
 	CAM_ARG_DEBUG_PERIPH	= 0x20000000,
+	CAM_ARG_DEBUG_PROBE	= 0x40000000,
 } cam_argmask;
 
 struct camcontrol_opts {
@@ -175,11 +177,12 @@ struct camcontrol_opts option_table[] = {
 	{"tags", CAM_CMD_TAG, CAM_ARG_NONE, "N:q"},
 	{"negotiate", CAM_CMD_RATE, CAM_ARG_NONE, negotiate_opts},
 	{"rate", CAM_CMD_RATE, CAM_ARG_NONE, negotiate_opts},
-	{"debug", CAM_CMD_DEBUG, CAM_ARG_NONE, "IPTSXc"},
+	{"debug", CAM_CMD_DEBUG, CAM_ARG_NONE, "IPTSXcp"},
 	{"format", CAM_CMD_FORMAT, CAM_ARG_NONE, "qrwy"},
 	{"idle", CAM_CMD_IDLE, CAM_ARG_NONE, "t:"},
 	{"standby", CAM_CMD_STANDBY, CAM_ARG_NONE, "t:"},
 	{"sleep", CAM_CMD_SLEEP, CAM_ARG_NONE, ""},
+	{"fwdownload", CAM_CMD_DOWNLOAD_FW, CAM_ARG_NONE, "f:ys"},
 #endif /* MINIMALISTIC */
 	{"help", CAM_CMD_USAGE, CAM_ARG_NONE, NULL},
 	{"-?", CAM_CMD_USAGE, CAM_ARG_NONE, NULL},
@@ -222,8 +225,6 @@ static int testunitready(struct cam_device *device, int retry_count,
 			 int timeout, int quiet);
 static int scsistart(struct cam_device *device, int startstop, int loadeject,
 		     int retry_count, int timeout);
-static int scsidoinquiry(struct cam_device *device, int argc, char **argv,
-			 char *combinedopt, int retry_count, int timeout);
 static int scsiinquiry(struct cam_device *device, int retry_count, int timeout);
 static int scsiserial(struct cam_device *device, int retry_count, int timeout);
 static int camxferrate(struct cam_device *device);
@@ -702,7 +703,7 @@ scsistart(struct cam_device *device, int startstop, int loadeject,
 	return(error);
 }
 
-static int
+int
 scsidoinquiry(struct cam_device *device, int argc, char **argv,
 	      char *combinedopt, int retry_count, int timeout)
 {
@@ -1798,13 +1799,14 @@ readdefects(struct cam_device *device, int argc, char **argv,
 	union ccb *ccb = NULL;
 	struct scsi_read_defect_data_10 *rdd_cdb;
 	u_int8_t *defect_list = NULL;
-	u_int32_t dlist_length = 65000;
+	u_int32_t max_dlist_length = SRDD10_MAX_LENGTH, dlist_length = 0;
 	u_int32_t returned_length = 0;
 	u_int32_t num_returned = 0;
 	u_int8_t returned_format;
 	unsigned int i;
 	int c, error = 0;
-	int lists_specified = 0;
+	int lists_specified;
+	int get_length = 1;
 
 	while ((c = getopt(argc, argv, combinedopt)) != -1) {
 		switch(c){
@@ -1841,19 +1843,32 @@ readdefects(struct cam_device *device, int argc, char **argv,
 	ccb = cam_getccb(device);
 
 	/*
-	 * Hopefully 65000 bytes is enough to hold the defect list.  If it
-	 * isn't, the disk is probably dead already.  We'd have to go with
-	 * 12 byte command (i.e. alloc_length is 32 bits instead of 16)
-	 * to hold them all.
+	 * Eventually we should probably support the 12 byte READ DEFECT
+	 * DATA command.  It supports a longer parameter list, which may be
+	 * necessary on newer drives with lots of defects.  According to
+	 * the SBC-3 spec, drives are supposed to return an illegal request
+	 * if they have more defect data than will fit in 64K.
 	 */
-	defect_list = malloc(dlist_length);
+	defect_list = malloc(max_dlist_length);
 	if (defect_list == NULL) {
 		warnx("can't malloc memory for defect list");
 		error = 1;
 		goto defect_bailout;
 	}
 
+	/*
+	 * We start off asking for just the header to determine how much
+	 * defect data is available.  Some Hitachi drives return an error
+	 * if you ask for more data than the drive has.  Once we know the
+	 * length, we retry the command with the returned length.
+	 */
+	dlist_length = sizeof(struct scsi_read_defect_data_hdr_10);
+
 	rdd_cdb =(struct scsi_read_defect_data_10 *)&ccb->csio.cdb_io.cdb_bytes;
+
+retry:
+
+	lists_specified = 0;
 
 	/*
 	 * cam_getccb() zeros the CCB header only.  So we need to zero the
@@ -1915,6 +1930,51 @@ readdefects(struct cam_device *device, int argc, char **argv,
 
 	returned_length = scsi_2btoul(((struct
 		scsi_read_defect_data_hdr_10 *)defect_list)->length);
+
+	if (get_length != 0) {
+		get_length = 0;
+
+		if ((ccb->ccb_h.status & CAM_STATUS_MASK) ==
+		     CAM_SCSI_STATUS_ERROR) {
+			struct scsi_sense_data *sense;
+			int error_code, sense_key, asc, ascq;
+
+			sense = &ccb->csio.sense_data;
+			scsi_extract_sense_len(sense, ccb->csio.sense_len -
+			    ccb->csio.sense_resid, &error_code, &sense_key,
+			    &asc, &ascq, /*show_errors*/ 1);
+
+			/*
+			 * If the drive is reporting that it just doesn't
+			 * support the defect list format, go ahead and use
+			 * the length it reported.  Otherwise, the length
+			 * may not be valid, so use the maximum.
+			 */
+			if ((sense_key == SSD_KEY_RECOVERED_ERROR)
+			 && (asc == 0x1c) && (ascq == 0x00)
+			 && (returned_length > 0)) {
+				dlist_length = returned_length +
+				    sizeof(struct scsi_read_defect_data_hdr_10);
+				dlist_length = min(dlist_length,
+						   SRDD10_MAX_LENGTH);
+			} else
+				dlist_length = max_dlist_length;
+		} else if ((ccb->ccb_h.status & CAM_STATUS_MASK) !=
+			    CAM_REQ_CMP){
+			error = 1;
+			warnx("Error reading defect header");
+			if (arglist & CAM_ARG_VERBOSE)
+				cam_error_print(device, ccb, CAM_ESF_ALL,
+						CAM_EPF_ALL, stderr);
+			goto defect_bailout;
+		} else {
+			dlist_length = returned_length +
+			    sizeof(struct scsi_read_defect_data_hdr_10);
+			dlist_length = min(dlist_length, SRDD10_MAX_LENGTH);
+		}
+
+		goto retry;
+	}
 
 	returned_format = ((struct scsi_read_defect_data_hdr_10 *)
 			defect_list)->format;
@@ -2640,6 +2700,10 @@ camdebug(int argc, char **argv, char *combinedopt)
 			arglist |= CAM_ARG_DEBUG_CDB;
 			ccb.cdbg.flags |= CAM_DEBUG_CDB;
 			break;
+		case 'p':
+			arglist |= CAM_ARG_DEBUG_PROBE;
+			ccb.cdbg.flags |= CAM_DEBUG_PROBE;
+			break;
 		default:
 			break;
 		}
@@ -2669,7 +2733,7 @@ camdebug(int argc, char **argv, char *combinedopt)
 		ccb.cdbg.flags = CAM_DEBUG_NONE;
 		arglist &= ~(CAM_ARG_DEBUG_INFO|CAM_ARG_DEBUG_PERIPH|
 			     CAM_ARG_DEBUG_TRACE|CAM_ARG_DEBUG_SUBTRACE|
-			     CAM_ARG_DEBUG_XPT);
+			     CAM_ARG_DEBUG_XPT|CAM_ARG_DEBUG_PROBE);
 	} else if (strncmp(tstr, "all", 3) != 0) {
 		tmpstr = (char *)strtok(tstr, ":");
 		if ((tmpstr != NULL) && (*tmpstr != '\0')){
@@ -3064,6 +3128,26 @@ get_cgd(struct cam_device *device, struct ccb_getdev *cgd)
 get_cgd_bailout:
 	cam_freeccb(ccb);
 	return(retval);
+}
+
+/* return the type of disk (really the command type) */
+static const char *
+get_disk_type(struct cam_device *device)
+{
+	struct ccb_getdev	cgd;
+
+	(void) memset(&cgd, 0x0, sizeof(cgd));
+	get_cgd(device, &cgd);
+	switch(cgd.protocol) {
+	case PROTO_SCSI:
+		return "scsi";
+	case PROTO_ATA:
+	case PROTO_ATAPI:
+	case PROTO_SATAPM:
+		return "ata";
+	default:
+		return "unknown";
+	}
 }
 
 static void
@@ -3639,7 +3723,7 @@ scsiformat(struct cam_device *device, int argc, char **argv,
 	union ccb *ccb;
 	int c;
 	int ycount = 0, quiet = 0;
-	int error = 0, response = 0, retval = 0;
+	int error = 0, retval = 0;
 	int use_timeout = 10800 * 1000;
 	int immediate = 1;
 	struct format_defect_list_header fh;
@@ -3693,27 +3777,7 @@ scsiformat(struct cam_device *device, int argc, char **argv,
 	}
 
 	if (ycount == 0) {
-
-		do {
-			char str[1024];
-
-			fprintf(stdout, "Are you SURE you want to do "
-				"this? (yes/no) ");
-
-			if (fgets(str, sizeof(str), stdin) != NULL) {
-
-				if (strncasecmp(str, "yes", 3) == 0)
-					response = 1;
-				else if (strncasecmp(str, "no", 2) == 0)
-					response = -1;
-				else {
-					fprintf(stdout, "Please answer"
-						" \"yes\" or \"no\"\n");
-				}
-			}
-		} while (response == 0);
-
-		if (response == -1) {
+		if (!get_confirmation()) {
 			error = 1;
 			goto scsiformat_bailout;
 		}
@@ -5760,6 +5824,7 @@ usage(int verbose)
 "        camcontrol idle       [dev_id][generic args][-t time]\n"
 "        camcontrol standby    [dev_id][generic args][-t time]\n"
 "        camcontrol sleep      [dev_id][generic args]\n"
+"        camcontrol fwdownload [dev_id][generic args] <-f fw_image> [-y][-s]\n"
 #endif /* MINIMALISTIC */
 "        camcontrol help\n");
 	if (!verbose)
@@ -5795,6 +5860,7 @@ usage(int verbose)
 "idle        send the ATA IDLE command to the named device\n"
 "standby     send the ATA STANDBY command to the named device\n"
 "sleep       send the ATA SLEEP command to the named device\n"
+"fwdownload  program firmware of the named device with the given image"
 "help        this message\n"
 "Device Identifiers:\n"
 "bus:target        specify the bus and target, lun defaults to 0\n"
@@ -5886,7 +5952,12 @@ usage(int verbose)
 "-w                don't send immediate format command\n"
 "-y                don't ask any questions\n"
 "idle/standby arguments:\n"
-"-t <arg>          number of seconds before respective state.\n");
+"-t <arg>          number of seconds before respective state.\n"
+"fwdownload arguments:\n"
+"-f fw_image       path to firmware image file\n"
+"-y                don't ask any questions\n"
+"-s                run in simulation mode\n"
+"-v                print info for every firmware segment sent to device\n");
 #endif /* MINIMALISTIC */
 }
 
@@ -6201,6 +6272,11 @@ main(int argc, char **argv)
 			error = atapm(cam_dev, argc, argv,
 						 combinedopt, retry_count,
 						 timeout);
+			break;
+		case CAM_CMD_DOWNLOAD_FW:
+			error = fwdownload(cam_dev, argc, argv, combinedopt,
+			    arglist & CAM_ARG_VERBOSE, retry_count, timeout,
+			    get_disk_type(cam_dev));
 			break;
 #endif /* MINIMALISTIC */
 		case CAM_CMD_USAGE:
