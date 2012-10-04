@@ -4463,7 +4463,7 @@ static int
 smpcmd(struct cam_device *device, int argc, char **argv, char *combinedopt,
        int retry_count, int timeout)
 {
-	int c, error;
+	int c, error = 0;
 	union ccb *ccb;
 	uint8_t *smp_request = NULL, *smp_response = NULL;
 	int request_size = 0, response_size = 0;
@@ -5458,6 +5458,7 @@ smpphylist(struct cam_device *device, int argc, char **argv,
 
 	bzero(&(&ccb->ccb_h)[1],
 	      sizeof(union ccb) - sizeof(struct ccb_hdr));
+	STAILQ_INIT(&devlist.dev_queue);
 
 	rgrequest = malloc(sizeof(*rgrequest));
 	if (rgrequest == NULL) {
@@ -5526,7 +5527,6 @@ smpphylist(struct cam_device *device, int argc, char **argv,
 		goto bailout;
 	}
 
-	STAILQ_INIT(&devlist.dev_queue);
 	devlist.path_id = device->path_id;
 
 	retval = buildbusdevlist(&devlist);

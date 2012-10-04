@@ -618,6 +618,7 @@ flow_to_route(struct flentry *fle, struct route *ro)
 	sin->sin_addr.s_addr = hashkey[2];
 	ro->ro_rt = __DEVOLATILE(struct rtentry *, fle->f_rt);
 	ro->ro_lle = __DEVOLATILE(struct llentry *, fle->f_lle);
+	ro->ro_flags |= RT_NORTREF;
 }
 #endif /* INET */
 
@@ -825,7 +826,7 @@ flow_to_route_in6(struct flentry *fle, struct route_in6 *ro)
 	memcpy(&sin6->sin6_addr, &hashkey[5], sizeof (struct in6_addr));
 	ro->ro_rt = __DEVOLATILE(struct rtentry *, fle->f_rt);
 	ro->ro_lle = __DEVOLATILE(struct llentry *, fle->f_lle);
-
+	ro->ro_flags |= RT_NORTREF;
 }
 #endif /* INET6 */
 
@@ -1256,7 +1257,7 @@ uncached:
 			
 			else
 				l3addr = (struct sockaddr_storage *)&ro->ro_dst;
-			llentry_update(&lle, LLTABLE6(ifp), l3addr, ifp);
+			lle = llentry_alloc(ifp, LLTABLE6(ifp), l3addr);
 		}
 #endif	
 #ifdef INET
@@ -1265,7 +1266,7 @@ uncached:
 				l3addr = (struct sockaddr_storage *)rt->rt_gateway;
 			else
 				l3addr = (struct sockaddr_storage *)&ro->ro_dst;
-			llentry_update(&lle, LLTABLE(ifp), l3addr, ifp);	
+			lle = llentry_alloc(ifp, LLTABLE(ifp), l3addr);	
 		}
 			
 #endif

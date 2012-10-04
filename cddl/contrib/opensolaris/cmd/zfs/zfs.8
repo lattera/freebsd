@@ -22,10 +22,11 @@
 .\" Copyright (c) 2012 Nexenta Systems, Inc. All Rights Reserved.
 .\" Copyright (c) 2012, Joyent, Inc. All rights reserved.
 .\" Copyright (c) 2011, Pawel Jakub Dawidek <pjd@FreeBSD.org>
+.\" Copyright (c) 2012, Bryan Drewery <bdrewery@FreeBSD.org>
 .\"
 .\" $FreeBSD$
 .\"
-.Dd November 26, 2011
+.Dd September 5, 2012
 .Dt ZFS 8
 .Os
 .Sh NAME
@@ -1076,7 +1077,7 @@ bit is respected for the file system. The default value is
 .It Sy sharesmb Ns = Ns Cm on | off | Ar opts
 The
 .Sy sharesmb
-property has currently no effect o
+property currently has no effect on
 .Fx .
 .It Sy sharenfs Ns = Ns Cm on | off | Ar opts
 Controls whether the file system is shared via
@@ -2022,7 +2023,7 @@ The default is
 .Pp
 The default can be changed to include group types.
 .It Fl i
-Translate SID to POSIX ID. This flag has currently no effect on
+Translate SID to POSIX ID. This flag currently has no effect on
 .Fx .
 .El
 .It Xo
@@ -2241,7 +2242,7 @@ properties, and current snapshot and file system names are set when the stream
 is received. If the
 .Fl F
 flag is specified when this stream is received, snapshots and file systems that
- do not exist on the sending side are destroyed.
+do not exist on the sending side are destroyed.
 .It Fl D
 Generate a deduplicated stream. Blocks which would have been sent multiple
 times in the send stream will only be sent once.  The receiving system must
@@ -3021,9 +3022,9 @@ a new snapshot, as follows:
 .Li # Ic zfs destroy -r pool/users@7daysago
 .Li # Ic zfs rename -r pool/users@6daysago @7daysago
 .Li # Ic zfs rename -r pool/users@5daysago @6daysago
-.Li # Ic zfs rename -r pool/users@yesterday @5daysago
-.Li # Ic zfs rename -r pool/users@yesterday @4daysago
-.Li # Ic zfs rename -r pool/users@yesterday @3daysago
+.Li # Ic zfs rename -r pool/users@4daysago @5daysago
+.Li # Ic zfs rename -r pool/users@3daysago @4daysago
+.Li # Ic zfs rename -r pool/users@2daysago @3daysago
 .Li # Ic zfs rename -r pool/users@yesterday @2daysago
 .Li # Ic zfs rename -r pool/users@today @yesterday
 .Li # Ic zfs snapshot -r pool/users@today

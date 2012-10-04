@@ -312,7 +312,10 @@ struct thread {
 	struct vnet	*td_vnet;	/* (k) Effective vnet. */
 	const char	*td_vnet_lpush;	/* (k) Debugging vnet push / pop. */
 	struct trapframe *td_intr_frame;/* (k) Frame of the current irq */
-	struct proc *td_rfppwait_p;	/* (k) The vforked child */
+	struct proc	*td_rfppwait_p;	/* (k) The vforked child */
+	struct vm_page	**td_ma;	/* (k) uio pages held */
+	int		td_ma_cnt;	/* (k) size of *td_ma */
+	struct rl_q_entry *td_rlqe;	/* (k) Associated range lock entry. */
 };
 
 struct mtx *thread_lock_block(struct thread *);
@@ -420,6 +423,7 @@ do {									\
 #define	TDP_RFPPWAIT	0x02000000 /* Handle RFPPWAIT on syscall exit */
 #define	TDP_RESETSPUR	0x04000000 /* Reset spurious page fault history. */
 #define	TDP_NERRNO	0x08000000 /* Last errno is already in td_errno */
+#define	TDP_UIOHELD	0x10000000 /* Current uio has pages held in td_ma */
 
 /*
  * Reasons that the current thread can not be run yet.
@@ -693,11 +697,12 @@ MALLOC_DECLARE(M_SUBPROC);
 #define	FIRST_THREAD_IN_PROC(p)	TAILQ_FIRST(&(p)->p_threads)
 
 /*
- * We use process IDs <= PID_MAX; PID_MAX + 1 must also fit in a pid_t,
- * as it is used to represent "no process group".
+ * We use process IDs <= pid_max <= PID_MAX; PID_MAX + 1 must also fit
+ * in a pid_t, as it is used to represent "no process group".
  */
 #define	PID_MAX		99999
 #define	NO_PID		100000
+extern pid_t pid_max;
 
 #define	SESS_LEADER(p)	((p)->p_session->s_leader == (p))
 

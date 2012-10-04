@@ -181,7 +181,9 @@ static struct {
 	{0x1e0e8086, 0x00, "Intel Panther Point",	0},
 	{0x1e0f8086, 0x00, "Intel Panther Point",	0},
 	{0x23238086, 0x00, "Intel DH89xxCC",	0},
+	{0x2360197b, 0x00, "JMicron JMB360",	0},
 	{0x2361197b, 0x00, "JMicron JMB361",	AHCI_Q_NOFORCE},
+	{0x2362197b, 0x00, "JMicron JMB362",	0},
 	{0x2363197b, 0x00, "JMicron JMB363",	AHCI_Q_NOFORCE},
 	{0x2365197b, 0x00, "JMicron JMB365",	AHCI_Q_NOFORCE},
 	{0x2366197b, 0x00, "JMicron JMB366",	AHCI_Q_NOFORCE},
@@ -407,7 +409,7 @@ ahci_attach(device_t dev)
 	/* Get the HW capabilities */
 	version = ATA_INL(ctlr->r_mem, AHCI_VS);
 	ctlr->caps = ATA_INL(ctlr->r_mem, AHCI_CAP);
-	if (version >= 0x00010020)
+	if (version >= 0x00010200)
 		ctlr->caps2 = ATA_INL(ctlr->r_mem, AHCI_CAP2);
 	if (ctlr->caps & AHCI_CAP_EMS)
 		ctlr->capsem = ATA_INL(ctlr->r_mem, AHCI_EM_CTL);
@@ -488,7 +490,7 @@ ahci_attach(device_t dev)
 		    (ctlr->caps & AHCI_CAP_SXS) ? " eSATA":"",
 		    (ctlr->caps & AHCI_CAP_NPMASK) + 1);
 	}
-	if (bootverbose && version >= 0x00010020) {
+	if (bootverbose && version >= 0x00010200) {
 		device_printf(dev, "Caps2:%s%s%s\n",
 		    (ctlr->caps2 & AHCI_CAP2_APST) ? " APST":"",
 		    (ctlr->caps2 & AHCI_CAP2_NVMP) ? " NVMP":"",
@@ -973,7 +975,7 @@ ahci_ch_attach(device_t dev)
 	}
 	ch->chcaps = ATA_INL(ch->r_mem, AHCI_P_CMD);
 	version = ATA_INL(ctlr->r_mem, AHCI_VS);
-	if (version < 0x00010020 && (ctlr->caps & AHCI_CAP_FBSS))
+	if (version < 0x00010200 && (ctlr->caps & AHCI_CAP_FBSS))
 		ch->chcaps |= AHCI_P_CMD_FBSCP;
 	if (bootverbose) {
 		device_printf(dev, "Caps:%s%s%s%s%s\n",

@@ -882,7 +882,7 @@ ino_isat(ino_t parent, off_t diroff, ino_t child, int *mode, int *isdot)
 				printf("Directory %d has bad mode %o\n",
 				    parent, *mode);
 			else
-				printf("Directory %d zero inode\n", parent);
+				printf("Directory %d has zero mode\n", parent);
 		}
 		return (0);
 	}
@@ -2383,7 +2383,7 @@ suj_verifyino(union dinode *ip)
 		return (-1);
 	}
 
-	if (DIP(ip, di_size) < SUJ_MIN || DIP(ip, di_size) > SUJ_MAX) {
+	if (DIP(ip, di_size) < SUJ_MIN) {
 		printf("Invalid size %jd for journal inode %d\n",
 		    DIP(ip, di_size), sujino);
 		return (-1);
