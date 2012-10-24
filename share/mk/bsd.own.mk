@@ -203,10 +203,18 @@ COMPRESS_EXT?=	.gz
 # regardless of user's setting).
 #
 .for var in \
+    CTF \
     INSTALLLIB \
     MAN \
     PROFILE
 .if defined(NO_${var})
+.if defined(WITH_${var})
+.warning unsetting WITH_${var}
+.undef WITH_${var}
+.if defined(WITH_${var})
+.error wtf
+.endif
+.endif
 WITHOUT_${var}=
 .endif
 .endfor
@@ -415,6 +423,7 @@ __DEFAULT_NO_OPTIONS = \
     BIND_XML \
     CLANG_EXTRAS \
     CLANG_IS_CC \
+    CTF \
     HESIOD \
     ICONV \
     IDEA \
@@ -518,6 +527,7 @@ MK_SOURCELESS_UCODE:= no
 
 .if ${MK_CDDL} == "no"
 MK_ZFS:=	no
+MK_CTF:=	no
 .endif
 
 .if ${MK_CLANG} == "no"
@@ -629,6 +639,14 @@ MK_${vv:H}:=	no
 MK_${vv:H}:=	${MK_${vv:T}}
 .endif
 .endfor
+
+.if ${MK_CTF} != "no"
+CTFCONVERT_CMD=	${CTFCONVERT} ${CTFFLAGS} ${.TARGET}
+.elif ${MAKE_VERSION} >= 9201210220
+CTFCONVERT_CMD=
+.else
+CTFCONVERT_CMD=	@:
+.endif 
 
 .endif # !_WITHOUT_SRCCONF
 
