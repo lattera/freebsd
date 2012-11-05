@@ -648,6 +648,34 @@ spa_find_by_name(const char *name)
 	return (0);
 }
 
+#ifdef BOOT2
+static spa_t *
+spa_get_primary(void)
+{
+
+	return (STAILQ_FIRST(&zfs_pools));
+}
+
+static vdev_t *
+spa_get_primary_vdev(const spa_t *spa)
+{
+	vdev_t *vdev;
+	vdev_t *kid;
+
+	if (spa == NULL)
+		spa = spa_get_primary();
+	if (spa == NULL)
+		return (NULL);
+	vdev = STAILQ_FIRST(&spa->spa_vdevs);
+	if (vdev == NULL)
+		return (NULL);
+	for (kid = STAILQ_FIRST(&vdev->v_children); kid != NULL;
+	     kid = STAILQ_FIRST(&vdev->v_children))
+		vdev = kid;
+	return (vdev);
+}
+#endif
+
 static spa_t *
 spa_create(uint64_t guid)
 {
@@ -1332,8 +1360,6 @@ zap_lookup(const spa_t *spa, const dnode_phys_t *dnode, const char *name, uint64
 	return (EIO);
 }
 
-#ifdef BOOT2
-
 /*
  * List a microzap directory. Assumes that the zap scratch buffer contains
  * the directory contents.
@@ -1457,8 +1483,6 @@ zap_list(const spa_t *spa, const dnode_phys_t *dnode)
 	else
 		return fzap_list(spa, dnode);
 }
-
-#endif
 
 static int
 objset_get_dnode(const spa_t *spa, const objset_phys_t *os, uint64_t objnum, dnode_phys_t *dnode)
@@ -1696,6 +1720,38 @@ zfs_lookup_dataset(const spa_t *spa, const char *name, uint64_t *objnum)
 	return (0);
 }
 
+#ifndef BOOT2
+static int
+zfs_list_dataset(const spa_t *spa, uint64_t objnum/*, int pos, char *entry*/)
+{
+	uint64_t dir_obj, child_dir_zapobj;
+	dnode_phys_t child_dir_zap, dir, dataset;
+	dsl_dataset_phys_t *ds;
+	dsl_dir_phys_t *dd;
+
+	if (objset_get_dnode(spa, &spa->spa_mos, objnum, &dataset)) {
+		printf("ZFS: can't find dataset %ju\n", (uintmax_t)objnum);
+		return (EIO);
+	}
+	ds = (dsl_dataset_phys_t *) &dataset.dn_bonus;
+	dir_obj = ds->ds_dir_obj;
+
+	if (objset_get_dnode(spa, &spa->spa_mos, dir_obj, &dir)) {
+		printf("ZFS: can't find dirobj %ju\n", (uintmax_t)dir_obj);
+		return (EIO);
+	}
+	dd = (dsl_dir_phys_t *)&dir.dn_bonus;
+
+	child_dir_zapobj = dd->dd_child_dir_zapobj;
+	if (objset_get_dnode(spa, &spa->spa_mos, child_dir_zapobj, &child_dir_zap) != 0) {
+		printf("ZFS: can't find child zap %ju\n", (uintmax_t)dir_obj);
+		return (EIO);
+	}
+
+	return (zap_list(spa, &child_dir_zap) != 0);
+}
+#endif
+
 /*
  * Find the object set given the object number of its dataset object
  * and return its details in *objset
@@ -1798,13 +1854,14 @@ static int
 zfs_spa_init(spa_t *spa)
 {
 
-	if (spa->spa_inited)
-		return (0);
 	if (zio_read(spa, &spa->spa_uberblock.ub_rootbp, &spa->spa_mos)) {
 		printf("ZFS: can't read MOS of pool %s\n", spa->spa_name);
 		return (EIO);
 	}
-	spa->spa_inited = 1;
+	if (spa->spa_mos.os_type != DMU_OST_META) {
+		printf("ZFS: corrupted MOS of pool %s\n", spa->spa_name);
+		return (EIO);
+	}
 	return (0);
 }
 
