@@ -1119,6 +1119,7 @@ zfs_domount(vfs_t *vfsp, char *osname)
 	vfsp->mnt_kern_flag |= MNTK_MPSAFE;
 	vfsp->mnt_kern_flag |= MNTK_LOOKUP_SHARED;
 	vfsp->mnt_kern_flag |= MNTK_SHARED_WRITES;
+	vfsp->mnt_kern_flag |= MNTK_EXTENDED_SHARED;
 
 	/*
 	 * The fsid is 64 bits, composed of an 8-bit fs type, which
@@ -1740,15 +1741,7 @@ zfs_vnode_lock(vnode_t *vp, int flags)
 
 	ASSERT(vp != NULL);
 
-	/*
-	 * Check if the file system wasn't forcibly unmounted in the meantime.
-	 */
 	error = vn_lock(vp, flags);
-	if (error == 0 && (vp->v_iflag & VI_DOOMED) != 0) {
-		VOP_UNLOCK(vp, 0);
-		error = ENOENT;
-	}
-
 	return (error);
 }
 
@@ -1974,10 +1967,6 @@ zfs_umount(vfs_t *vfsp, int fflag)
 			    zfsvfs->z_ctldir->v_count > 1)
 				return (EBUSY);
 		}
-	} else {
-		MNT_ILOCK(vfsp);
-		vfsp->mnt_kern_flag |= MNTK_UNMOUNTF;
-		MNT_IUNLOCK(vfsp);
 	}
 
 	VERIFY(zfsvfs_teardown(zfsvfs, B_TRUE) == 0);

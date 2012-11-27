@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/route.h>
 #include <net/pf_mtag.h>
+#include <net/pfil.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -70,7 +71,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip_var.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ip_fw.h>
-#include <netinet/ipfw/ip_fw_private.h>
 #include <netinet/ip_carp.h>
 #include <netinet/pim.h>
 #include <netinet/tcp_var.h>
@@ -85,6 +85,8 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/scope6_var.h>
 #include <netinet6/ip6_var.h>
 #endif
+
+#include <netpfil/ipfw/ip_fw_private.h>
 
 #include <machine/in_cksum.h>	/* XXX for in_cksum */
 
@@ -2531,12 +2533,6 @@ ipfw_init(void)
 		"(+ipv6) "
 #endif
 		"initialized, divert %s, nat %s, "
-		"rule-based forwarding "
-#ifdef IPFIREWALL_FORWARD
-		"enabled, "
-#else
-		"disabled, "
-#endif
 		"default to %s, logging ",
 #ifdef IPDIVERT
 		"enabled",

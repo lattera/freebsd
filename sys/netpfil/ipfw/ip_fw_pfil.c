@@ -59,8 +59,10 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #endif
-#include <netinet/ipfw/ip_fw_private.h>
+
 #include <netgraph/ng_ipfw.h>
+
+#include <netpfil/ipfw/ip_fw_private.h>
 
 #include <machine/in_cksum.h>
 
@@ -151,7 +153,7 @@ again:
 		/* next_hop may be set by ipfw_chk */
 		if (args.next_hop == NULL && args.next_hop6 == NULL)
 			break; /* pass */
-#if !defined(IPFIREWALL_FORWARD) || (!defined(INET6) && !defined(INET))
+#if (!defined(INET6) && !defined(INET))
 		ret = EACCES;
 #else
 	    {
@@ -191,6 +193,7 @@ again:
 			bcopy(args.next_hop6, (fwd_tag+1), len);
 			if (in6_localip(&args.next_hop6->sin6_addr))
 				(*m0)->m_flags |= M_FASTFWD_OURS;
+			(*m0)->m_flags |= M_IP6_NEXTHOP;
 		}
 #endif
 #ifdef INET
@@ -198,11 +201,12 @@ again:
 			bcopy(args.next_hop, (fwd_tag+1), len);
 			if (in_localip(args.next_hop->sin_addr))
 				(*m0)->m_flags |= M_FASTFWD_OURS;
+			(*m0)->m_flags |= M_IP_NEXTHOP;
 		}
 #endif
 		m_tag_prepend(*m0, fwd_tag);
 	    }
-#endif /* IPFIREWALL_FORWARD */
+#endif /* INET || INET6 */
 		break;
 
 	case IP_FW_DENY:
