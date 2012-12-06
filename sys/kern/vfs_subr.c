@@ -4084,40 +4084,6 @@ vop_strategy_pre(void *ap)
 }
 
 void
-vop_lookup_pre(void *ap)
-{
-#ifdef DEBUG_VFS_LOCKS
-	struct vop_lookup_args *a;
-	struct vnode *dvp;
-
-	a = ap;
-	dvp = a->a_dvp;
-	ASSERT_VI_UNLOCKED(dvp, "VOP_LOOKUP");
-	ASSERT_VOP_LOCKED(dvp, "VOP_LOOKUP");
-#endif
-}
-
-void
-vop_lookup_post(void *ap, int rc)
-{
-#ifdef DEBUG_VFS_LOCKS
-	struct vop_lookup_args *a;
-	struct vnode *dvp;
-	struct vnode *vp;
-
-	a = ap;
-	dvp = a->a_dvp;
-	vp = *(a->a_vpp);
-
-	ASSERT_VI_UNLOCKED(dvp, "VOP_LOOKUP");
-	ASSERT_VOP_LOCKED(dvp, "VOP_LOOKUP");
-
-	if (!rc)
-		ASSERT_VOP_LOCKED(vp, "VOP_LOOKUP (child)");
-#endif
-}
-
-void
 vop_lock_pre(void *ap)
 {
 #ifdef DEBUG_VFS_LOCKS
@@ -4776,7 +4742,7 @@ __mnt_vnode_first_active(struct vnode **mvp, struct mount *mp)
 	MNT_REF(mp);
 	(*mvp)->v_type = VMARKER;
 
-	vp = TAILQ_NEXT(*mvp, v_actfreelist);
+	vp = TAILQ_FIRST(&mp->mnt_activevnodelist);
 	while (vp != NULL) {
 		VI_LOCK(vp);
 		if (vp->v_mount == mp && vp->v_type != VMARKER &&
