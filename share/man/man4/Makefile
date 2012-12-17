@@ -148,9 +148,7 @@ MAN=	aac.4 \
 	gpib.4 \
 	gre.4 \
 	h_ertt.4 \
-	harp.4 \
 	hatm.4 \
-	hfa.4 \
 	hifn.4 \
 	hme.4 \
 	hpet.4 \
@@ -164,7 +162,6 @@ MAN=	aac.4 \
 	icmp.4 \
 	icmp6.4 \
 	ida.4 \
-	idt.4 \
 	ifmib.4 \
 	igb.4 \
 	igmp.4 \
@@ -595,7 +592,6 @@ MLINKS+=hme.4 if_hme.4
 MLINKS+=hpet.4 acpi_hpet.4
 MLINKS+=${_hptrr.4} ${_rr232x.4}
 MLINKS+=${_attimer.4} ${_i8254.4}
-MLINKS+=idt.4 if_idt.4
 MLINKS+=igb.4 if_igb.4
 MLINKS+=ip.4 rawip.4
 MLINKS+=ipfirewall.4 ipaccounting.4 \
