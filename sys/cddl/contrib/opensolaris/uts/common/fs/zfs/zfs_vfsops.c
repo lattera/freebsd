@@ -1656,24 +1656,12 @@ zfs_mount(vfs_t *vfsp)
 	if ((vfsp->vfs_flag & MNT_ROOTFS) != 0 &&
 	    (vfsp->vfs_flag & MNT_UPDATE) == 0) {
 		char pname[MAXNAMELEN];
-		spa_t *spa;
-		int prefer_cache;
 
 		error = getpoolname(osname, pname);
+		if (error == 0)
+			error = spa_import_rootpool(pname);
 		if (error)
 			goto out;
-
-		prefer_cache = 1;
-		TUNABLE_INT_FETCH("vfs.zfs.rootpool.prefer_cached_config",
-		    &prefer_cache);
-		mutex_enter(&spa_namespace_lock);
-		spa = spa_lookup(pname);
-		mutex_exit(&spa_namespace_lock);
-		if (!prefer_cache || spa == NULL) {
-			error = spa_import_rootpool(pname);
-			if (error)
-				goto out;
-		}
 	}
 	DROP_GIANT();
 	error = zfs_domount(vfsp, osname);
@@ -1860,18 +1848,6 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 		zfsvfs->z_unmounted = B_TRUE;
 		rrw_exit(&zfsvfs->z_teardown_lock, FTAG);
 		rw_exit(&zfsvfs->z_teardown_inactive_lock);
-
-#ifdef __FreeBSD__
-		/*
-		 * Some znodes might not be fully reclaimed, wait for them.
-		 */
-		mutex_enter(&zfsvfs->z_znodes_lock);
-		while (list_head(&zfsvfs->z_all_znodes) != NULL) {
-			msleep(zfsvfs, &zfsvfs->z_znodes_lock, 0,
-			    "zteardown", 0);
-		}
-		mutex_exit(&zfsvfs->z_znodes_lock);
-#endif
 	}
 
 	/*
@@ -2136,7 +2112,7 @@ zfs_fhtovp(vfs_t *vfsp, fid_t *fidp, int flags, vnode_t **vpp)
 			VN_HOLD(*vpp);
 		}
 		ZFS_EXIT(zfsvfs);
-		err = zfs_vnode_lock(*vpp, flags | LK_RETRY);
+		err = zfs_vnode_lock(*vpp, flags);
 		if (err != 0)
 			*vpp = NULL;
 		return (err);

@@ -473,9 +473,8 @@ interpret:
 	 * Remember if this was set before and unset it in case this is not
 	 * actually an executable image.
 	 */
-	textset = imgp->vp->v_vflag & VV_TEXT;
-	ASSERT_VOP_ELOCKED(imgp->vp, "vv_text");
-	imgp->vp->v_vflag |= VV_TEXT;
+	textset = VOP_IS_TEXT(imgp->vp);
+	VOP_SET_TEXT(imgp->vp);
 
 	error = exec_map_first_page(imgp);
 	if (error)
@@ -506,10 +505,8 @@ interpret:
 
 	if (error) {
 		if (error == -1) {
-			if (textset == 0) {
-				ASSERT_VOP_ELOCKED(imgp->vp, "vv_text");
-				imgp->vp->v_vflag &= ~VV_TEXT;
-			}
+			if (textset == 0)
+				VOP_UNSET_TEXT(imgp->vp);
 			error = ENOEXEC;
 		}
 		goto exec_fail_dealloc;
@@ -527,7 +524,7 @@ interpret:
 		 * VV_TEXT will be set. The vnode lock is held over this
 		 * entire period so nothing should illegitimately be blocked.
 		 */
-		imgp->vp->v_vflag &= ~VV_TEXT;
+		VOP_UNSET_TEXT(imgp->vp);
 		/* free name buffer and old vnode */
 		if (args->fname != NULL)
 			NDFREE(&nd, NDF_ONLY_PNBUF);
@@ -1396,7 +1393,7 @@ exec_check_permissions(imgp)
 	struct vnode *vp = imgp->vp;
 	struct vattr *attr = imgp->attr;
 	struct thread *td;
-	int error;
+	int error, writecount;
 
 	td = curthread;
 
@@ -1441,7 +1438,10 @@ exec_check_permissions(imgp)
 	 * Check number of open-for-writes on the file and deny execution
 	 * if there are any.
 	 */
-	if (vp->v_writecount)
+	error = VOP_GET_WRITECOUNT(vp, &writecount);
+	if (error != 0)
+		return (error);
+	if (writecount != 0)
 		return (ETXTBSY);
 
 	/*

@@ -252,7 +252,7 @@ restart:
 		goto bad;
 
 	if (fmode & FWRITE)
-		vp->v_writecount++;
+		VOP_ADD_WRITECOUNT(vp, 1);
 	*flagp = fmode;
 	ASSERT_VOP_LOCKED(vp, "vn_open_cred");
 	if (!mpsafe)
@@ -282,7 +282,7 @@ vn_writechk(vp)
 	 * the vnode, try to free it up once.  If
 	 * we fail, we can't allow writing.
 	 */
-	if (vp->v_vflag & VV_TEXT)
+	if (VOP_IS_TEXT(vp))
 		return (ETXTBSY);
 
 	return (0);
@@ -314,7 +314,7 @@ vn_close(vp, flags, file_cred, td)
 	if (flags & FWRITE) {
 		VNASSERT(vp->v_writecount > 0, vp, 
 		    ("vn_close: negative writecount"));
-		vp->v_writecount--;
+		VOP_ADD_WRITECOUNT(vp, -1);
 	}
 	error = VOP_CLOSE(vp, flags, file_cred, td);
 	vput(vp);
