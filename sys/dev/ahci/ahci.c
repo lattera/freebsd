@@ -120,14 +120,20 @@ static struct {
 #define AHCI_Q_NOAA	512
 #define AHCI_Q_NOCOUNT	1024
 #define AHCI_Q_ALTSIG	2048
+#define AHCI_Q_NOMSI	4096
 } ahci_ids[] = {
-	{0x43801002, 0x00, "ATI IXP600",	0},
+	{0x43801002, 0x00, "ATI IXP600",	AHCI_Q_NOMSI},
 	{0x43901002, 0x00, "ATI IXP700",	0},
 	{0x43911002, 0x00, "ATI IXP700",	0},
 	{0x43921002, 0x00, "ATI IXP700",	0},
 	{0x43931002, 0x00, "ATI IXP700",	0},
 	{0x43941002, 0x00, "ATI IXP800",	0},
 	{0x43951002, 0x00, "ATI IXP800",	0},
+	{0x78001022, 0x00, "AMD Hudson-2",	0},
+	{0x78011022, 0x00, "AMD Hudson-2",	0},
+	{0x78021022, 0x00, "AMD Hudson-2",	0},
+	{0x78031022, 0x00, "AMD Hudson-2",	0},
+	{0x78041022, 0x00, "AMD Hudson-2",	0},
 	{0x06121b21, 0x00, "ASMedia ASM1061",	0},
 	{0x26528086, 0x00, "Intel ICH6",	AHCI_Q_NOFORCE},
 	{0x26538086, 0x00, "Intel ICH6M",	AHCI_Q_NOFORCE},
@@ -633,6 +639,8 @@ ahci_setup_interrupt(device_t dev)
 	int i, msi = 1;
 
 	/* Process hints. */
+	if (ctlr->quirks & AHCI_Q_NOMSI)
+		msi = 0;
 	resource_int_value(device_get_name(dev),
 	    device_get_unit(dev), "msi", &msi);
 	if (msi < 0)

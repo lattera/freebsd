@@ -1,6 +1,10 @@
 /*-
- * Copyright (c) 2008 Citrix Systems, Inc.
+ * Copyright (c) 2012 SRI International
  * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -22,59 +26,34 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#include <sys/types.h>
 
-#include <sys/param.h>
-#include <sys/bus.h>
-#include <sys/kernel.h>
-#include <sys/interrupt.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <util.h>
 
-#include <machine/atomic.h>
-#include <machine/xen/xen-os.h>
-#include <xen/hypervisor.h>
-#include <xen/xen_intr.h>
-
-#include <dev/xen/xenpci/xenpcivar.h>
-
-void
-xen_suspend()
+char *
+flags_to_string(u_long flags, const char *def)
 {
-	int suspend_cancelled;
+	char *str;
 
-	if (DEVICE_SUSPEND(root_bus)) {
-		printf("xen_suspend: device_suspend failed\n");
-		return;
+	str = fflagstostr(flags);
+	if (*str == '\0') {
+		free(str);
+		str = strdup(def);
 	}
+	return (str);
+}
 
-	/*
-	 * Make sure we don't change cpus or switch to some other
-	 * thread. for the duration.
-	 */
-	critical_enter();
+int
+string_to_flags(char **stringp, u_long *setp, u_long *clrp)
+{
 
-	/*
-	 * Prevent any races with evtchn_interrupt() handler.
-	 */
-	irq_suspend();
-	disable_intr();
-
-	suspend_cancelled = HYPERVISOR_suspend(0);
-	if (!suspend_cancelled)
-		xenpci_resume();
-
-	/*
-	 * Re-enable interrupts and put the scheduler back to normal.
-	 */
-	enable_intr();
-	critical_exit();
-
-	/*
-	 * FreeBSD really needs to add DEVICE_SUSPEND_CANCEL or
-	 * similar.
-	 */
-	if (!suspend_cancelled)
-		DEVICE_RESUME(root_bus);
+	return strtofflags(stringp, setp, clrp);
 }
