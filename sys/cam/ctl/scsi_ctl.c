@@ -334,7 +334,7 @@ ctlfeasync(void *callback_arg, uint32_t code, struct cam_path *path, void *arg)
 				return;
 			}
 			xpt_setup_ccb(&ccb->ccb_h, cpi->ccb_h.path,
-				      /*priority*/ 1);
+				      CAM_PRIORITY_NONE);
 
 			sim = xpt_path_sim(cpi->ccb_h.path);
 
@@ -499,7 +499,7 @@ ctlfeasync(void *callback_arg, uint32_t code, struct cam_path *path, void *arg)
 
 			dev_chg = (struct ac_device_changed *)ac->contract_data;
 
-			printf("%s: WWPN %#jx port %u path %u target %u %s\n",
+			printf("%s: WWPN %#jx port 0x%06x path %u target %u %s\n",
 			       __func__, dev_chg->wwpn, dev_chg->port,
 			       xpt_path_path_id(path), dev_chg->target,
 			       (dev_chg->arrived == 0) ?  "left" : "arrived");
@@ -571,7 +571,7 @@ ctlferegister(struct cam_periph *periph, void *arg)
 	callout_init_mtx(&softc->dma_callout, sim->mtx, /*flags*/ 0);
 	periph->softc = softc;
 
-	xpt_setup_ccb(&en_lun_ccb.ccb_h, periph->path, /*priority*/ 1);
+	xpt_setup_ccb(&en_lun_ccb.ccb_h, periph->path, CAM_PRIORITY_NONE);
 	en_lun_ccb.ccb_h.func_code = XPT_EN_LUN;
 	en_lun_ccb.cel.grp6_len = 0;
 	en_lun_ccb.cel.grp7_len = 0;
@@ -590,7 +590,7 @@ ctlferegister(struct cam_periph *periph, void *arg)
 		union ccb *new_ccb;
 
 		new_ccb = (union ccb *)malloc(sizeof(*new_ccb), M_CTLFE,
-					      M_NOWAIT);
+					      M_ZERO|M_NOWAIT);
 		if (new_ccb == NULL) {
 			status = CAM_RESRC_UNAVAIL;
 			break;
@@ -624,7 +624,7 @@ ctlferegister(struct cam_periph *periph, void *arg)
 		union ccb *new_ccb;
 
 		new_ccb = (union ccb *)malloc(sizeof(*new_ccb), M_CTLFE,
-					      M_NOWAIT);
+					      M_ZERO|M_NOWAIT);
 		if (new_ccb == NULL) {
 			status = CAM_RESRC_UNAVAIL;
 			break;
@@ -668,7 +668,7 @@ ctlfeoninvalidate(struct cam_periph *periph)
 
 	softc = (struct ctlfe_lun_softc *)periph->softc;
 
-	xpt_setup_ccb(&en_lun_ccb.ccb_h, periph->path, /*priority*/ 1);
+	xpt_setup_ccb(&en_lun_ccb.ccb_h, periph->path, CAM_PRIORITY_NONE);
 	en_lun_ccb.ccb_h.func_code = XPT_EN_LUN;
 	en_lun_ccb.cel.grp6_len = 0;
 	en_lun_ccb.cel.grp7_len = 0;
@@ -1694,12 +1694,7 @@ ctlfe_onoffline(void *arg, int online)
 		return;
 	}
 	ccb = (union ccb *)malloc(sizeof(*ccb), M_TEMP, M_WAITOK | M_ZERO);
-	if (ccb == NULL) {
-		printf("%s: unable to malloc CCB!\n", __func__);
-		xpt_free_path(path);
-		return;
-	}
-	xpt_setup_ccb(&ccb->ccb_h, path, /*priority*/ 1);
+	xpt_setup_ccb(&ccb->ccb_h, path, CAM_PRIORITY_NONE);
 
 	sim = xpt_path_sim(path);
 
@@ -1827,8 +1822,6 @@ ctlfe_onoffline(void *arg, int online)
 
 	xpt_action(ccb);
 
-	CAM_SIM_UNLOCK(sim);
-
 	if ((ccb->ccb_h.status & CAM_STATUS_MASK) != CAM_REQ_CMP) {
 		printf("%s: SIM %s (path id %d) target %s failed with "
 		       "status %#x\n",
@@ -1841,8 +1834,11 @@ ctlfe_onoffline(void *arg, int online)
 		       (online != 0) ? "enable" : "disable");
 	}
 
-	free(ccb, M_TEMP);
 	xpt_free_path(path);
+
+	CAM_SIM_UNLOCK(sim);
+
+	free(ccb, M_TEMP);
 
 	return;
 }
@@ -1900,12 +1896,6 @@ ctlfe_lun_enable(void *arg, struct ctl_id targ_id, int lun_id)
 	}
 
 	softc = malloc(sizeof(*softc), M_CTLFE, M_WAITOK | M_ZERO);
-	if (softc == NULL) {
-		printf("%s: could not allocate %zd bytes for softc\n",
-		       __func__, sizeof(*softc));
-		xpt_free_path(path);
-		return (1);
-	}
 	sim = xpt_path_sim(path);
 	mtx_lock(sim->mtx);
 	periph = cam_periph_find(path, "ctl");
@@ -1931,9 +1921,9 @@ ctlfe_lun_enable(void *arg, struct ctl_id targ_id, int lun_id)
 				  0,
 				  softc);
 
-	mtx_unlock(sim->mtx);
-
 	xpt_free_path(path);
+
+	mtx_unlock(sim->mtx);
 
 	return (0);
 }

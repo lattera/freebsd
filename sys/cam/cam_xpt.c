@@ -582,7 +582,9 @@ xptioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread *td
 			/*
 			 * This is an immediate CCB, we can send it on directly.
 			 */
+			CAM_SIM_LOCK(xpt_path_sim(xpt_periph->path));
 			xpt_action(inccb);
+			CAM_SIM_UNLOCK(xpt_path_sim(xpt_periph->path));
 
 			/*
 			 * Map the buffers back into user space.
@@ -2176,8 +2178,8 @@ xptperiphtraverse(struct cam_ed *device, struct cam_periph *start_periph,
 		 * invalidated, but not peripherals that are scheduled to
 		 * be freed.  So instead of calling cam_periph_acquire(),
 		 * which will fail if the periph has been invalidated, we
-		 * just check for the free flag here.  If it is free, we
-		 * skip to the next periph.
+		 * just check for the free flag here.  If it is in the
+		 * process of being freed, we skip to the next periph.
 		 */
 		if (periph->flags & CAM_PERIPH_FREE) {
 			next_periph = SLIST_NEXT(periph, periph_links);
@@ -2190,14 +2192,7 @@ xptperiphtraverse(struct cam_ed *device, struct cam_periph *start_periph,
 		 */
 		periph->refcount++;
 
-		xpt_unlock_buses();
-
 		retval = tr_func(periph, arg);
-
-		/*
-		 * We need the lock for list traversal.
-		 */
-		xpt_lock_buses();
 
 		/*
 		 * Grab the next peripheral before we release this one, so
@@ -2281,11 +2276,6 @@ xptpdperiphtraverse(struct periph_driver **pdrv,
 		 */
 		periph->refcount++;
 
-		/*
-		 * XXX KDM we have the toplogy lock here, but in
-		 * xptperiphtraverse(), we drop it before calling the
-		 * traversal function.  Which is correct?
-		 */
 		retval = tr_func(periph, arg);
 
 		/*
@@ -2466,9 +2456,6 @@ xpt_action(union ccb *start_ccb)
 	CAM_DEBUG(start_ccb->ccb_h.path, CAM_DEBUG_TRACE, ("xpt_action\n"));
 
 	start_ccb->ccb_h.status = CAM_REQ_INPROG;
-	/* Compatibility for RL-unaware code. */
-	if (CAM_PRIORITY_TO_RL(start_ccb->ccb_h.pinfo.priority) == 0)
-	    start_ccb->ccb_h.pinfo.priority += CAM_PRIORITY_NORMAL - 1;
 	(*(start_ccb->ccb_h.path->bus->xport->action))(start_ccb);
 }
 
@@ -2818,6 +2805,11 @@ xpt_action_default(union ccb *start_ccb)
 				position_type = CAM_DEV_POS_PDRV;
 		}
 
+		/*
+		 * Note that we drop the SIM lock here, because the EDT
+		 * traversal code needs to do its own locking.
+		 */
+		CAM_SIM_UNLOCK(xpt_path_sim(cdm->ccb_h.path));
 		switch(position_type & CAM_DEV_POS_TYPEMASK) {
 		case CAM_DEV_POS_EDT:
 			xptedtmatch(cdm);
@@ -2829,6 +2821,7 @@ xpt_action_default(union ccb *start_ccb)
 			cdm->status = CAM_DEV_MATCH_ERROR;
 			break;
 		}
+		CAM_SIM_LOCK(xpt_path_sim(cdm->ccb_h.path));
 
 		if (cdm->status == CAM_DEV_MATCH_ERROR)
 			start_ccb->ccb_h.status = CAM_REQ_CMP_ERR;
