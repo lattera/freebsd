@@ -105,7 +105,8 @@
 #include <dev/ciss/cissio.h>
 #include <dev/ciss/cissvar.h>
 
-MALLOC_DEFINE(CISS_MALLOC_CLASS, "ciss_data", "ciss internal data buffers");
+static MALLOC_DEFINE(CISS_MALLOC_CLASS, "ciss_data",
+    "ciss internal data buffers");
 
 /* pci interface */
 static int	ciss_lookup(device_t dev);
@@ -281,6 +282,7 @@ TUNABLE_INT("hw.ciss.force_interrupt", &ciss_force_interrupt);
 #define CISS_BOARD_SA5		1
 #define CISS_BOARD_SA5B		2
 #define CISS_BOARD_NOMSI	(1<<4)
+#define CISS_BOARD_SIMPLE       (1<<5)
 
 static struct
 {
@@ -289,7 +291,8 @@ static struct
     int		flags;
     char	*desc;
 } ciss_vendor_data[] = {
-    { 0x0e11, 0x4070, CISS_BOARD_SA5|CISS_BOARD_NOMSI,	"Compaq Smart Array 5300" },
+    { 0x0e11, 0x4070, CISS_BOARD_SA5|CISS_BOARD_NOMSI|CISS_BOARD_SIMPLE,
+                                                        "Compaq Smart Array 5300" },
     { 0x0e11, 0x4080, CISS_BOARD_SA5B|CISS_BOARD_NOMSI,	"Compaq Smart Array 5i" },
     { 0x0e11, 0x4082, CISS_BOARD_SA5B|CISS_BOARD_NOMSI,	"Compaq Smart Array 532" },
     { 0x0e11, 0x4083, CISS_BOARD_SA5B|CISS_BOARD_NOMSI,	"HP Smart Array 5312" },
@@ -681,8 +684,15 @@ ciss_init_pci(struct ciss_softc *sc)
 	supported_methods = CISS_TRANSPORT_METHOD_PERF;
 	break;
     default:
-	supported_methods = sc->ciss_cfg->supported_methods;
-	break;
+        /*
+         * Override the capabilities of the BOARD and specify SIMPLE
+         * MODE 
+         */
+        if (ciss_vendor_data[i].flags & CISS_BOARD_SIMPLE)
+                supported_methods = CISS_TRANSPORT_METHOD_SIMPLE;
+        else
+                supported_methods = sc->ciss_cfg->supported_methods;
+        break;
     }
 
 setup:
@@ -1858,7 +1868,7 @@ ciss_accept_media(struct ciss_softc *sc, struct ciss_ldrive *ld)
 
     ldrive = CISS_LUN_TO_TARGET(ld->cl_address.logical.lun);
 
-    debug(0, "bringing logical drive %d back online");
+    debug(0, "bringing logical drive %d back online", ldrive);
 
     /*
      * Build a CISS BMIC command to bring the drive back online.
@@ -3342,9 +3352,14 @@ ciss_cam_complete_fixup(struct ciss_softc *sc, struct ccb_scsiio *csio)
 
 	cl = &sc->ciss_logical[bus][target];
 
-	padstr(inq->vendor, "COMPAQ", 8);
-	padstr(inq->product, ciss_name_ldrive_org(cl->cl_ldrive->fault_tolerance), 8);
-	padstr(inq->revision, ciss_name_ldrive_status(cl->cl_lstatus->status), 16);
+	padstr(inq->vendor, "COMPAQ",
+	       SID_VENDOR_SIZE);
+	padstr(inq->product,
+	       ciss_name_ldrive_org(cl->cl_ldrive->fault_tolerance),
+	       SID_PRODUCT_SIZE);
+	padstr(inq->revision,
+	       ciss_name_ldrive_status(cl->cl_lstatus->status),
+	       SID_REVISION_SIZE);
     }
 }
 
@@ -3955,7 +3970,8 @@ static void
 ciss_notify_logical(struct ciss_softc *sc, struct ciss_notify *cn)
 {
     struct ciss_ldrive	*ld;
-    int			ostatus, bus, target;
+    int			bus, target;
+    int			rescan_ld;
 
     debug_called(2);
 
@@ -3978,7 +3994,6 @@ ciss_notify_logical(struct ciss_softc *sc, struct ciss_notify *cn)
 	    /*
 	     * Update our idea of the drive's status.
 	     */
-	    ostatus = ciss_decode_ldrive_status(cn->data.logical_status.previous_state);
 	    ld->cl_status = ciss_decode_ldrive_status(cn->data.logical_status.new_state);
 	    if (ld->cl_lstatus != NULL)
 		ld->cl_lstatus->status = cn->data.logical_status.new_state;
@@ -3986,7 +4001,9 @@ ciss_notify_logical(struct ciss_softc *sc, struct ciss_notify *cn)
 	    /*
 	     * Have CAM rescan the drive if its status has changed.
 	     */
-	    if (ostatus != ld->cl_status) {
+            rescan_ld = (cn->data.logical_status.previous_state !=
+                         cn->data.logical_status.new_state) ? 1 : 0;
+	    if (rescan_ld) {
 		ld->cl_update = 1;
 		ciss_notify_rescan_logical(sc);
 	    }
@@ -4297,6 +4314,9 @@ ciss_print_ldrive(struct ciss_softc *sc, struct ciss_ldrive *ld)
 }
 
 #ifdef CISS_DEBUG
+#include "opt_ddb.h"
+#ifdef DDB
+#include <ddb/ddb.h>
 /************************************************************************
  * Print information about the controller/driver.
  */
@@ -4331,8 +4351,7 @@ ciss_print_adapter(struct ciss_softc *sc)
 }
 
 /* DDB hook */
-static void
-ciss_print0(void)
+DB_COMMAND(ciss_prt, db_ciss_prt)
 {
     struct ciss_softc	*sc;
 
@@ -4343,6 +4362,7 @@ ciss_print0(void)
 	ciss_print_adapter(sc);
     }
 }
+#endif
 #endif
 
 /************************************************************************

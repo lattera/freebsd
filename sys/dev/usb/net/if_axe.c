@@ -133,7 +133,7 @@ __FBSDID("$FreeBSD$");
 #ifdef USB_DEBUG
 static int axe_debug = 0;
 
-SYSCTL_NODE(_hw_usb, OID_AUTO, axe, CTLFLAG_RW, 0, "USB axe");
+static SYSCTL_NODE(_hw_usb, OID_AUTO, axe, CTLFLAG_RW, 0, "USB axe");
 SYSCTL_INT(_hw_usb_axe, OID_AUTO, debug, CTLFLAG_RW, &axe_debug, 0,
     "Debug level");
 #endif
@@ -1114,7 +1114,7 @@ axe_rxeof(struct usb_ether *ue, struct usb_page_cache *pc, unsigned int offset,
 		return (EINVAL);
 	}
 
-	m = m_getcl(M_DONTWAIT, MT_DATA, M_PKTHDR);
+	m = m_getcl(M_NOWAIT, MT_DATA, M_PKTHDR);
 	if (m == NULL) {
 		ifp->if_iqdrops++;
 		return (ENOMEM);

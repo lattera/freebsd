@@ -214,7 +214,8 @@ SYSCTL_INT(_kern_sched, OID_AUTO, slice, CTLFLAG_RW, &sched_slice, 0,
     "Quantum for timeshare threads in stathz ticks");
 #ifdef SMP
 /* Enable forwarding of wakeups to all other cpus */
-SYSCTL_NODE(_kern_sched, OID_AUTO, ipiwakeup, CTLFLAG_RD, NULL, "Kernel SMP");
+static SYSCTL_NODE(_kern_sched, OID_AUTO, ipiwakeup, CTLFLAG_RD, NULL,
+    "Kernel SMP");
 
 static int runq_fuzz = 1;
 SYSCTL_INT(_kern_sched, OID_AUTO, runq_fuzz, CTLFLAG_RW, &runq_fuzz, 0, "");
@@ -1583,6 +1584,40 @@ sched_pctcpu(struct thread *td)
 	ts = td->td_sched;
 	return (ts->ts_pctcpu);
 }
+
+#ifdef	RACCT
+/*
+ * Calculates the contribution to the thread cpu usage for the latest
+ * (unfinished) second.
+ */
+fixpt_t
+sched_pctcpu_delta(struct thread *td)
+{
+	struct td_sched *ts;
+	fixpt_t delta;
+	int realstathz;
+
+	THREAD_LOCK_ASSERT(td, MA_OWNED);
+	ts = td->td_sched;
+	delta = 0;
+	realstathz = stathz ? stathz : hz;
+	if (ts->ts_cpticks != 0) {
+#if	(FSHIFT >= CCPU_SHIFT)
+		delta = (realstathz == 100)
+		    ? ((fixpt_t) ts->ts_cpticks) <<
+		    (FSHIFT - CCPU_SHIFT) :
+		    100 * (((fixpt_t) ts->ts_cpticks)
+		    << (FSHIFT - CCPU_SHIFT)) / realstathz;
+#else
+		delta = ((FSCALE - ccpu) *
+		    (ts->ts_cpticks *
+		    FSCALE / realstathz)) >> FSHIFT;
+#endif
+	}
+
+	return (delta);
+}
+#endif
 
 void
 sched_tick(int cnt)

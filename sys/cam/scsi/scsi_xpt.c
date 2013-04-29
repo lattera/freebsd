@@ -2306,7 +2306,6 @@ scsi_alloc_device(struct cam_eb *bus, struct cam_et *target, lun_id_t lun_id)
 	struct cam_path path;
 	struct scsi_quirk_entry *quirk;
 	struct cam_ed *device;
-	struct cam_ed *cur_device;
 
 	device = xpt_alloc_device(bus, target, lun_id);
 	if (device == NULL)
@@ -2335,16 +2334,6 @@ scsi_alloc_device(struct cam_eb *bus, struct cam_et *target, lun_id_t lun_id)
 	 * do.
 	 */
 	bus->sim->max_ccbs += device->ccbq.devq_openings;
-	/* Insertion sort into our target's device list */
-	cur_device = TAILQ_FIRST(&target->ed_entries);
-	while (cur_device != NULL && cur_device->lun_id < lun_id)
-		cur_device = TAILQ_NEXT(cur_device, links);
-	if (cur_device != NULL) {
-		TAILQ_INSERT_BEFORE(cur_device, device, links);
-	} else {
-		TAILQ_INSERT_TAIL(&target->ed_entries, device, links);
-	}
-	target->generation++;
 	if (lun_id != CAM_LUN_WILDCARD) {
 		xpt_compile_path(&path,
 				 NULL,
@@ -2473,8 +2462,10 @@ scsi_dev_advinfo(union ccb *start_ccb)
 		break;
 	case CDAI_TYPE_PHYS_PATH:
 		if (cdai->flags & CDAI_FLAG_STORE) {
-			if (device->physpath != NULL)
+			if (device->physpath != NULL) {
 				free(device->physpath, M_CAMXPT);
+				device->physpath = NULL;
+			}
 			device->physpath_len = cdai->bufsiz;
 			/* Clear existing buffer if zero length */
 			if (cdai->bufsiz == 0)
@@ -2493,6 +2484,36 @@ scsi_dev_advinfo(union ccb *start_ccb)
 			if (cdai->provsiz > cdai->bufsiz)
 				amt = cdai->bufsiz;
 			memcpy(cdai->buf, device->physpath, amt);
+		}
+		break;
+	case CDAI_TYPE_RCAPLONG:
+		if (cdai->flags & CDAI_FLAG_STORE) {
+			if (device->rcap_buf != NULL) {
+				free(device->rcap_buf, M_CAMXPT);
+				device->rcap_buf = NULL;
+			}
+
+			device->rcap_len = cdai->bufsiz;
+			/* Clear existing buffer if zero length */
+			if (cdai->bufsiz == 0)
+				break;
+
+			device->rcap_buf = malloc(cdai->bufsiz, M_CAMXPT,
+						  M_NOWAIT);
+			if (device->rcap_buf == NULL) {
+				start_ccb->ccb_h.status = CAM_REQ_ABORTED;
+				return;
+			}
+
+			memcpy(device->rcap_buf, cdai->buf, cdai->bufsiz);
+		} else {
+			cdai->provsiz = device->rcap_len;
+			if (device->rcap_len == 0)
+				break;
+			amt = device->rcap_len;
+			if (cdai->provsiz > cdai->bufsiz)
+				amt = cdai->bufsiz;
+			memcpy(cdai->buf, device->rcap_buf, amt);
 		}
 		break;
 	default:

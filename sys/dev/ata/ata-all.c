@@ -111,7 +111,7 @@ static int atapi_dma = 1;
 #endif
 
 /* sysctl vars */
-SYSCTL_NODE(_hw, OID_AUTO, ata, CTLFLAG_RD, 0, "ATA driver parameters");
+static SYSCTL_NODE(_hw, OID_AUTO, ata, CTLFLAG_RD, 0, "ATA driver parameters");
 #ifndef ATA_CAM
 TUNABLE_INT("hw.ata.ata_dma", &ata_dma);
 SYSCTL_INT(_hw_ata, OID_AUTO, ata_dma, CTLFLAG_RDTUN, &ata_dma, 0,
@@ -166,9 +166,11 @@ ata_attach(device_t dev)
     ch->state = ATA_IDLE;
     bzero(&ch->state_mtx, sizeof(struct mtx));
     mtx_init(&ch->state_mtx, "ATA state lock", NULL, MTX_DEF);
+#ifndef ATA_CAM
     bzero(&ch->queue_mtx, sizeof(struct mtx));
     mtx_init(&ch->queue_mtx, "ATA queue lock", NULL, MTX_DEF);
     TAILQ_INIT(&ch->ata_queue);
+#endif
     TASK_INIT(&ch->conntask, 0, ata_conn_event, dev);
 #ifdef ATA_CAM
 	for (i = 0; i < 16; i++) {
@@ -340,7 +342,9 @@ ata_detach(device_t dev)
 	ch->dma.free(dev);
 
     mtx_destroy(&ch->state_mtx);
+#ifndef ATA_CAM
     mtx_destroy(&ch->queue_mtx);
+#endif
     return 0;
 }
 
@@ -869,7 +873,7 @@ ata_boot_attach(void)
 
     mtx_lock(&Giant);       /* newbus suckage it needs Giant */
 
-    /* kick of probe and attach on all channels */
+    /* kick off probe and attach on all channels */
     for (ctlr = 0; ctlr < devclass_get_maxunit(ata_devclass); ctlr++) {
 	if ((ch = devclass_get_softc(ata_devclass, ctlr))) {
 	    ata_identify(ch->dev);
@@ -1107,6 +1111,7 @@ ata_default_registers(device_t dev)
     ch->r_io[ATA_ALTSTAT].offset = ch->r_io[ATA_CONTROL].offset;
 }
 
+#ifndef ATA_CAM
 void
 ata_modify_if_48bit(struct ata_request *request)
 {
@@ -1208,6 +1213,7 @@ ata_modify_if_48bit(struct ata_request *request)
 	request->flags |= ATA_R_48BIT;
     }
 }
+#endif
 
 void
 ata_udelay(int interval)
@@ -1453,7 +1459,7 @@ bpack(int8_t *src, int8_t *dst, int len)
 #endif
 
 #ifdef ATA_CAM
-void
+static void
 ata_cam_begin_transaction(device_t dev, union ccb *ccb)
 {
 	struct ata_channel *ch = device_get_softc(dev);

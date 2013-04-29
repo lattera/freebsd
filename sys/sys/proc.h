@@ -593,6 +593,7 @@ struct proc {
 	 */
 	LIST_ENTRY(proc) p_orphan;	/* (e) List of orphan processes. */
 	LIST_HEAD(, proc) p_orphans;	/* (e) Pointer to list of orphans. */
+	u_char		p_throttled;	/* (c) Flag for racct pcpu throttling */
 };
 
 #define	p_session	p_pgrp->pg_session
@@ -636,6 +637,7 @@ struct proc {
 #define	P_INMEM		0x10000000 /* Loaded into memory. */
 #define	P_SWAPPINGOUT	0x20000000 /* Process is being swapped out. */
 #define	P_SWAPPINGIN	0x40000000 /* Process is being swapped in. */
+#define	P_PPTRACE	0x80000000 /* PT_TRACEME by vforked child. */
 
 #define	P_STOPPED	(P_STOPPED_SIG|P_STOPPED_SINGLE|P_STOPPED_TRACE)
 #define	P_SHOULDSTOP(p)	((p)->p_flag & P_STOPPED)

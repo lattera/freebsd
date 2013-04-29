@@ -532,7 +532,7 @@ static int bge_allow_asf = 1;
 
 TUNABLE_INT("hw.bge.allow_asf", &bge_allow_asf);
 
-SYSCTL_NODE(_hw, OID_AUTO, bge, CTLFLAG_RD, 0, "BGE driver parameters");
+static SYSCTL_NODE(_hw, OID_AUTO, bge, CTLFLAG_RD, 0, "BGE driver parameters");
 SYSCTL_INT(_hw_bge, OID_AUTO, allow_asf, CTLFLAG_RD, &bge_allow_asf, 0,
 	"Allow ASF mode if available");
 
@@ -1312,12 +1312,12 @@ bge_newbuf_std(struct bge_softc *sc, int i)
 	if (sc->bge_flags & BGE_FLAG_JUMBO_STD &&
 	    (sc->bge_ifp->if_mtu + ETHER_HDR_LEN + ETHER_CRC_LEN +
 	    ETHER_VLAN_ENCAP_LEN > (MCLBYTES - ETHER_ALIGN))) {
-		m = m_getjcl(M_DONTWAIT, MT_DATA, M_PKTHDR, MJUM9BYTES);
+		m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, MJUM9BYTES);
 		if (m == NULL)
 			return (ENOBUFS);
 		m->m_len = m->m_pkthdr.len = MJUM9BYTES;
 	} else {
-		m = m_getcl(M_DONTWAIT, MT_DATA, M_PKTHDR);
+		m = m_getcl(M_NOWAIT, MT_DATA, M_PKTHDR);
 		if (m == NULL)
 			return (ENOBUFS);
 		m->m_len = m->m_pkthdr.len = MCLBYTES;
@@ -1368,11 +1368,11 @@ bge_newbuf_jumbo(struct bge_softc *sc, int i)
 	struct mbuf *m;
 	int error, nsegs;
 
-	MGETHDR(m, M_DONTWAIT, MT_DATA);
+	MGETHDR(m, M_NOWAIT, MT_DATA);
 	if (m == NULL)
 		return (ENOBUFS);
 
-	m_cljget(m, M_DONTWAIT, MJUM9BYTES);
+	m_cljget(m, M_NOWAIT, MJUM9BYTES);
 	if (!(m->m_flags & M_EXT)) {
 		m_freem(m);
 		return (ENOBUFS);
@@ -3637,15 +3637,15 @@ bge_attach(device_t dev)
 	}
 
 	bge_stop_fw(sc);
-	bge_sig_pre_reset(sc, BGE_RESET_START);
+	bge_sig_pre_reset(sc, BGE_RESET_SHUTDOWN);
 	if (bge_reset(sc)) {
 		device_printf(sc->bge_dev, "chip reset failed\n");
 		error = ENXIO;
 		goto fail;
 	}
 
-	bge_sig_legacy(sc, BGE_RESET_START);
-	bge_sig_post_reset(sc, BGE_RESET_START);
+	bge_sig_legacy(sc, BGE_RESET_SHUTDOWN);
+	bge_sig_post_reset(sc, BGE_RESET_SHUTDOWN);
 
 	if (bge_chipinit(sc)) {
 		device_printf(sc->bge_dev, "chip initialization failed\n");
@@ -3998,6 +3998,20 @@ bge_reset(struct bge_softc *sc)
 	} else
 		write_op = bge_writereg_ind;
 
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5700 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5701) {
+		CSR_WRITE_4(sc, BGE_NVRAM_SWARB, BGE_NVRAMSWARB_SET1);
+		for (i = 0; i < 8000; i++) {
+			if (CSR_READ_4(sc, BGE_NVRAM_SWARB) &
+			    BGE_NVRAMSWARB_GNT1)
+				break;
+			DELAY(20);
+		}
+		if (i == 8000) {
+			if (bootverbose)
+				device_printf(dev, "NVRAM lock timedout!\n");
+		}
+	}
 	/* Take APE lock when performing reset. */
 	bge_ape_lock(sc, BGE_APE_LOCK_GRC);
 
@@ -4971,7 +4985,7 @@ bge_cksum_pad(struct mbuf *m)
 			/* Allocate new empty mbuf, pad it. Compact later. */
 			struct mbuf *n;
 
-			MGET(n, M_DONTWAIT, MT_DATA);
+			MGET(n, M_NOWAIT, MT_DATA);
 			if (n == NULL)
 				return (ENOBUFS);
 			n->m_len = 0;
@@ -5013,7 +5027,7 @@ bge_check_short_dma(struct mbuf *m)
 	}
 
 	if (found > 1) {
-		n = m_defrag(m, M_DONTWAIT);
+		n = m_defrag(m, M_NOWAIT);
 		if (n == NULL)
 			m_freem(m);
 	} else
@@ -5033,7 +5047,7 @@ bge_setup_tso(struct bge_softc *sc, struct mbuf *m, uint16_t *mss,
 
 	if (M_WRITABLE(m) == 0) {
 		/* Get a writable copy. */
-		n = m_dup(m, M_DONTWAIT);
+		n = m_dup(m, M_NOWAIT);
 		m_freem(m);
 		if (n == NULL)
 			return (NULL);
@@ -5150,9 +5164,9 @@ bge_encap(struct bge_softc *sc, struct mbuf **m_head, uint32_t *txidx)
 			 * DMA read operation.
 			 */
 			if (sc->bge_forced_collapse == 1)
-				m = m_defrag(m, M_DONTWAIT);
+				m = m_defrag(m, M_NOWAIT);
 			else
-				m = m_collapse(m, M_DONTWAIT,
+				m = m_collapse(m, M_NOWAIT,
 				    sc->bge_forced_collapse);
 			if (m == NULL)
 				m = *m_head;
@@ -5164,7 +5178,7 @@ bge_encap(struct bge_softc *sc, struct mbuf **m_head, uint32_t *txidx)
 	error = bus_dmamap_load_mbuf_sg(sc->bge_cdata.bge_tx_mtag, map, m, segs,
 	    &nsegs, BUS_DMA_NOWAIT);
 	if (error == EFBIG) {
-		m = m_collapse(m, M_DONTWAIT, BGE_NSEG_NEW);
+		m = m_collapse(m, M_NOWAIT, BGE_NSEG_NEW);
 		if (m == NULL) {
 			m_freem(*m_head);
 			*m_head = NULL;

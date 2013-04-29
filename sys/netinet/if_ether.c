@@ -77,8 +77,8 @@ __FBSDID("$FreeBSD$");
 #define SDL(s) ((struct sockaddr_dl *)s)
 
 SYSCTL_DECL(_net_link_ether);
-SYSCTL_NODE(_net_link_ether, PF_INET, inet, CTLFLAG_RW, 0, "");
-SYSCTL_NODE(_net_link_ether, PF_ARP, arp, CTLFLAG_RW, 0, "");
+static SYSCTL_NODE(_net_link_ether, PF_INET, inet, CTLFLAG_RW, 0, "");
+static SYSCTL_NODE(_net_link_ether, PF_ARP, arp, CTLFLAG_RW, 0, "");
 
 /* timer values */
 static VNET_DEFINE(int, arpt_keep) = (20*60);	/* once resolved, good for 20
@@ -169,7 +169,6 @@ arptimer(void *arg)
 {
 	struct llentry *lle = (struct llentry *)arg;
 	struct ifnet *ifp;
-	size_t pkts_dropped;
 
 	if (lle->la_flags & LLE_STATIC) {
 		LLE_WUNLOCK(lle);
@@ -186,11 +185,20 @@ arptimer(void *arg)
 	IF_AFDATA_LOCK(ifp);
 	LLE_WLOCK(lle);
 
-	LLE_REMREF(lle);
-	pkts_dropped = llentry_free(lle);
+	/* Guard against race with other llentry_free(). */
+	if (lle->la_flags & LLE_LINKED) {
+		size_t pkts_dropped;
+
+		LLE_REMREF(lle);
+		pkts_dropped = llentry_free(lle);
+		ARPSTAT_ADD(dropped, pkts_dropped);
+	} else
+		LLE_FREE_LOCKED(lle);
+
 	IF_AFDATA_UNLOCK(ifp);
-	ARPSTAT_ADD(dropped, pkts_dropped);
+
 	ARPSTAT_INC(timeouts);
+
 	CURVNET_RESTORE();
 }
 
@@ -535,13 +543,13 @@ in_arpinput(struct mbuf *m)
 	if (ah->ar_pln != sizeof(struct in_addr)) {
 		log(LOG_NOTICE, "in_arp: requested protocol length != %zu\n",
 		    sizeof(struct in_addr));
-		return;
+		goto drop;
 	}
 
 	if (allow_multicast == 0 && ETHER_IS_MULTICAST(ar_sha(ah))) {
 		log(LOG_NOTICE, "arp: %*D is multicast\n",
 		    ifp->if_addrlen, (u_char *)ar_sha(ah), ":");
-		return;
+		goto drop;
 	}
 
 	op = ntohs(ah->ar_op);

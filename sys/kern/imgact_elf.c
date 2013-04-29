@@ -663,9 +663,8 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	}
 
 	/* Only support headers that fit within first page for now      */
-	/*    (multiplication of two Elf_Half fields will not overflow) */
 	if ((hdr->e_phoff > PAGE_SIZE) ||
-	    (hdr->e_phentsize * hdr->e_phnum) > PAGE_SIZE - hdr->e_phoff) {
+	    (u_int)hdr->e_phentsize * hdr->e_phnum > PAGE_SIZE - hdr->e_phoff) {
 		error = ENOEXEC;
 		goto fail;
 	}
@@ -747,7 +746,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 
 	if ((hdr->e_phoff > PAGE_SIZE) ||
-	    (hdr->e_phoff + hdr->e_phentsize * hdr->e_phnum) > PAGE_SIZE) {
+	    (u_int)hdr->e_phentsize * hdr->e_phnum > PAGE_SIZE - hdr->e_phoff) {
 		/* Only support headers in first page for now */
 		return (ENOEXEC);
 	}
@@ -766,8 +765,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		case PT_INTERP:
 			/* Path to interpreter */
 			if (phdr[i].p_filesz > MAXPATHLEN ||
-			    phdr[i].p_offset >= PAGE_SIZE ||
-			    phdr[i].p_offset + phdr[i].p_filesz >= PAGE_SIZE)
+			    phdr[i].p_offset > PAGE_SIZE ||
+			    phdr[i].p_filesz > PAGE_SIZE - phdr[i].p_offset)
 				return (ENOEXEC);
 			interp = imgp->image_header + phdr[i].p_offset;
 			interp_name_len = phdr[i].p_filesz;
@@ -829,16 +828,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			if (phdr[i].p_memsz == 0)
 				break;
 			prot = __elfN(trans_prot)(phdr[i].p_flags);
-
-#if defined(__ia64__) && __ELF_WORD_SIZE == 32 && defined(IA32_ME_HARDER)
-			/*
-			 * Some x86 binaries assume read == executable,
-			 * notably the M3 runtime and therefore cvsup
-			 */
-			if (prot & VM_PROT_READ)
-				prot |= VM_PROT_EXECUTE;
-#endif
-
 			if ((error = __elfN(load_section)(vmspace,
 			    imgp->object, phdr[i].p_offset,
 			    (caddr_t)(uintptr_t)phdr[i].p_vaddr + et_dyn_addr,
@@ -1526,8 +1515,8 @@ __elfN(puthdr)(struct thread *td, void *dst, size_t *off, int numsegs)
 		phdr->p_paddr = 0;
 		phdr->p_filesz = notesz;
 		phdr->p_memsz = 0;
-		phdr->p_flags = 0;
-		phdr->p_align = 0;
+		phdr->p_flags = PF_R;
+		phdr->p_align = sizeof(Elf32_Size);
 		phdr++;
 
 		/* All the writable segments from the program. */
@@ -1551,10 +1540,10 @@ __elfN(putnote)(void *dst, size_t *off, const char *name, int type,
 	*off += sizeof note;
 	if (dst != NULL)
 		bcopy(name, (char *)dst + *off, note.n_namesz);
-	*off += roundup2(note.n_namesz, sizeof(Elf_Size));
+	*off += roundup2(note.n_namesz, sizeof(Elf32_Size));
 	if (dst != NULL)
 		bcopy(desc, (char *)dst + *off, note.n_descsz);
-	*off += roundup2(note.n_descsz, sizeof(Elf_Size));
+	*off += roundup2(note.n_descsz, sizeof(Elf32_Size));
 }
 
 static boolean_t
@@ -1565,9 +1554,8 @@ __elfN(parse_notes)(struct image_params *imgp, Elf_Brandnote *checknote,
 	const char *note_name;
 	int i;
 
-	if (pnote == NULL || pnote->p_offset >= PAGE_SIZE ||
-	    pnote->p_filesz > PAGE_SIZE ||
-	    pnote->p_offset + pnote->p_filesz >= PAGE_SIZE)
+	if (pnote == NULL || pnote->p_offset > PAGE_SIZE ||
+	    pnote->p_filesz > PAGE_SIZE - pnote->p_offset)
 		return (FALSE);
 
 	note = note0 = (const Elf_Note *)(imgp->image_header + pnote->p_offset);

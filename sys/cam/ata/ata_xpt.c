@@ -463,6 +463,12 @@ negotiate:
 		    0, 0x02);
 		break;
 	case PROBE_SETAN:
+		/* Remember what transport thinks about AEN. */
+		if (softc->caps & CTS_SATA_CAPS_H_AN)
+			path->device->inq_flags |= SID_AEN;
+		else
+			path->device->inq_flags &= ~SID_AEN;
+		xpt_async(AC_GETDEV_CHANGED, path, NULL);
 		cam_fill_ataio(ataio,
 		    1,
 		    probedone,
@@ -1157,6 +1163,12 @@ notsata:
 		cts.xport_specific.sata.valid = CTS_SATA_VALID_CAPS;
 		xpt_action((union ccb *)&cts);
 		softc->caps = caps;
+		/* Remember what transport thinks about AEN. */
+		if (softc->caps & CTS_SATA_CAPS_H_AN)
+			path->device->inq_flags |= SID_AEN;
+		else
+			path->device->inq_flags &= ~SID_AEN;
+		xpt_async(AC_GETDEV_CHANGED, path, NULL);
 		if (periph->path->device->flags & CAM_DEV_UNCONFIGURED) {
 			path->device->flags &= ~CAM_DEV_UNCONFIGURED;
 			xpt_acquire_device(path->device);
@@ -1522,7 +1534,6 @@ ata_alloc_device(struct cam_eb *bus, struct cam_et *target, lun_id_t lun_id)
 	struct cam_path path;
 	struct ata_quirk_entry *quirk;
 	struct cam_ed *device;
-	struct cam_ed *cur_device;
 
 	device = xpt_alloc_device(bus, target, lun_id);
 	if (device == NULL)
@@ -1547,16 +1558,6 @@ ata_alloc_device(struct cam_eb *bus, struct cam_et *target, lun_id_t lun_id)
 	 * do.
 	 */
 	bus->sim->max_ccbs += device->ccbq.devq_openings;
-	/* Insertion sort into our target's device list */
-	cur_device = TAILQ_FIRST(&target->ed_entries);
-	while (cur_device != NULL && cur_device->lun_id < lun_id)
-		cur_device = TAILQ_NEXT(cur_device, links);
-	if (cur_device != NULL) {
-		TAILQ_INSERT_BEFORE(cur_device, device, links);
-	} else {
-		TAILQ_INSERT_TAIL(&target->ed_entries, device, links);
-	}
-	target->generation++;
 	if (lun_id != CAM_LUN_WILDCARD) {
 		xpt_compile_path(&path,
 				 NULL,

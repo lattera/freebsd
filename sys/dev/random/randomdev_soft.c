@@ -366,6 +366,8 @@ random_yarrow_unblock(void)
 		selwakeuppri(&random_systat.rsel, PUSER);
 		wakeup(&random_systat);
 	}
+	(void)atomic_cmpset_int(&arc4rand_iniseed_state, ARC4_ENTR_NONE,
+	    ARC4_ENTR_HAVE);
 }
 
 static int
@@ -391,7 +393,7 @@ random_yarrow_block(int flag)
 	mtx_lock(&random_reseed_mtx);
 
 	/* Blocking logic */
-	while (random_systat.seeded && !error) {
+	while (!random_systat.seeded && !error) {
 		if (flag & O_NONBLOCK)
 			error = EWOULDBLOCK;
 		else {

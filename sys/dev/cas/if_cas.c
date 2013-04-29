@@ -824,7 +824,8 @@ cas_disable_rx(struct cas_softc *sc)
 	    BUS_SPACE_BARRIER_READ | BUS_SPACE_BARRIER_WRITE);
 	if (cas_bitwait(sc, CAS_MAC_RX_CONF, CAS_MAC_RX_CONF_EN, 0))
 		return (1);
-	device_printf(sc->sc_dev, "cannot disable RX MAC\n");
+	if (bootverbose)
+		device_printf(sc->sc_dev, "cannot disable RX MAC\n");
 	return (0);
 }
 
@@ -838,7 +839,8 @@ cas_disable_tx(struct cas_softc *sc)
 	    BUS_SPACE_BARRIER_READ | BUS_SPACE_BARRIER_WRITE);
 	if (cas_bitwait(sc, CAS_MAC_TX_CONF, CAS_MAC_TX_CONF_EN, 0))
 		return (1);
-	device_printf(sc->sc_dev, "cannot disable TX MAC\n");
+	if (bootverbose)
+		device_printf(sc->sc_dev, "cannot disable TX MAC\n");
 	return (0);
 }
 
@@ -1041,7 +1043,8 @@ cas_init_locked(struct cas_softc *sc)
 	/*
 	 * Enable infinite bursts for revisions without PCI issues if
 	 * applicable.  Doing so greatly improves the TX performance on
-	 * !__sparc64__.
+	 * !__sparc64__ (on sparc64, setting CAS_INF_BURST improves TX
+	 * performance only marginally but hurts RX throughput quite a bit).
 	 */
 	CAS_WRITE_4(sc, CAS_INF_BURST,
 #if !defined(__sparc64__)
@@ -1201,7 +1204,7 @@ cas_load_txmbuf(struct cas_softc *sc, struct mbuf **m_head)
 	cflags = 0;
 	if (((*m_head)->m_pkthdr.csum_flags & CAS_CSUM_FEATURES) != 0) {
 		if (M_WRITABLE(*m_head) == 0) {
-			m = m_dup(*m_head, M_DONTWAIT);
+			m = m_dup(*m_head, M_NOWAIT);
 			m_freem(*m_head);
 			*m_head = m;
 			if (m == NULL)
@@ -1224,7 +1227,7 @@ cas_load_txmbuf(struct cas_softc *sc, struct mbuf **m_head)
 	error = bus_dmamap_load_mbuf_sg(sc->sc_tdmatag, txs->txs_dmamap,
 	    *m_head, txsegs, &nsegs, BUS_DMA_NOWAIT);
 	if (error == EFBIG) {
-		m = m_collapse(*m_head, M_DONTWAIT, CAS_NTXSEGS);
+		m = m_collapse(*m_head, M_NOWAIT, CAS_NTXSEGS);
 		if (m == NULL) {
 			m_freem(*m_head);
 			*m_head = NULL;
@@ -1723,7 +1726,7 @@ cas_rint(struct cas_softc *sc)
 			    __func__, idx, off, len);
 #endif
 			rxds = &sc->sc_rxdsoft[idx];
-			MGETHDR(m, M_DONTWAIT, MT_DATA);
+			MGETHDR(m, M_NOWAIT, MT_DATA);
 			if (m != NULL) {
 				refcount_acquire(&rxds->rxds_refcount);
 				bus_dmamap_sync(sc->sc_rdmatag,
@@ -1768,7 +1771,7 @@ cas_rint(struct cas_softc *sc)
 			    __func__, idx, off, len);
 #endif
 			rxds = &sc->sc_rxdsoft[idx];
-			MGETHDR(m, M_DONTWAIT, MT_DATA);
+			MGETHDR(m, M_NOWAIT, MT_DATA);
 			if (m != NULL) {
 				refcount_acquire(&rxds->rxds_refcount);
 				off += ETHER_ALIGN;
@@ -1805,7 +1808,7 @@ cas_rint(struct cas_softc *sc)
 #endif
 				rxds2 = &sc->sc_rxdsoft[idx2];
 				if (m != NULL) {
-					MGET(m2, M_DONTWAIT, MT_DATA);
+					MGET(m2, M_NOWAIT, MT_DATA);
 					if (m2 != NULL) {
 						refcount_acquire(
 						    &rxds2->rxds_refcount);
@@ -2691,7 +2694,10 @@ cas_pci_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	pci_enable_busmaster(dev);
+	/* PCI configuration */
+	pci_write_config(dev, PCIR_COMMAND,
+	    pci_read_config(dev, PCIR_COMMAND, 2) | PCIM_CMD_BUSMASTEREN |
+	    PCIM_CMD_MWRICEN | PCIM_CMD_PERRESPEN | PCIM_CMD_SERRESPEN, 2);
 
 	sc->sc_dev = dev;
 	if (sc->sc_variant == CAS_CAS && pci_get_devid(dev) < 0x02)

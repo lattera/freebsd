@@ -53,7 +53,7 @@ struct sockaddr_storage me_sock;
 
 static int send_packet(int peer, uint16_t block, char *pkt, int size);
 
-struct errmsg {
+static struct errmsg {
 	int	e_code;
 	const char	*e_msg;
 } errmsgs[] = {
@@ -72,13 +72,13 @@ struct errmsg {
 #define DROPPACKET(s)							\
 	if (packetdroppercentage != 0 &&				\
 	    random()%100 < packetdroppercentage) {			\
-		tftp_log(LOG_DEBUG, "Artifical packet drop in %s", s);	\
+		tftp_log(LOG_DEBUG, "Artificial packet drop in %s", s);	\
 		return;							\
 	}
 #define DROPPACKETn(s,n)						\
 	if (packetdroppercentage != 0 &&				\
 	    random()%100 < packetdroppercentage) {			\
-		tftp_log(LOG_DEBUG, "Artifical packet drop in %s", s);	\
+		tftp_log(LOG_DEBUG, "Artificial packet drop in %s", s);	\
 		return (n);						\
 	}
 
@@ -106,13 +106,13 @@ send_packet(int peer, uint16_t block, char *pkt, int size)
 	for (i = 0; i < 12 ; i++) {
 		DROPPACKETn("send_packet", 0);
 
-		if (sendto(peer, pkt, size, 0,
-			(struct sockaddr *)&peer_sock, peer_sock.ss_len)
-			== size) {
+		if (sendto(peer, pkt, size, 0, (struct sockaddr *)&peer_sock,
+		    peer_sock.ss_len) == size) {
 			if (i)
 				tftp_log(LOG_ERR,
 				    "%s block %d, attempt %d successful",
-				    block, i);
+		    		    packettype(ntohs(((struct tftphdr *)
+				    (pkt))->th_opcode)), block, i);
 			return (0);
 		}
 		tftp_log(LOG_ERR,
@@ -142,7 +142,7 @@ send_error(int peer, int error)
 	char buf[MAXPKTSIZE];
 
 	if (debug&DEBUG_PACKETS)
-		tftp_log(LOG_DEBUG, "Sending ERROR %d: %s", error);
+		tftp_log(LOG_DEBUG, "Sending ERROR %d", error);
 
 	DROPPACKET("send_error");
 
@@ -374,7 +374,7 @@ send_data(int peer, uint16_t block, char *data, int size)
 /*
  * Receive a packet
  */
-jmp_buf	timeoutbuf;
+static jmp_buf timeoutbuf;
 
 static void
 timeout(int sig __unused)

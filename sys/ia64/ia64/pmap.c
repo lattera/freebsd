@@ -208,7 +208,7 @@ static uma_zone_t ptezone;
  * Virtual Hash Page Table (VHPT) data.
  */
 /* SYSCTL_DECL(_machdep); */
-SYSCTL_NODE(_machdep, OID_AUTO, vhpt, CTLFLAG_RD, 0, "");
+static SYSCTL_NODE(_machdep, OID_AUTO, vhpt, CTLFLAG_RD, 0, "");
 
 struct ia64_bucket *pmap_vhpt_bucket;
 
@@ -1882,6 +1882,30 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 	src = (void *)pmap_page_to_va(msrc);
 	dst = (void *)pmap_page_to_va(mdst);
 	bcopy(src, dst, PAGE_SIZE);
+}
+
+void
+pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
+    vm_offset_t b_offset, int xfersize)
+{
+	void *a_cp, *b_cp;
+	vm_offset_t a_pg_offset, b_pg_offset;
+	int cnt;
+
+	while (xfersize > 0) {
+		a_pg_offset = a_offset & PAGE_MASK;
+		cnt = min(xfersize, PAGE_SIZE - a_pg_offset);
+		a_cp = (char *)pmap_page_to_va(ma[a_offset >> PAGE_SHIFT]) +
+		    a_pg_offset;
+		b_pg_offset = b_offset & PAGE_MASK;
+		cnt = min(cnt, PAGE_SIZE - b_pg_offset);
+		b_cp = (char *)pmap_page_to_va(mb[b_offset >> PAGE_SHIFT]) +
+		    b_pg_offset;
+		bcopy(a_cp, b_cp, cnt);
+		a_offset += cnt;
+		b_offset += cnt;
+		xfersize -= cnt;
+	}
 }
 
 /*

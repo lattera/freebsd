@@ -61,7 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/usb/wlan/if_urtwreg.h>
 #include <dev/usb/wlan/if_urtwvar.h>
 
-SYSCTL_NODE(_hw_usb, OID_AUTO, urtw, CTLFLAG_RW, 0, "USB Realtek 8187L");
+static SYSCTL_NODE(_hw_usb, OID_AUTO, urtw, CTLFLAG_RW, 0, "USB Realtek 8187L");
 #ifdef URTW_DEBUG
 int urtw_debug = 0;
 SYSCTL_INT(_hw_usb_urtw, OID_AUTO, debug, CTLFLAG_RW | CTLFLAG_TUN, &urtw_debug, 0,
@@ -1458,7 +1458,7 @@ urtw_alloc_data_list(struct urtw_softc *sc, struct urtw_data data[],
 
 		dp->sc = sc;
 		if (fillmbuf) {
-			dp->m = m_getcl(M_DONTWAIT, MT_DATA, M_PKTHDR);
+			dp->m = m_getcl(M_NOWAIT, MT_DATA, M_PKTHDR);
 			if (dp->m == NULL) {
 				device_printf(sc->sc_dev,
 				    "could not allocate rx mbuf\n");
@@ -3994,7 +3994,7 @@ urtw_rxeof(struct usb_xfer *xfer, struct urtw_data *data, int *rssi_p,
 		noise = rx->noise;
 	}
 
-	mnew = m_getcl(M_DONTWAIT, MT_DATA, M_PKTHDR);
+	mnew = m_getcl(M_NOWAIT, MT_DATA, M_PKTHDR);
 	if (mnew == NULL) {
 		ifp->if_ierrors++;
 		return (NULL);

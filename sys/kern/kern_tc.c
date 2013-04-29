@@ -91,8 +91,8 @@ static struct timecounter *timecounters = &dummy_timecounter;
 
 int tc_min_ticktock_freq = 1;
 
-time_t time_second = 1;
-time_t time_uptime = 1;
+volatile time_t time_second = 1;
+volatile time_t time_uptime = 1;
 
 struct bintime boottimebin;
 struct timeval boottime;
@@ -101,7 +101,7 @@ SYSCTL_PROC(_kern, KERN_BOOTTIME, boottime, CTLTYPE_STRUCT|CTLFLAG_RD,
     NULL, 0, sysctl_kern_boottime, "S,timeval", "System boottime");
 
 SYSCTL_NODE(_kern, OID_AUTO, timecounter, CTLFLAG_RW, 0, "");
-SYSCTL_NODE(_kern_timecounter, OID_AUTO, tc, CTLFLAG_RW, 0, "");
+static SYSCTL_NODE(_kern_timecounter, OID_AUTO, tc, CTLFLAG_RW, 0, "");
 
 static int timestepwarnings;
 SYSCTL_INT(_kern_timecounter, OID_AUTO, stepwarnings, CTLFLAG_RW,

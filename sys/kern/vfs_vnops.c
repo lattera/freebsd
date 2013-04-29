@@ -7,6 +7,12 @@
  * Co. or Unix System Laboratories, Inc. and are reproduced herein with
  * the permission of UNIX System Laboratories, Inc.
  *
+ * Copyright (c) 2012 Konstantin Belousov <kib@FreeBSD.org>
+ * Copyright (c) 2013 The FreeBSD Foundation
+ *
+ * Portions of this software were developed by Konstantin Belousov
+ * under sponsorship from the FreeBSD Foundation.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -834,8 +840,8 @@ static const int io_hold_cnt = 16;
 static int vn_io_fault_enable = 0;
 SYSCTL_INT(_debug, OID_AUTO, vn_io_fault_enable, CTLFLAG_RW,
     &vn_io_fault_enable, 0, "Enable vn_io_fault lock avoidance");
-static unsigned long vn_io_faults_cnt;
-SYSCTL_LONG(_debug, OID_AUTO, vn_io_faults, CTLFLAG_RD,
+static u_long vn_io_faults_cnt;
+SYSCTL_ULONG(_debug, OID_AUTO, vn_io_faults, CTLFLAG_RD,
     &vn_io_faults_cnt, 0, "Count of vn_io_fault lock avoidance triggers");
 
 /*
@@ -1082,6 +1088,45 @@ vn_io_fault_uiomove(char *data, int xfersize, struct uio *uio)
 	uio->uio_offset += adv;
 	return (error);
 }
+
+int
+vn_io_fault_pgmove(vm_page_t ma[], vm_offset_t offset, int xfersize,
+    struct uio *uio)
+{
+	struct thread *td;
+	vm_offset_t iov_base;
+	int cnt, pgadv;
+
+	td = curthread;
+	if ((td->td_pflags & TDP_UIOHELD) == 0 ||
+	    uio->uio_segflg != UIO_USERSPACE)
+		return (uiomove_fromphys(ma, offset, xfersize, uio));
+
+	KASSERT(uio->uio_iovcnt == 1, ("uio_iovcnt %d", uio->uio_iovcnt));
+	cnt = xfersize > uio->uio_resid ? uio->uio_resid : xfersize;
+	iov_base = (vm_offset_t)uio->uio_iov->iov_base;
+	switch (uio->uio_rw) {
+	case UIO_WRITE:
+		pmap_copy_pages(td->td_ma, iov_base & PAGE_MASK, ma,
+		    offset, cnt);
+		break;
+	case UIO_READ:
+		pmap_copy_pages(ma, offset, td->td_ma, iov_base & PAGE_MASK,
+		    cnt);
+		break;
+	}
+	pgadv = ((iov_base + cnt) >> PAGE_SHIFT) - (iov_base >> PAGE_SHIFT);
+	td->td_ma += pgadv;
+	KASSERT(td->td_ma_cnt >= pgadv, ("consumed pages %d %d", td->td_ma_cnt,
+	    pgadv));
+	td->td_ma_cnt -= pgadv;
+	uio->uio_iov->iov_base = (char *)(iov_base + cnt);
+	uio->uio_iov->iov_len -= cnt;
+	uio->uio_resid -= cnt;
+	uio->uio_offset += cnt;
+	return (0);
+}
+
 
 /*
  * File table truncate routine.

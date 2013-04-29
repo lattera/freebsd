@@ -318,7 +318,8 @@ static MALLOC_DEFINE(M_VFSCACHE, "vfscache", "VFS name cache entries");
 /*
  * Grab an atomic snapshot of the name cache hash chain lengths
  */
-SYSCTL_NODE(_debug, OID_AUTO, hashstat, CTLFLAG_RW, NULL, "hash table stats");
+static SYSCTL_NODE(_debug, OID_AUTO, hashstat, CTLFLAG_RW, NULL,
+    "hash table stats");
 
 static int
 sysctl_debug_hashstat_rawnchash(SYSCTL_HANDLER_ARGS)
@@ -1384,6 +1385,28 @@ vn_fullpath1(struct thread *td, struct vnode *vp, struct vnode *rdir,
 	    0, 0);
 	*retbuf = buf + buflen;
 	return (0);
+}
+
+struct vnode *
+vn_dir_dd_ino(struct vnode *vp)
+{
+	struct namecache *ncp;
+	struct vnode *ddvp;
+
+	ASSERT_VOP_LOCKED(vp, "vn_dir_dd_ino");
+	CACHE_RLOCK();
+	TAILQ_FOREACH(ncp, &(vp->v_cache_dst), nc_dst) {
+		if ((ncp->nc_flag & NCF_ISDOTDOT) != 0)
+			continue;
+		ddvp = ncp->nc_dvp;
+		VI_LOCK(ddvp);
+		CACHE_RUNLOCK();
+		if (vget(ddvp, LK_INTERLOCK | LK_SHARED | LK_NOWAIT, curthread))
+			return (NULL);
+		return (ddvp);
+	}
+	CACHE_RUNLOCK();
+	return (NULL);
 }
 
 int

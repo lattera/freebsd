@@ -202,14 +202,12 @@ g_orphan_register(struct g_provider *pp)
 	 * Tell all consumers the bad news.
 	 * Don't be surprised if they self-destruct.
 	 */
-	cp = LIST_FIRST(&pp->consumers);
-	while (cp != NULL) {
-		cp2 = LIST_NEXT(cp, consumers);
+	LIST_FOREACH_SAFE(cp, &pp->consumers, consumers, cp2) {
 		KASSERT(cp->geom->orphan != NULL,
 		    ("geom %s has no orphan, class %s",
 		    cp->geom->name, cp->geom->class->name));
+		cp->flags |= G_CF_ORPHAN;
 		cp->geom->orphan(cp);
-		cp = cp2;
 	}
 	if (LIST_EMPTY(&pp->consumers) && wf)
 		g_destroy_provider(pp);
@@ -275,21 +273,16 @@ one_event(void)
 void
 g_run_events()
 {
-	int i;
 
 	for (;;) {
 		g_topology_lock();
 		while (one_event())
 			;
 		mtx_assert(&g_eventlock, MA_OWNED);
-		i = g_wither_work;
-		if (i) {
+		if (g_wither_work) {
+			g_wither_work = 0;
 			mtx_unlock(&g_eventlock);
-			while (i) {
-				i = g_wither_washer();
-				g_wither_work = i & 1;
-				i &= 2;
-			}
+			g_wither_washer();
 			g_topology_unlock();
 		} else {
 			g_topology_unlock();
