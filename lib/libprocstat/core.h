@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2007 Robert N. M. Watson
+ * Copyright (c) 2013 Mikolaj Golub <trociny@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -26,54 +26,28 @@
  * $FreeBSD$
  */
 
-#include <sys/param.h>
-#include <sys/sysctl.h>
-#include <sys/user.h>
+#ifndef _CORE_H
+#define _CORE_H
 
-#include <err.h>
-#include <errno.h>
-#include <libprocstat.h>
-#include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+enum psc_type {
+	PSC_TYPE_PROC,
+	PSC_TYPE_FILES,
+	PSC_TYPE_VMMAP,
+	PSC_TYPE_GROUPS,
+	PSC_TYPE_UMASK,
+	PSC_TYPE_RLIMIT,
+	PSC_TYPE_OSREL,
+	PSC_TYPE_PSSTRINGS,
+	PSC_TYPE_ARGV,
+	PSC_TYPE_ENVV,
+	PSC_TYPE_AUXV,
+};
 
-#include "procstat.h"
+struct procstat_core;
 
-static void
-do_args(struct procstat *procstat, struct kinfo_proc *kipp, int env)
-{
-	int i;
-	char **args;
+void procstat_core_close(struct procstat_core *core);
+void *procstat_core_get(struct procstat_core *core, enum psc_type type,
+    void * buf, size_t *lenp);
+struct procstat_core *procstat_core_open(const char *filename);
 
-	if (!hflag) {
-		printf("%5s %-16s %-53s\n", "PID", "COMM",
-		    env ? "ENVIRONMENT" : "ARGS");
-	}
-
-	args = env ? procstat_getenvv(procstat, kipp, 0) :
-	    procstat_getargv(procstat, kipp, 0);
-
-	printf("%5d %-16s", kipp->ki_pid, kipp->ki_comm);
-
-	if (args == NULL) {
-		printf(" -\n");
-		return;
-	}
-
-	for (i = 0; args[i] != NULL; i++)
-		printf(" %s", args[i]);
-	printf("\n");
-}
-
-void
-procstat_args(struct procstat *procstat, struct kinfo_proc *kipp)
-{
-	do_args(procstat, kipp, 0);
-}
-
-void
-procstat_env(struct procstat *procstat, struct kinfo_proc *kipp)
-{
-	do_args(procstat, kipp, 1);
-}
+#endif 	/* !_CORE_H_ */
