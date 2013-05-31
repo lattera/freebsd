@@ -833,6 +833,18 @@ breada(struct vnode * vp, daddr_t * rablkno, int * rabsize,
 }
 
 /*
+ * Operates like bread, but with getblk flags.
+ */
+int
+bread_gb(struct vnode * vp, daddr_t blkno, int cnt, struct ucred * cred,
+    int gbflags, struct buf **bpp)
+{
+
+	return (breadn_flags(vp, blkno, cnt, NULL, NULL, 0,
+		    cred, gbflags, bpp));
+}
+
+/*
  * Operates like bread, but also starts asynchronous I/O on
  * read-ahead blocks.
  */
@@ -1830,7 +1842,7 @@ vfs_bio_awrite(struct buf *bp)
 		if (ncl != 1) {
 			BUF_UNLOCK(bp);
 			nwritten = cluster_wbuild(vp, size, lblkno - j, ncl);
-			return nwritten;
+			return (nwritten);
 		}
 	}
 	bremfree(bp);
