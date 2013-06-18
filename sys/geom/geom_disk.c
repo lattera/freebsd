@@ -138,6 +138,8 @@ g_disk_access(struct g_provider *pp, int r, int w, int e)
 				printf("Opened disk %s -> %d\n",
 				    pp->name, error);
 			g_disk_unlock_giant(dp);
+			if (error != 0)
+				return (error);
 		}
 		pp->mediasize = dp->d_mediasize;
 		pp->sectorsize = dp->d_sectorsize;
@@ -299,13 +301,29 @@ g_disk_start(struct bio *bp)
 		do {
 			bp2->bio_offset += off;
 			bp2->bio_length -= off;
-			bp2->bio_data += off;
+			if ((bp->bio_flags & BIO_UNMAPPED) == 0) {
+				bp2->bio_data += off;
+			} else {
+				KASSERT((dp->d_flags & DISKFLAG_UNMAPPED_BIO)
+				    != 0,
+				    ("unmapped bio not supported by disk %s",
+				    dp->d_name));
+				bp2->bio_ma += off / PAGE_SIZE;
+				bp2->bio_ma_offset += off;
+				bp2->bio_ma_offset %= PAGE_SIZE;
+				bp2->bio_ma_n -= off / PAGE_SIZE;
+			}
 			if (bp2->bio_length > dp->d_maxsize) {
 				/*
 				 * XXX: If we have a stripesize we should really
 				 * use it here.
 				 */
 				bp2->bio_length = dp->d_maxsize;
+				if ((bp->bio_flags & BIO_UNMAPPED) != 0) {
+					bp2->bio_ma_n = howmany(
+					    bp2->bio_ma_offset +
+					    bp2->bio_length, PAGE_SIZE);
+				}
 				off += dp->d_maxsize;
 				/*
 				 * To avoid a race, we need to grab the next bio
@@ -467,6 +485,8 @@ g_disk_create(void *arg, int flag)
 		pp->flags |= G_PF_CANDELETE;
 	pp->stripeoffset = dp->d_stripeoffset;
 	pp->stripesize = dp->d_stripesize;
+	if ((dp->d_flags & DISKFLAG_UNMAPPED_BIO) != 0)
+		pp->flags |= G_PF_ACCEPT_UNMAPPED;
 	if (bootverbose)
 		printf("GEOM: new disk %s\n", gp->name);
 	sysctl_ctx_init(&sc->sysctl_ctx);
