@@ -1246,6 +1246,7 @@ exec_copyout_strings(imgp)
 	size_t execpath_len;
 	int szsigcode, szps;
 	char canary[sizeof(long) * 8];
+    unsigned int sgap;
 
 	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	/*
@@ -1263,7 +1264,8 @@ exec_copyout_strings(imgp)
 		if (p->p_sysent->sv_szsigcode != NULL)
 			szsigcode = *(p->p_sysent->sv_szsigcode);
 	}
-	destp =	(caddr_t)arginfo - szsigcode - SPARE_USRSPACE -
+    sgap=(unsigned int)(ALIGN(arc4random()&((64*1024)-1)));
+	destp =	(caddr_t)arginfo - szsigcode - SPARE_USRSPACE - sgap -
 	    roundup(execpath_len, sizeof(char *)) -
 	    roundup(sizeof(canary), sizeof(char *)) -
 	    roundup(szps, sizeof(char *)) -
