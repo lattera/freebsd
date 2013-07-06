@@ -135,6 +135,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/uio.h>
 #include <sys/jail.h>
+#include <sys/syslog.h>
 
 #include <net/vnet.h>
 
@@ -447,16 +448,24 @@ sonewconn(struct socket *head, int connstatus)
 	over = (head->so_qlen > 3 * head->so_qlimit / 2);
 	ACCEPT_UNLOCK();
 #ifdef REGRESSION
-	if (regression_sonewconn_earlytest && over)
+	if (regression_sonewconn_earlytest && over) {
 #else
-	if (over)
+	if (over) {
 #endif
+		log(LOG_DEBUG, "%s: pcb %p: Listen queue overflow: "
+		    "%i already in queue awaiting acceptance\n",
+		    __func__, head->so_pcb, head->so_qlen);
 		return (NULL);
+	}
 	VNET_ASSERT(head->so_vnet != NULL, ("%s:%d so_vnet is NULL, head=%p",
 	    __func__, __LINE__, head));
 	so = soalloc(head->so_vnet);
-	if (so == NULL)
+	if (so == NULL) {
+		log(LOG_DEBUG, "%s: pcb %p: New socket allocation failure: "
+		    "limit reached or out of memory\n",
+		    __func__, head->so_pcb);
 		return (NULL);
+	}
 	if ((head->so_options & SO_ACCEPTFILTER) != 0)
 		connstatus = 0;
 	so->so_head = head;
@@ -473,9 +482,16 @@ sonewconn(struct socket *head, int connstatus)
 	knlist_init_mtx(&so->so_rcv.sb_sel.si_note, SOCKBUF_MTX(&so->so_rcv));
 	knlist_init_mtx(&so->so_snd.sb_sel.si_note, SOCKBUF_MTX(&so->so_snd));
 	VNET_SO_ASSERT(head);
-	if (soreserve(so, head->so_snd.sb_hiwat, head->so_rcv.sb_hiwat) ||
-	    (*so->so_proto->pr_usrreqs->pru_attach)(so, 0, NULL)) {
+	if (soreserve(so, head->so_snd.sb_hiwat, head->so_rcv.sb_hiwat)) {
 		sodealloc(so);
+		log(LOG_DEBUG, "%s: pcb %p: soreserve() failed\n",
+		    __func__, head->so_pcb);
+		return (NULL);
+	}
+	if ((*so->so_proto->pr_usrreqs->pru_attach)(so, 0, NULL)) {
+		sodealloc(so);
+		log(LOG_DEBUG, "%s: pcb %p: pru_attach() failed\n",
+		    __func__, head->so_pcb);
 		return (NULL);
 	}
 	so->so_rcv.sb_lowat = head->so_rcv.sb_lowat;
@@ -486,6 +502,16 @@ sonewconn(struct socket *head, int connstatus)
 	so->so_snd.sb_flags |= head->so_snd.sb_flags & SB_AUTOSIZE;
 	so->so_state |= connstatus;
 	ACCEPT_LOCK();
+	/*
+	 * The accept socket may be tearing down but we just
+	 * won a race on the ACCEPT_LOCK.
+	 */
+	if (!(head->so_options & SO_ACCEPTCONN)) {
+		SOCK_LOCK(so);
+		so->so_head = NULL;
+		sofree(so);		/* NB: returns ACCEPT_UNLOCK'ed. */
+		return (NULL);
+	}
 	if (connstatus) {
 		TAILQ_INSERT_TAIL(&head->so_comp, so, so_list);
 		so->so_qstate |= SQ_COMP;
@@ -711,9 +737,14 @@ soclose(struct socket *so)
 drop:
 	if (so->so_proto->pr_usrreqs->pru_close != NULL)
 		(*so->so_proto->pr_usrreqs->pru_close)(so);
+	ACCEPT_LOCK();
 	if (so->so_options & SO_ACCEPTCONN) {
 		struct socket *sp;
-		ACCEPT_LOCK();
+		/*
+		 * Prevent new additions to the accept queues due
+		 * to ACCEPT_LOCK races while we are draining them.
+		 */
+		so->so_options &= ~SO_ACCEPTCONN;
 		while ((sp = TAILQ_FIRST(&so->so_incomp)) != NULL) {
 			TAILQ_REMOVE(&so->so_incomp, sp, so_list);
 			so->so_incqlen--;
@@ -732,13 +763,15 @@ drop:
 			soabort(sp);
 			ACCEPT_LOCK();
 		}
-		ACCEPT_UNLOCK();
+		KASSERT((TAILQ_EMPTY(&so->so_comp)),
+		    ("%s: so_comp populated", __func__));
+		KASSERT((TAILQ_EMPTY(&so->so_incomp)),
+		    ("%s: so_incomp populated", __func__));
 	}
-	ACCEPT_LOCK();
 	SOCK_LOCK(so);
 	KASSERT((so->so_state & SS_NOFDREF) == 0, ("soclose: NOFDREF"));
 	so->so_state |= SS_NOFDREF;
-	sorele(so);
+	sorele(so);			/* NB: Returns with ACCEPT_UNLOCK(). */
 	CURVNET_RESTORE();
 	return (error);
 }
@@ -860,12 +893,6 @@ struct so_zerocopy_stats{
 	int found_ifp;
 };
 struct so_zerocopy_stats so_zerocp_stats = {0,0,0};
-#include <netinet/in.h>
-#include <net/route.h>
-#include <netinet/in_pcb.h>
-#include <vm/vm.h>
-#include <vm/vm_page.h>
-#include <vm/vm_object.h>
 
 /*
  * sosend_copyin() is only used if zero copy sockets are enabled.  Otherwise
@@ -890,9 +917,7 @@ sosend_copyin(struct uio *uio, struct mbuf **retmp, int atomic, long *space,
 	long len;
 	ssize_t resid;
 	int error;
-#ifdef ZERO_COPY_SOCKETS
 	int cow_send;
-#endif
 
 	*retmp = top = NULL;
 	mp = &top;
@@ -900,11 +925,8 @@ sosend_copyin(struct uio *uio, struct mbuf **retmp, int atomic, long *space,
 	resid = uio->uio_resid;
 	error = 0;
 	do {
-#ifdef ZERO_COPY_SOCKETS
 		cow_send = 0;
-#endif /* ZERO_COPY_SOCKETS */
 		if (resid >= MINCLSIZE) {
-#ifdef ZERO_COPY_SOCKETS
 			if (top == NULL) {
 				m = m_gethdr(M_WAITOK, MT_DATA);
 				m->m_pkthdr.len = 0;
@@ -912,9 +934,9 @@ sosend_copyin(struct uio *uio, struct mbuf **retmp, int atomic, long *space,
 			} else
 				m = m_get(M_WAITOK, MT_DATA);
 			if (so_zero_copy_send &&
-			    resid>=PAGE_SIZE &&
-			    *space>=PAGE_SIZE &&
-			    uio->uio_iov->iov_len>=PAGE_SIZE) {
+			    resid >= PAGE_SIZE &&
+			    *space >= PAGE_SIZE &&
+			    uio->uio_iov->iov_len >= PAGE_SIZE) {
 				so_zerocp_stats.size_ok++;
 				so_zerocp_stats.align_ok++;
 				cow_send = socow_setup(m, uio);
@@ -924,15 +946,6 @@ sosend_copyin(struct uio *uio, struct mbuf **retmp, int atomic, long *space,
 				m_clget(m, M_WAITOK);
 				len = min(min(MCLBYTES, resid), *space);
 			}
-#else /* ZERO_COPY_SOCKETS */
-			if (top == NULL) {
-				m = m_getcl(M_WAIT, MT_DATA, M_PKTHDR);
-				m->m_pkthdr.len = 0;
-				m->m_pkthdr.rcvif = NULL;
-			} else
-				m = m_getcl(M_WAIT, MT_DATA, 0);
-			len = min(min(MCLBYTES, resid), *space);
-#endif /* ZERO_COPY_SOCKETS */
 		} else {
 			if (top == NULL) {
 				m = m_gethdr(M_WAIT, MT_DATA);
@@ -957,12 +970,10 @@ sosend_copyin(struct uio *uio, struct mbuf **retmp, int atomic, long *space,
 		}
 
 		*space -= len;
-#ifdef ZERO_COPY_SOCKETS
 		if (cow_send)
 			error = 0;
 		else
-#endif /* ZERO_COPY_SOCKETS */
-		error = uiomove(mtod(m, void *), (int)len, uio);
+			error = uiomove(mtod(m, void *), (int)len, uio);
 		resid = uio->uio_resid;
 		m->m_len = len;
 		*mp = m;
@@ -980,7 +991,7 @@ out:
 	*retmp = top;
 	return (error);
 }
-#endif /*ZERO_COPY_SOCKETS*/
+#endif /* ZERO_COPY_SOCKETS */
 
 #define	SBLOCKWAIT(f)	(((f) & MSG_DONTWAIT) ? 0 : SBL_WAIT)
 
@@ -1915,6 +1926,7 @@ release:
 
 /*
  * Optimized version of soreceive() for stream (TCP) sockets.
+ * XXXAO: (MSG_WAITALL | MSG_PEEK) isn't properly handled.
  */
 int
 soreceive_stream(struct socket *so, struct sockaddr **psa, struct uio *uio,
@@ -2003,7 +2015,7 @@ restart:
 
 	/* On MSG_WAITALL we must wait until all data or error arrives. */
 	if ((flags & MSG_WAITALL) &&
-	    (sb->sb_cc >= uio->uio_resid || sb->sb_cc >= sb->sb_lowat))
+	    (sb->sb_cc >= uio->uio_resid || sb->sb_cc >= sb->sb_hiwat))
 		goto deliver;
 
 	/*
@@ -2029,7 +2041,11 @@ deliver:
 	if (mp0 != NULL) {
 		/* Dequeue as many mbufs as possible. */
 		if (!(flags & MSG_PEEK) && len >= sb->sb_mb->m_len) {
-			for (*mp0 = m = sb->sb_mb;
+			if (*mp0 == NULL)
+				*mp0 = sb->sb_mb;
+			else
+				m_cat(*mp0, sb->sb_mb);
+			for (m = sb->sb_mb;
 			     m != NULL && m->m_len <= len;
 			     m = m->m_next) {
 				len -= m->m_len;
@@ -2037,10 +2053,11 @@ deliver:
 				sbfree(sb, m);
 				n = m;
 			}
+			n->m_next = NULL;
 			sb->sb_mb = m;
+			sb->sb_lastrecord = sb->sb_mb;
 			if (sb->sb_mb == NULL)
 				SB_EMPTY_FIXUP(sb);
-			n->m_next = NULL;
 		}
 		/* Copy the remainder. */
 		if (len > 0) {
@@ -2051,9 +2068,9 @@ deliver:
 			if (m == NULL)
 				len = 0;	/* Don't flush data from sockbuf. */
 			else
-				uio->uio_resid -= m->m_len;
+				uio->uio_resid -= len;
 			if (*mp0 != NULL)
-				n->m_next = m;
+				m_cat(*mp0, m);
 			else
 				*mp0 = m;
 			if (*mp0 == NULL) {
