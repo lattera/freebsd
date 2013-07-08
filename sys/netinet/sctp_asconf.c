@@ -1862,7 +1862,6 @@ sctp_addr_mgmt_assoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 {
 	int status;
 
-
 	if ((inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) == 0 ||
 	    sctp_is_feature_off(inp, SCTP_PCB_FLAGS_DO_ASCONF)) {
 		/* subset bound, no ASCONF allowed case, so ignore */
@@ -1917,7 +1916,7 @@ sctp_addr_mgmt_assoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 				return;
 			}
 			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
-				if (stcb->asoc.local_scope == 0) {
+				if (stcb->asoc.scope.local_scope == 0) {
 					return;
 				}
 				/* is it the right link local scope? */
@@ -1925,7 +1924,7 @@ sctp_addr_mgmt_assoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 					return;
 				}
 			}
-			if (stcb->asoc.site_scope == 0 &&
+			if (stcb->asoc.scope.site_scope == 0 &&
 			    IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
 				return;
 			}
@@ -1949,7 +1948,7 @@ sctp_addr_mgmt_assoc(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 				/* we skip unspecifed addresses */
 				return;
 			}
-			if (stcb->asoc.ipv4_local_scope == 0 &&
+			if (stcb->asoc.scope.ipv4_local_scope == 0 &&
 			    IN4_ISPRIVATE_ADDRESS(&sin->sin_addr)) {
 				return;
 			}
@@ -2107,7 +2106,7 @@ sctp_asconf_iterator_stcb(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 					continue;
 				}
 				if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
-					if (stcb->asoc.local_scope == 0) {
+					if (stcb->asoc.scope.local_scope == 0) {
 						continue;
 					}
 					/* is it the right link local scope? */
@@ -2136,7 +2135,7 @@ sctp_asconf_iterator_stcb(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 					/* we skip unspecifed addresses */
 					continue;
 				}
-				if (stcb->asoc.ipv4_local_scope == 0 &&
+				if (stcb->asoc.scope.ipv4_local_scope == 0 &&
 				    IN4_ISPRIVATE_ADDRESS(&sin->sin_addr)) {
 					continue;
 				}
@@ -2199,13 +2198,7 @@ sctp_asconf_iterator_stcb(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 				}
 			} else {
 				/* Need to check scopes for this guy */
-				if (sctp_is_address_in_scope(ifa,
-				    stcb->asoc.ipv4_addr_legal,
-				    stcb->asoc.ipv6_addr_legal,
-				    stcb->asoc.loopback_scope,
-				    stcb->asoc.ipv4_local_scope,
-				    stcb->asoc.local_scope,
-				    stcb->asoc.site_scope, 0) == 0) {
+				if (sctp_is_address_in_scope(ifa, &stcb->asoc.scope, 0) == 0) {
 					continue;
 				}
 			}
@@ -2278,7 +2271,7 @@ sctp_set_primary_ip_address_sa(struct sctp_tcb *stcb, struct sockaddr *sa)
 		/* set primary queuing succeeded */
 		SCTPDBG(SCTP_DEBUG_ASCONF1,
 		    "set_primary_ip_address_sa: queued on tcb=%p, ",
-		    stcb);
+		    (void *)stcb);
 		SCTPDBG_ADDR(SCTP_DEBUG_ASCONF1, sa);
 		if (SCTP_GET_STATE(&stcb->asoc) == SCTP_STATE_OPEN) {
 #ifdef SCTP_TIMER_BASED_ASCONF
@@ -2291,7 +2284,7 @@ sctp_set_primary_ip_address_sa(struct sctp_tcb *stcb, struct sockaddr *sa)
 		}
 	} else {
 		SCTPDBG(SCTP_DEBUG_ASCONF1, "set_primary_ip_address_sa: failed to add to queue on tcb=%p, ",
-		    stcb);
+		    (void *)stcb);
 		SCTPDBG_ADDR(SCTP_DEBUG_ASCONF1, sa);
 		return (-1);
 	}
@@ -2314,7 +2307,7 @@ sctp_set_primary_ip_address(struct sctp_ifa *ifa)
 			    SCTP_SET_PRIM_ADDR)) {
 				/* set primary queuing succeeded */
 				SCTPDBG(SCTP_DEBUG_ASCONF1, "set_primary_ip_address: queued on stcb=%p, ",
-				    stcb);
+				    (void *)stcb);
 				SCTPDBG_ADDR(SCTP_DEBUG_ASCONF1, &ifa->address.sa);
 				if (SCTP_GET_STATE(&stcb->asoc) == SCTP_STATE_OPEN) {
 #ifdef SCTP_TIMER_BASED_ASCONF
@@ -2438,7 +2431,7 @@ sctp_find_valid_localaddr(struct sctp_tcb *stcb, int addr_locked)
 		return (NULL);
 	}
 	LIST_FOREACH(sctp_ifn, &vrf->ifnlist, next_ifn) {
-		if (stcb->asoc.loopback_scope == 0 &&
+		if (stcb->asoc.scope.loopback_scope == 0 &&
 		    SCTP_IFN_IS_IFT_LOOP(sctp_ifn)) {
 			/* Skip if loopback_scope not set */
 			continue;
@@ -2447,7 +2440,7 @@ sctp_find_valid_localaddr(struct sctp_tcb *stcb, int addr_locked)
 			switch (sctp_ifa->address.sa.sa_family) {
 #ifdef INET
 			case AF_INET:
-				if (stcb->asoc.ipv4_addr_legal) {
+				if (stcb->asoc.scope.ipv4_addr_legal) {
 					struct sockaddr_in *sin;
 
 					sin = (struct sockaddr_in *)&sctp_ifa->address.sa;
@@ -2455,7 +2448,7 @@ sctp_find_valid_localaddr(struct sctp_tcb *stcb, int addr_locked)
 						/* skip unspecifed addresses */
 						continue;
 					}
-					if (stcb->asoc.ipv4_local_scope == 0 &&
+					if (stcb->asoc.scope.ipv4_local_scope == 0 &&
 					    IN4_ISPRIVATE_ADDRESS(&sin->sin_addr))
 						continue;
 
@@ -2474,7 +2467,7 @@ sctp_find_valid_localaddr(struct sctp_tcb *stcb, int addr_locked)
 #endif
 #ifdef INET6
 			case AF_INET6:
-				if (stcb->asoc.ipv6_addr_legal) {
+				if (stcb->asoc.scope.ipv6_addr_legal) {
 					struct sockaddr_in6 *sin6;
 
 					if (sctp_ifa->localifa_flags & SCTP_ADDR_IFA_UNUSEABLE) {
@@ -2488,10 +2481,10 @@ sctp_find_valid_localaddr(struct sctp_tcb *stcb, int addr_locked)
 						 */
 						continue;
 					}
-					if (stcb->asoc.local_scope == 0 &&
+					if (stcb->asoc.scope.local_scope == 0 &&
 					    IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
 						continue;
-					if (stcb->asoc.site_scope == 0 &&
+					if (stcb->asoc.scope.site_scope == 0 &&
 					    IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr))
 						continue;
 
