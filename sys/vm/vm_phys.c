@@ -226,9 +226,9 @@ vm_freelist_add(struct vm_freelist *fl, vm_page_t m, int order, int tail)
 
 	m->order = order;
 	if (tail)
-		TAILQ_INSERT_TAIL(&fl[order].pl, m, pageq);
+		TAILQ_INSERT_TAIL(&fl[order].pl, m, plinks.q);
 	else
-		TAILQ_INSERT_HEAD(&fl[order].pl, m, pageq);
+		TAILQ_INSERT_HEAD(&fl[order].pl, m, plinks.q);
 	fl[order].lcnt++;
 }
 
@@ -236,7 +236,7 @@ static void
 vm_freelist_rem(struct vm_freelist *fl, vm_page_t m, int order)
 {
 
-	TAILQ_REMOVE(&fl[order].pl, m, pageq);
+	TAILQ_REMOVE(&fl[order].pl, m, plinks.q);
 	fl[order].lcnt--;
 	m->order = VM_NFREEORDER;
 }
@@ -568,7 +568,8 @@ vm_phys_fictitious_reg_range(vm_paddr_t start, vm_paddr_t end,
 	}
 	for (i = 0; i < page_count; i++) {
 		vm_page_initfake(&fp[i], start + PAGE_SIZE * i, memattr);
-		fp[i].oflags &= ~(VPO_BUSY | VPO_UNMANAGED);
+		fp[i].oflags &= ~VPO_UNMANAGED;
+		fp[i].busy_lock = VPB_UNBUSIED;
 	}
 	mtx_lock(&vm_phys_fictitious_reg_mtx);
 	for (segind = 0; segind < VM_PHYS_FICTITIOUS_NSEGS; segind++) {
@@ -818,7 +819,7 @@ vm_phys_zero_pages_idle(void)
 	fl = vm_phys_free_queues[domain][0][0];
 	mtx_assert(&vm_page_queue_free_mtx, MA_OWNED);
 	for (;;) {
-		TAILQ_FOREACH_REVERSE(m, &fl[oind].pl, pglist, pageq) {
+		TAILQ_FOREACH_REVERSE(m, &fl[oind].pl, pglist, plinks.q) {
 			for (m_tmp = m; m_tmp < &m[1 << oind]; m_tmp++) {
 				if ((m_tmp->flags & (PG_CACHED | PG_ZERO)) == 0) {
 					vm_phys_unfree_page(m_tmp);
@@ -888,7 +889,7 @@ restartdom:
 		for (oind = min(order, VM_NFREEORDER - 1); oind < VM_NFREEORDER; oind++) {
 			for (pind = 0; pind < VM_NFREEPOOL; pind++) {
 				fl = &vm_phys_free_queues[domain][flind][pind][0];
-				TAILQ_FOREACH(m_ret, &fl[oind].pl, pageq) {
+				TAILQ_FOREACH(m_ret, &fl[oind].pl, plinks.q) {
 					/*
 					 * A free list may contain physical pages
 					 * from one or more segments.

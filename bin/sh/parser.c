@@ -96,7 +96,7 @@ static struct heredoc *heredoclist;	/* list of here documents to read */
 static int doprompt;		/* if set, prompt the user */
 static int needprompt;		/* true if interactive and at start of line */
 static int lasttoken;		/* last token read */
-int tokpushback;		/* last token pushed back */
+static int tokpushback;		/* last token pushed back */
 static char *wordtext;		/* text of last word returned by readtoken */
 static int checkkwd;
 static struct nodelist *backquotelist;
@@ -121,6 +121,7 @@ static int readtoken(void);
 static int xxreadtoken(void);
 static int readtoken1(int, const char *, const char *, int);
 static int noexpand(char *);
+static void consumetoken(int);
 static void synexpect(int) __dead2;
 static void synerror(const char *) __dead2;
 static void setprompt(int);
@@ -210,6 +211,7 @@ parsecmd(int interact)
 	heredoclist = NULL;
 
 	tokpushback = 0;
+	checkkwd = 0;
 	doprompt = interact;
 	if (doprompt)
 		setprompt(1);
@@ -412,8 +414,7 @@ command(void)
 		n1->type = NIF;
 		if ((n1->nif.test = list(0, 0)) == NULL)
 			synexpect(-1);
-		if (readtoken() != TTHEN)
-			synexpect(TTHEN);
+		consumetoken(TTHEN);
 		n1->nif.ifpart = list(0, 0);
 		n2 = n1;
 		while (readtoken() == TELIF) {
@@ -422,8 +423,7 @@ command(void)
 			n2->type = NIF;
 			if ((n2->nif.test = list(0, 0)) == NULL)
 				synexpect(-1);
-			if (readtoken() != TTHEN)
-				synexpect(TTHEN);
+			consumetoken(TTHEN);
 			n2->nif.ifpart = list(0, 0);
 		}
 		if (lasttoken == TELSE)
@@ -432,27 +432,20 @@ command(void)
 			n2->nif.elsepart = NULL;
 			tokpushback++;
 		}
-		if (readtoken() != TFI)
-			synexpect(TFI);
+		consumetoken(TFI);
 		checkkwd = CHKKWD | CHKALIAS;
 		break;
 	case TWHILE:
-	case TUNTIL: {
-		int got;
+	case TUNTIL:
 		n1 = (union node *)stalloc(sizeof (struct nbinary));
 		n1->type = (lasttoken == TWHILE)? NWHILE : NUNTIL;
 		if ((n1->nbinary.ch1 = list(0, 0)) == NULL)
 			synexpect(-1);
-		if ((got=readtoken()) != TDO) {
-TRACE(("expecting DO got %s %s\n", tokname[got], got == TWORD ? wordtext : ""));
-			synexpect(TDO);
-		}
+		consumetoken(TDO);
 		n1->nbinary.ch2 = list(0, 0);
-		if (readtoken() != TDONE)
-			synexpect(TDONE);
+		consumetoken(TDONE);
 		checkkwd = CHKKWD | CHKALIAS;
 		break;
-	}
 	case TFOR:
 		if (readtoken() != TWORD || quoteflag || ! goodname(wordtext))
 			synerror("Bad for loop variable");
@@ -500,15 +493,13 @@ TRACE(("expecting DO got %s %s\n", tokname[got], got == TWORD ? wordtext : ""));
 		else
 			synexpect(-1);
 		n1->nfor.body = list(0, 0);
-		if (readtoken() != t)
-			synexpect(t);
+		consumetoken(t);
 		checkkwd = CHKKWD | CHKALIAS;
 		break;
 	case TCASE:
 		n1 = (union node *)stalloc(sizeof (struct ncase));
 		n1->type = NCASE;
-		if (readtoken() != TWORD)
-			synexpect(TWORD);
+		consumetoken(TWORD);
 		n1->ncase.expr = n2 = (union node *)stalloc(sizeof (struct narg));
 		n2->type = NARG;
 		n2->narg.text = wordtext;
@@ -561,32 +552,29 @@ TRACE(("expecting DO got %s %s\n", tokname[got], got == TWORD ? wordtext : ""));
 		n1->type = NSUBSHELL;
 		n1->nredir.n = list(0, 0);
 		n1->nredir.redirect = NULL;
-		if (readtoken() != TRP)
-			synexpect(TRP);
+		consumetoken(TRP);
 		checkkwd = CHKKWD | CHKALIAS;
 		is_subshell = 1;
 		break;
 	case TBEGIN:
 		n1 = list(0, 0);
-		if (readtoken() != TEND)
-			synexpect(TEND);
+		consumetoken(TEND);
 		checkkwd = CHKKWD | CHKALIAS;
 		break;
-	/* Handle an empty command like other simple commands.  */
+	/* A simple command must have at least one redirection or word. */
 	case TBACKGND:
 	case TSEMI:
 	case TAND:
 	case TOR:
-		/*
-		 * An empty command before a ; doesn't make much sense, and
-		 * should certainly be disallowed in the case of `if ;'.
-		 */
+	case TPIPE:
+	case TENDCASE:
+	case TFALLTHRU:
+	case TEOF:
+	case TNL:
+	case TRP:
 		if (!redir)
 			synexpect(-1);
-	case TNL:
-	case TEOF:
 	case TWORD:
-	case TRP:
 		tokpushback++;
 		n1 = simplecmd(rpp, redir);
 		return n1;
@@ -659,8 +647,7 @@ simplecmd(union node **rpp, union node *redir)
 		} else if (lasttoken == TLP && app == &args->narg.next
 					    && rpp == orig_rpp) {
 			/* We have a function */
-			if (readtoken() != TRP)
-				synexpect(TRP);
+			consumetoken(TRP);
 			funclinno = plinno;
 			/*
 			 * - Require plain text.
@@ -734,8 +721,7 @@ parsefname(void)
 {
 	union node *n = redirnode;
 
-	if (readtoken() != TWORD)
-		synexpect(-1);
+	consumetoken(TWORD);
 	if (n->type == NHERE) {
 		struct heredoc *here = heredoc;
 		struct heredoc *p;
@@ -1094,10 +1080,8 @@ done:
 
 	if (oldstyle)
 		doprompt = saveprompt;
-	else {
-		if (readtoken() != TRP)
-			synexpect(TRP);
-	}
+	else
+		consumetoken(TRP);
 
 	(*nlpp)->n = n;
         if (oldstyle) {
@@ -1819,14 +1803,6 @@ parsearith: {
 } /* end of readtoken */
 
 
-void
-resetparser(void)
-{
-	tokpushback = 0;
-	checkkwd = 0;
-}
-
-
 /*
  * Returns true if the text contains nothing to expand (no dollar signs
  * or backquotes).
@@ -1885,6 +1861,14 @@ isassignment(const char *p)
 			return 0;
 		p++;
 	}
+}
+
+
+static void
+consumetoken(int token)
+{
+	if (readtoken() != token)
+		synexpect(token);
 }
 
 
