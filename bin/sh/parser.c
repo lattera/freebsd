@@ -108,12 +108,13 @@ static int funclinno;		/* line # where the current function started */
 static struct parser_temp *parser_temp;
 
 
-static union node *list(int, int);
+static union node *list(int);
 static union node *andor(void);
 static union node *pipeline(void);
 static union node *command(void);
 static union node *simplecmd(union node **, union node *);
 static union node *makename(void);
+static union node *makebinary(int type, union node *n1, union node *n2);
 static void parsefname(void);
 static void parseheredoc(void);
 static int peektoken(void);
@@ -224,18 +225,18 @@ parsecmd(int interact)
 	if (t == TNL)
 		return NULL;
 	tokpushback++;
-	return list(1, 1);
+	return list(1);
 }
 
 
 static union node *
-list(int nlflag, int erflag)
+list(int nlflag)
 {
 	union node *ntop, *n1, *n2, *n3;
 	int tok;
 
 	checkkwd = CHKNL | CHKKWD | CHKALIAS;
-	if (!nlflag && !erflag && tokendlist[peektoken()])
+	if (!nlflag && tokendlist[peektoken()])
 		return NULL;
 	ntop = n1 = NULL;
 	for (;;) {
@@ -257,17 +258,11 @@ list(int nlflag, int erflag)
 		if (ntop == NULL)
 			ntop = n2;
 		else if (n1 == NULL) {
-			n1 = (union node *)stalloc(sizeof (struct nbinary));
-			n1->type = NSEMI;
-			n1->nbinary.ch1 = ntop;
-			n1->nbinary.ch2 = n2;
+			n1 = makebinary(NSEMI, ntop, n2);
 			ntop = n1;
 		}
 		else {
-			n3 = (union node *)stalloc(sizeof (struct nbinary));
-			n3->type = NSEMI;
-			n3->nbinary.ch1 = n1->nbinary.ch2;
-			n3->nbinary.ch2 = n2;
+			n3 = makebinary(NSEMI, n1->nbinary.ch2, n2);
 			n1->nbinary.ch2 = n3;
 			n1 = n3;
 		}
@@ -288,8 +283,7 @@ list(int nlflag, int erflag)
 				tokpushback++;
 			}
 			checkkwd = CHKNL | CHKKWD | CHKALIAS;
-			if (!nlflag && (erflag ? peektoken() == TEOF :
-			    tokendlist[peektoken()]))
+			if (!nlflag && tokendlist[peektoken()])
 				return ntop;
 			break;
 		case TEOF:
@@ -299,7 +293,7 @@ list(int nlflag, int erflag)
 				pungetc();		/* push back EOF on input */
 			return ntop;
 		default:
-			if (nlflag || erflag)
+			if (nlflag)
 				synexpect(-1);
 			tokpushback++;
 			return ntop;
@@ -312,10 +306,10 @@ list(int nlflag, int erflag)
 static union node *
 andor(void)
 {
-	union node *n1, *n2, *n3;
+	union node *n;
 	int t;
 
-	n1 = pipeline();
+	n = pipeline();
 	for (;;) {
 		if ((t = readtoken()) == TAND) {
 			t = NAND;
@@ -323,14 +317,9 @@ andor(void)
 			t = NOR;
 		} else {
 			tokpushback++;
-			return n1;
+			return n;
 		}
-		n2 = pipeline();
-		n3 = (union node *)stalloc(sizeof (struct nbinary));
-		n3->type = t;
-		n3->nbinary.ch1 = n1;
-		n3->nbinary.ch2 = n2;
-		n1 = n3;
+		n = makebinary(t, n, pipeline());
 	}
 }
 
@@ -412,22 +401,22 @@ command(void)
 	case TIF:
 		n1 = (union node *)stalloc(sizeof (struct nif));
 		n1->type = NIF;
-		if ((n1->nif.test = list(0, 0)) == NULL)
+		if ((n1->nif.test = list(0)) == NULL)
 			synexpect(-1);
 		consumetoken(TTHEN);
-		n1->nif.ifpart = list(0, 0);
+		n1->nif.ifpart = list(0);
 		n2 = n1;
 		while (readtoken() == TELIF) {
 			n2->nif.elsepart = (union node *)stalloc(sizeof (struct nif));
 			n2 = n2->nif.elsepart;
 			n2->type = NIF;
-			if ((n2->nif.test = list(0, 0)) == NULL)
+			if ((n2->nif.test = list(0)) == NULL)
 				synexpect(-1);
 			consumetoken(TTHEN);
-			n2->nif.ifpart = list(0, 0);
+			n2->nif.ifpart = list(0);
 		}
 		if (lasttoken == TELSE)
-			n2->nif.elsepart = list(0, 0);
+			n2->nif.elsepart = list(0);
 		else {
 			n2->nif.elsepart = NULL;
 			tokpushback++;
@@ -437,12 +426,11 @@ command(void)
 		break;
 	case TWHILE:
 	case TUNTIL:
-		n1 = (union node *)stalloc(sizeof (struct nbinary));
-		n1->type = (lasttoken == TWHILE)? NWHILE : NUNTIL;
-		if ((n1->nbinary.ch1 = list(0, 0)) == NULL)
+		t = lasttoken;
+		if ((n1 = list(0)) == NULL)
 			synexpect(-1);
 		consumetoken(TDO);
-		n1->nbinary.ch2 = list(0, 0);
+		n1 = makebinary((t == TWHILE)? NWHILE : NUNTIL, n1, list(0));
 		consumetoken(TDONE);
 		checkkwd = CHKKWD | CHKALIAS;
 		break;
@@ -457,10 +445,7 @@ command(void)
 		if (lasttoken == TWORD && ! quoteflag && equal(wordtext, "in")) {
 			app = &ap;
 			while (readtoken() == TWORD) {
-				n2 = (union node *)stalloc(sizeof (struct narg));
-				n2->type = NARG;
-				n2->narg.text = wordtext;
-				n2->narg.backquote = backquotelist;
+				n2 = makename();
 				*app = n2;
 				app = &n2->narg.next;
 			}
@@ -492,7 +477,7 @@ command(void)
 			t = TEND;
 		else
 			synexpect(-1);
-		n1->nfor.body = list(0, 0);
+		n1->nfor.body = list(0);
 		consumetoken(t);
 		checkkwd = CHKKWD | CHKALIAS;
 		break;
@@ -500,11 +485,7 @@ command(void)
 		n1 = (union node *)stalloc(sizeof (struct ncase));
 		n1->type = NCASE;
 		consumetoken(TWORD);
-		n1->ncase.expr = n2 = (union node *)stalloc(sizeof (struct narg));
-		n2->type = NARG;
-		n2->narg.text = wordtext;
-		n2->narg.backquote = backquotelist;
-		n2->narg.next = NULL;
+		n1->ncase.expr = makename();
 		while (readtoken() == TNL);
 		if (lasttoken != TWORD || ! equal(wordtext, "in"))
 			synerror("expecting \"in\"");
@@ -517,10 +498,7 @@ command(void)
 			if (lasttoken == TLP)
 				readtoken();
 			for (;;) {
-				*app = ap = (union node *)stalloc(sizeof (struct narg));
-				ap->type = NARG;
-				ap->narg.text = wordtext;
-				ap->narg.backquote = backquotelist;
+				*app = ap = makename();
 				checkkwd = CHKNL | CHKKWD;
 				if (readtoken() != TPIPE)
 					break;
@@ -530,7 +508,7 @@ command(void)
 			ap->narg.next = NULL;
 			if (lasttoken != TRP)
 				synexpect(TRP);
-			cp->nclist.body = list(0, 0);
+			cp->nclist.body = list(0);
 
 			checkkwd = CHKNL | CHKKWD | CHKALIAS;
 			if ((t = readtoken()) != TESAC) {
@@ -550,14 +528,14 @@ command(void)
 	case TLP:
 		n1 = (union node *)stalloc(sizeof (struct nredir));
 		n1->type = NSUBSHELL;
-		n1->nredir.n = list(0, 0);
+		n1->nredir.n = list(0);
 		n1->nredir.redirect = NULL;
 		consumetoken(TRP);
 		checkkwd = CHKKWD | CHKALIAS;
 		is_subshell = 1;
 		break;
 	case TBEGIN:
-		n1 = list(0, 0);
+		n1 = list(0);
 		consumetoken(TEND);
 		checkkwd = CHKKWD | CHKALIAS;
 		break;
@@ -632,10 +610,7 @@ simplecmd(union node **rpp, union node *redir)
 	for (;;) {
 		checkkwd = savecheckkwd;
 		if (readtoken() == TWORD) {
-			n = (union node *)stalloc(sizeof (struct narg));
-			n->type = NARG;
-			n->narg.text = wordtext;
-			n->narg.backquote = backquotelist;
+			n = makename();
 			*app = n;
 			app = &n->narg.next;
 			if (savecheckkwd != 0 && !isassignment(wordtext))
@@ -693,6 +668,18 @@ makename(void)
 	n->narg.text = wordtext;
 	n->narg.backquote = backquotelist;
 	return n;
+}
+
+static union node *
+makebinary(int type, union node *n1, union node *n2)
+{
+	union node *n;
+
+	n = (union node *)stalloc(sizeof (struct nbinary));
+	n->type = type;
+	n->nbinary.ch1 = n1;
+	n->nbinary.ch2 = n2;
+	return (n);
 }
 
 void
@@ -772,11 +759,7 @@ parseheredoc(void)
 		}
 		readtoken1(pgetc(), here->here->type == NHERE? SQSYNTAX : DQSYNTAX,
 				here->eofmark, here->striptabs);
-		n = (union node *)stalloc(sizeof (struct narg));
-		n->narg.type = NARG;
-		n->narg.next = NULL;
-		n->narg.text = wordtext;
-		n->narg.backquote = backquotelist;
+		n = makename();
 		here->here->nhere.doc = n;
 	}
 }
@@ -1076,11 +1059,13 @@ done:
 		doprompt = 0;
 	}
 
-	n = list(0, oldstyle);
+	n = list(0);
 
-	if (oldstyle)
+	if (oldstyle) {
+		if (peektoken() != TEOF)
+			synexpect(-1);
 		doprompt = saveprompt;
-	else
+	} else
 		consumetoken(TRP);
 
 	(*nlpp)->n = n;
