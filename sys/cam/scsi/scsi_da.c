@@ -83,14 +83,14 @@ typedef enum {
 	DA_FLAG_NEW_PACK	= 0x002,
 	DA_FLAG_PACK_LOCKED	= 0x004,
 	DA_FLAG_PACK_REMOVABLE	= 0x008,
-	DA_FLAG_SAW_MEDIA	= 0x010,
 	DA_FLAG_NEED_OTAG	= 0x020,
 	DA_FLAG_WENT_IDLE	= 0x040,
 	DA_FLAG_RETRY_UA	= 0x080,
 	DA_FLAG_OPEN		= 0x100,
 	DA_FLAG_SCTX_INIT	= 0x200,
 	DA_FLAG_CAN_RC16	= 0x400,
-	DA_FLAG_PROBED		= 0x800		
+	DA_FLAG_PROBED		= 0x800,
+	DA_FLAG_DIRTY		= 0x1000
 } da_flags;
 
 typedef enum {
@@ -98,7 +98,8 @@ typedef enum {
 	DA_Q_NO_SYNC_CACHE	= 0x01,
 	DA_Q_NO_6_BYTE		= 0x02,
 	DA_Q_NO_PREVENT		= 0x04,
-	DA_Q_4K			= 0x08
+	DA_Q_4K			= 0x08,
+	DA_Q_NO_RC16		= 0x10
 } da_quirks;
 
 #define DA_Q_BIT_STRING		\
@@ -106,7 +107,8 @@ typedef enum {
 	"\001NO_SYNC_CACHE"	\
 	"\002NO_6_BYTE"		\
 	"\003NO_PREVENT"	\
-	"\0044K"
+	"\0044K"		\
+	"\005NO_RC16"
 
 typedef enum {
 	DA_CCB_PROBE_RC		= 0x01,
@@ -144,6 +146,22 @@ typedef enum {
 	DA_DELETE_MIN = DA_DELETE_ATA_TRIM,
 	DA_DELETE_MAX = DA_DELETE_ZERO
 } da_delete_methods;
+
+typedef void da_delete_func_t (struct cam_periph *periph, union ccb *ccb,
+			      struct bio *bp);
+static da_delete_func_t da_delete_trim;
+static da_delete_func_t da_delete_unmap;
+static da_delete_func_t da_delete_ws;
+
+static const void * da_delete_functions[] = {
+	NULL,
+	NULL,
+	da_delete_trim,
+	da_delete_unmap,
+	da_delete_ws,
+	da_delete_ws,
+	da_delete_ws
+};
 
 static const char *da_delete_method_names[] =
     { "NONE", "DISABLE", "ATA_TRIM", "UNMAP", "WS16", "WS10", "ZERO" };
@@ -199,6 +217,7 @@ struct da_softc {
 	uint32_t		unmap_max_lba;
 	uint64_t		ws_max_blks;
 	da_delete_methods	delete_method;
+	da_delete_func_t	*delete_func;
 	struct	 disk_params params;
 	struct	 disk *disk;
 	union	 ccb saved_ccb;
@@ -662,6 +681,11 @@ static struct da_quirk_entry da_quirk_table[] =
 	{
 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Kingston", "DataTraveler G3",
 		 "1.00"}, /*quirks*/ DA_Q_NO_PREVENT
+	},
+	{
+		/* At least several Transcent USB sticks lie on RC16. */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "JetFlash", "Transcend*",
+		 "*"}, /*quirks*/ DA_Q_NO_RC16
 	},
 	/* ATA/SATA devices over SAS/USB/... */
 	{
@@ -1169,7 +1193,6 @@ daopen(struct disk *dp)
 {
 	struct cam_periph *periph;
 	struct da_softc *softc;
-	int unit;
 	int error;
 
 	periph = (struct cam_periph *)dp->d_drv1;
@@ -1184,18 +1207,10 @@ daopen(struct disk *dp)
 		return (error);
 	}
 
-	unit = periph->unit_number;
-	softc = (struct da_softc *)periph->softc;
-	softc->flags |= DA_FLAG_OPEN;
-
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE | CAM_DEBUG_PERIPH,
 	    ("daopen\n"));
 
-	if ((softc->flags & DA_FLAG_PACK_INVALID) != 0) {
-		/* Invalidate our pack information. */
-		softc->flags &= ~DA_FLAG_PACK_INVALID;
-	}
-
+	softc = (struct da_softc *)periph->softc;
 	dareprobe(periph);
 
 	/* Wait for the disk size update.  */
@@ -1204,25 +1219,23 @@ daopen(struct disk *dp)
 	if (error != 0)
 		xpt_print(periph->path, "unable to retrieve capacity data");
 
-	if (periph->flags & CAM_PERIPH_INVALID ||
-	    softc->disk->d_sectorsize == 0 ||
-	    softc->disk->d_mediasize == 0)
+	if (periph->flags & CAM_PERIPH_INVALID)
 		error = ENXIO;
 
 	if (error == 0 && (softc->flags & DA_FLAG_PACK_REMOVABLE) != 0 &&
 	    (softc->quirks & DA_Q_NO_PREVENT) == 0)
 		daprevent(periph, PR_PREVENT);
 
-	if (error == 0)
-		softc->flags |= DA_FLAG_SAW_MEDIA;
+	if (error == 0) {
+		softc->flags &= ~DA_FLAG_PACK_INVALID;
+		softc->flags |= DA_FLAG_OPEN;
+	}
 
 	cam_periph_unhold(periph);
 	cam_periph_unlock(periph);
 
-	if (error != 0) {
-		softc->flags &= ~DA_FLAG_OPEN;
+	if (error != 0)
 		cam_periph_release(periph);
-	}
 
 	return (error);
 }
@@ -1232,6 +1245,7 @@ daclose(struct disk *dp)
 {
 	struct	cam_periph *periph;
 	struct	da_softc *softc;
+	int error;
 
 	periph = (struct cam_periph *)dp->d_drv1;
 	cam_periph_lock(periph);
@@ -1246,8 +1260,9 @@ daclose(struct disk *dp)
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE | CAM_DEBUG_PERIPH,
 	    ("daclose\n"));
 
-	if ((softc->quirks & DA_Q_NO_SYNC_CACHE) == 0
-	 && (softc->flags & DA_FLAG_PACK_INVALID) == 0) {
+	if ((softc->flags & DA_FLAG_DIRTY) != 0 &&
+	    (softc->quirks & DA_Q_NO_SYNC_CACHE) == 0 &&
+	    (softc->flags & DA_FLAG_PACK_INVALID) == 0) {
 		union	ccb *ccb;
 
 		ccb = cam_periph_getccb(periph, CAM_PRIORITY_NORMAL);
@@ -1261,9 +1276,11 @@ daclose(struct disk *dp)
 				       SSD_FULL_SIZE,
 				       5 * 60 * 1000);
 
-		cam_periph_runccb(ccb, daerror, /*cam_flags*/0,
+		error = cam_periph_runccb(ccb, daerror, /*cam_flags*/0,
 				  /*sense_flags*/SF_RETRY_UA | SF_QUIET_IR,
 				  softc->disk->d_devstat);
+		if (error == 0)
+			softc->flags &= ~DA_FLAG_DIRTY;
 		xpt_release_ccb(ccb);
 
 	}
@@ -1813,6 +1830,7 @@ dadeletemethodset(struct da_softc *softc, da_delete_methods delete_method)
 
 	softc->delete_method = delete_method;
 	softc->disk->d_delmaxsize = dadeletemaxsize(softc, delete_method);
+	softc->delete_func = da_delete_functions[delete_method];
 
 	if (softc->delete_method > DA_DELETE_DISABLE)
 		softc->disk->d_flags |= DISKFLAG_CANDELETE;
@@ -2064,7 +2082,8 @@ daregister(struct cam_periph *periph, void *arg)
 		softc->minimum_cmd_size = 16;
 
 	/* Predict whether device may support READ CAPACITY(16). */
-	if (SID_ANSI_REV(&cgd->inq_data) >= SCSI_REV_SPC3) {
+	if (SID_ANSI_REV(&cgd->inq_data) >= SCSI_REV_SPC3 &&
+	    (softc->quirks & DA_Q_NO_RC16) == 0) {
 		softc->flags |= DA_FLAG_CAN_RC16;
 		softc->state = DA_STATE_PROBE_RC16;
 	}
@@ -2172,7 +2191,7 @@ skipstate:
 	switch (softc->state) {
 	case DA_STATE_NORMAL:
 	{
-		struct bio *bp, *bp1;
+		struct bio *bp;
 		uint8_t tag_code;
 
 		/* Execute immediate CCB if waiting. */
@@ -2192,237 +2211,13 @@ skipstate:
 		/* Run BIO_DELETE if not running yet. */
 		if (!softc->delete_running &&
 		    (bp = bioq_first(&softc->delete_queue)) != NULL) {
-		    uint64_t lba;
-		    uint64_t count; /* forward compat with WS32 */
-
-		    /*
-		     * In each of the methods below, while its the caller's
-		     * responsibility to ensure the request will fit into a
-		     * single device request, we might have changed the delete
-		     * method due to the device incorrectly advertising either
-		     * its supported methods or limits.
-		     * 
-		     * To prevent this causing further issues we validate the
-		     * against the methods limits, and warn which would
-		     * otherwise be unnecessary.
-		     */
-
-		    if (softc->delete_method == DA_DELETE_UNMAP) {
-			uint8_t *buf = softc->unmap_buf;
-			uint64_t lastlba = (uint64_t)-1;
-			uint32_t lastcount = 0, c;
-			uint64_t totalcount = 0;
-			uint32_t off, ranges = 0;
-
-			/*
-			 * Currently this doesn't take the UNMAP
-			 * Granularity and Granularity Alignment
-			 * fields into account.
-			 *
-			 * This could result in both unoptimal unmap
-			 * requests as as well as UNMAP calls unmapping
-			 * fewer LBA's than requested.
-			 */
-
-			softc->delete_running = 1;
-			bzero(softc->unmap_buf, sizeof(softc->unmap_buf));
-			bp1 = bp;
-			do {
-				bioq_remove(&softc->delete_queue, bp1);
-				if (bp1 != bp)
-					bioq_insert_tail(&softc->delete_run_queue, bp1);
-				lba = bp1->bio_pblkno;
-				count = bp1->bio_bcount / softc->params.secsize;
-
-				/* Try to extend the previous range. */
-				if (lba == lastlba) {
-					c = min(count, softc->unmap_max_lba -
-						lastcount);
-					lastcount += c;
-					off = ((ranges - 1) * UNMAP_RANGE_SIZE) +
-					      UNMAP_HEAD_SIZE;
-					scsi_ulto4b(lastcount, &buf[off + 8]);
-					count -= c;
-					lba +=c;
-					totalcount += c;
-				}
-
-				while (count > 0) {
-					c = min(count, softc->unmap_max_lba);
-					if (totalcount + c > softc->unmap_max_lba ||
-					    ranges >= softc->unmap_max_ranges) {
-						xpt_print(periph->path,
-						  "%s issuing short delete %ld > %ld"
-						  "|| %d >= %d",
-						  da_delete_method_desc[softc->delete_method],
-						  totalcount + c, softc->unmap_max_lba,
-						  ranges, softc->unmap_max_ranges);
-						break;
-					}
-					off = (ranges * UNMAP_RANGE_SIZE) +
-					      UNMAP_HEAD_SIZE;
-					scsi_u64to8b(lba, &buf[off + 0]);
-					scsi_ulto4b(c, &buf[off + 8]);
-					lba += c;
-					totalcount += c;
-					ranges++;
-					count -= c;
-					lastcount = c;
-				}
-				lastlba = lba;
-				bp1 = bioq_first(&softc->delete_queue);
-				if (bp1 == NULL ||
-				    ranges >= softc->unmap_max_ranges ||
-				    totalcount + bp1->bio_bcount /
-				     softc->params.secsize > softc->unmap_max_lba)
-					break;
-			} while (1);
-			scsi_ulto2b(ranges * 16 + 6, &buf[0]);
-			scsi_ulto2b(ranges * 16, &buf[2]);
-
-			scsi_unmap(&start_ccb->csio,
-					/*retries*/da_retry_count,
-					/*cbfcnp*/dadone,
-					/*tag_action*/MSG_SIMPLE_Q_TAG,
-					/*byte2*/0,
-					/*data_ptr*/ buf,
-					/*dxfer_len*/ ranges * 16 + 8,
-					/*sense_len*/SSD_FULL_SIZE,
-					da_default_timeout * 1000);
-			start_ccb->ccb_h.ccb_state = DA_CCB_DELETE;
-			goto out;
-		    } else if (softc->delete_method == DA_DELETE_ATA_TRIM) {
-				uint8_t *buf = softc->unmap_buf;
-				uint64_t lastlba = (uint64_t)-1;
-				uint32_t lastcount = 0, c, requestcount;
-				int ranges = 0, off, block_count;
-
-				softc->delete_running = 1;
-				bzero(softc->unmap_buf, sizeof(softc->unmap_buf));
-				bp1 = bp;
-				do {
-					bioq_remove(&softc->delete_queue, bp1);
-					if (bp1 != bp)
-						bioq_insert_tail(&softc->delete_run_queue, bp1);
-					lba = bp1->bio_pblkno;
-					count = bp1->bio_bcount / softc->params.secsize;
-					requestcount = count;
-
-					/* Try to extend the previous range. */
-					if (lba == lastlba) {
-						c = min(count, ATA_DSM_RANGE_MAX - lastcount);
-						lastcount += c;
-						off = (ranges - 1) * 8;
-						buf[off + 6] = lastcount & 0xff;
-						buf[off + 7] = (lastcount >> 8) & 0xff;
-						count -= c;
-						lba += c;
-					}
-
-					while (count > 0) {
-						c = min(count, ATA_DSM_RANGE_MAX);
-						off = ranges * 8;
-
-						buf[off + 0] = lba & 0xff;
-						buf[off + 1] = (lba >> 8) & 0xff;
-						buf[off + 2] = (lba >> 16) & 0xff;
-						buf[off + 3] = (lba >> 24) & 0xff;
-						buf[off + 4] = (lba >> 32) & 0xff;
-						buf[off + 5] = (lba >> 40) & 0xff;
-						buf[off + 6] = c & 0xff;
-						buf[off + 7] = (c >> 8) & 0xff;
-						lba += c;
-						ranges++;
-						count -= c;
-						lastcount = c;
-						if (count != 0 && ranges == softc->trim_max_ranges) {
-							xpt_print(periph->path,
-							  "%s issuing short delete %ld > %ld",
-							  da_delete_method_desc[softc->delete_method],
-							  requestcount,
-							  (softc->trim_max_ranges - ranges) *
-							  ATA_DSM_RANGE_MAX);
-							break;
-						}
-					}
-					lastlba = lba;
-					bp1 = bioq_first(&softc->delete_queue);
-					if (bp1 == NULL ||
-					    bp1->bio_bcount / softc->params.secsize >
-					    (softc->trim_max_ranges - ranges) *
-						    ATA_DSM_RANGE_MAX)
-						break;
-				} while (1);
-
-				block_count = (ranges + ATA_DSM_BLK_RANGES - 1) /
-					      ATA_DSM_BLK_RANGES;
-				scsi_ata_trim(&start_ccb->csio,
-						/*retries*/da_retry_count,
-						/*cbfcnp*/dadone,
-						/*tag_action*/MSG_SIMPLE_Q_TAG,
-						block_count,
-						/*data_ptr*/buf,
-						/*dxfer_len*/block_count * ATA_DSM_BLK_SIZE,
-						/*sense_len*/SSD_FULL_SIZE,
-						da_default_timeout * 1000);
-				start_ccb->ccb_h.ccb_state = DA_CCB_DELETE;
+			if (softc->delete_func != NULL) {
+				softc->delete_func(periph, start_ccb, bp);
 				goto out;
-		    } else if (softc->delete_method == DA_DELETE_ZERO ||
-			       softc->delete_method == DA_DELETE_WS10 ||
-			       softc->delete_method == DA_DELETE_WS16) {
-			/*
-			 * We calculate ws_max_blks here based off d_delmaxsize instead
-			 * of using softc->ws_max_blks as it is absolute max for the
-			 * device not the protocol max which may well be lower
-			 */
-			uint64_t ws_max_blks;
-			ws_max_blks = softc->disk->d_delmaxsize / softc->params.secsize;
-			softc->delete_running = 1;
-			lba = bp->bio_pblkno;
-			count = 0;
-			bp1 = bp;
-			do {
-				bioq_remove(&softc->delete_queue, bp1);
-				if (bp1 != bp)
-					bioq_insert_tail(&softc->delete_run_queue, bp1);
-				count += bp1->bio_bcount / softc->params.secsize;
-				if (count > ws_max_blks) {
-					count = min(count, ws_max_blks);
-					xpt_print(periph->path,
-					  "%s issuing short delete %ld > %ld",
-					  da_delete_method_desc[softc->delete_method],
-					  count, ws_max_blks);
-					break;
-				}
-				bp1 = bioq_first(&softc->delete_queue);
-				if (bp1 == NULL ||
-				    lba + count != bp1->bio_pblkno ||
-				    count + bp1->bio_bcount /
-				     softc->params.secsize > ws_max_blks)
-					break;
-			} while (1);
-
-			scsi_write_same(&start_ccb->csio,
-					/*retries*/da_retry_count,
-					/*cbfcnp*/dadone,
-					/*tag_action*/MSG_SIMPLE_Q_TAG,
-					/*byte2*/softc->delete_method ==
-					    DA_DELETE_ZERO ? 0 : SWS_UNMAP,
-					softc->delete_method ==
-					    DA_DELETE_WS16 ? 16 : 10,
-					/*lba*/lba,
-					/*block_count*/count,
-					/*data_ptr*/ __DECONST(void *,
-					    zero_region),
-					/*dxfer_len*/ softc->params.secsize,
-					/*sense_len*/SSD_FULL_SIZE,
-					da_default_timeout * 1000);
-			start_ccb->ccb_h.ccb_state = DA_CCB_DELETE;
-			goto out;
-		    } else {
-			bioq_flush(&softc->delete_queue, NULL, 0);
-			/* FALLTHROUGH */
-		    }
+			} else {
+				bioq_flush(&softc->delete_queue, NULL, 0);
+				/* FALLTHROUGH */
+			}
 		}
 
 		/* Run regular command. */
@@ -2458,8 +2253,10 @@ skipstate:
 		}
 
 		switch (bp->bio_cmd) {
-		case BIO_READ:
 		case BIO_WRITE:
+			softc->flags |= DA_FLAG_DIRTY;
+			/* FALLTHROUGH */
+		case BIO_READ:
 			scsi_read_write(&start_ccb->csio,
 					/*retries*/da_retry_count,
 					/*cbfcnp*/dadone,
@@ -2714,6 +2511,240 @@ out:
 	}
 }
 
+/*
+ * In each of the methods below, while its the caller's
+ * responsibility to ensure the request will fit into a
+ * single device request, we might have changed the delete
+ * method due to the device incorrectly advertising either
+ * its supported methods or limits.
+ * 
+ * To prevent this causing further issues we validate the
+ * against the methods limits, and warn which would
+ * otherwise be unnecessary.
+ */
+static void
+da_delete_unmap(struct cam_periph *periph, union ccb *ccb, struct bio *bp)
+{
+	struct da_softc *softc = (struct da_softc *)periph->softc;;
+	struct bio *bp1;
+	uint8_t *buf = softc->unmap_buf;
+	uint64_t lba, lastlba = (uint64_t)-1;
+	uint64_t totalcount = 0;
+	uint64_t count;
+	uint32_t lastcount = 0, c;
+	uint32_t off, ranges = 0;
+
+	/*
+	 * Currently this doesn't take the UNMAP
+	 * Granularity and Granularity Alignment
+	 * fields into account.
+	 *
+	 * This could result in both unoptimal unmap
+	 * requests as as well as UNMAP calls unmapping
+	 * fewer LBA's than requested.
+	 */
+
+	softc->delete_running = 1;
+	bzero(softc->unmap_buf, sizeof(softc->unmap_buf));
+	bp1 = bp;
+	do {
+		bioq_remove(&softc->delete_queue, bp1);
+		if (bp1 != bp)
+			bioq_insert_tail(&softc->delete_run_queue, bp1);
+		lba = bp1->bio_pblkno;
+		count = bp1->bio_bcount / softc->params.secsize;
+
+		/* Try to extend the previous range. */
+		if (lba == lastlba) {
+			c = min(count, softc->unmap_max_lba - lastcount);
+			lastcount += c;
+			off = ((ranges - 1) * UNMAP_RANGE_SIZE) +
+			      UNMAP_HEAD_SIZE;
+			scsi_ulto4b(lastcount, &buf[off + 8]);
+			count -= c;
+			lba +=c;
+			totalcount += c;
+		}
+
+		while (count > 0) {
+			c = min(count, softc->unmap_max_lba);
+			if (totalcount + c > softc->unmap_max_lba ||
+			    ranges >= softc->unmap_max_ranges) {
+				xpt_print(periph->path,
+				    "%s issuing short delete %ld > %ld"
+				    "|| %d >= %d",
+				    da_delete_method_desc[softc->delete_method],
+				    totalcount + c, softc->unmap_max_lba,
+				    ranges, softc->unmap_max_ranges);
+				break;
+			}
+			off = (ranges * UNMAP_RANGE_SIZE) + UNMAP_HEAD_SIZE;
+			scsi_u64to8b(lba, &buf[off + 0]);
+			scsi_ulto4b(c, &buf[off + 8]);
+			lba += c;
+			totalcount += c;
+			ranges++;
+			count -= c;
+			lastcount = c;
+		}
+		lastlba = lba;
+		bp1 = bioq_first(&softc->delete_queue);
+		if (bp1 == NULL || ranges >= softc->unmap_max_ranges ||
+		    totalcount + bp1->bio_bcount /
+		    softc->params.secsize > softc->unmap_max_lba)
+			break;
+	} while (1);
+	scsi_ulto2b(ranges * 16 + 6, &buf[0]);
+	scsi_ulto2b(ranges * 16, &buf[2]);
+
+	scsi_unmap(&ccb->csio,
+		   /*retries*/da_retry_count,
+		   /*cbfcnp*/dadone,
+		   /*tag_action*/MSG_SIMPLE_Q_TAG,
+		   /*byte2*/0,
+		   /*data_ptr*/ buf,
+		   /*dxfer_len*/ ranges * 16 + 8,
+		   /*sense_len*/SSD_FULL_SIZE,
+		   da_default_timeout * 1000);
+	ccb->ccb_h.ccb_state = DA_CCB_DELETE;
+}
+
+static void
+da_delete_trim(struct cam_periph *periph, union ccb *ccb, struct bio *bp)
+{
+	struct da_softc *softc = (struct da_softc *)periph->softc;
+	struct bio *bp1;
+	uint8_t *buf = softc->unmap_buf;
+	uint64_t lastlba = (uint64_t)-1;
+	uint64_t count;
+	uint64_t lba;
+	uint32_t lastcount = 0, c, requestcount;
+	int ranges = 0, off, block_count;
+
+	softc->delete_running = 1;
+	bzero(softc->unmap_buf, sizeof(softc->unmap_buf));
+	bp1 = bp;
+	do {
+		bioq_remove(&softc->delete_queue, bp1);
+		if (bp1 != bp)
+			bioq_insert_tail(&softc->delete_run_queue, bp1);
+		lba = bp1->bio_pblkno;
+		count = bp1->bio_bcount / softc->params.secsize;
+		requestcount = count;
+
+		/* Try to extend the previous range. */
+		if (lba == lastlba) {
+			c = min(count, ATA_DSM_RANGE_MAX - lastcount);
+			lastcount += c;
+			off = (ranges - 1) * 8;
+			buf[off + 6] = lastcount & 0xff;
+			buf[off + 7] = (lastcount >> 8) & 0xff;
+			count -= c;
+			lba += c;
+		}
+
+		while (count > 0) {
+			c = min(count, ATA_DSM_RANGE_MAX);
+			off = ranges * 8;
+
+			buf[off + 0] = lba & 0xff;
+			buf[off + 1] = (lba >> 8) & 0xff;
+			buf[off + 2] = (lba >> 16) & 0xff;
+			buf[off + 3] = (lba >> 24) & 0xff;
+			buf[off + 4] = (lba >> 32) & 0xff;
+			buf[off + 5] = (lba >> 40) & 0xff;
+			buf[off + 6] = c & 0xff;
+			buf[off + 7] = (c >> 8) & 0xff;
+			lba += c;
+			ranges++;
+			count -= c;
+			lastcount = c;
+			if (count != 0 && ranges == softc->trim_max_ranges) {
+				xpt_print(periph->path,
+				    "%s issuing short delete %ld > %ld",
+				    da_delete_method_desc[softc->delete_method],
+				    requestcount,
+				    (softc->trim_max_ranges - ranges) *
+				    ATA_DSM_RANGE_MAX);
+				break;
+			}
+		}
+		lastlba = lba;
+		bp1 = bioq_first(&softc->delete_queue);
+		if (bp1 == NULL || bp1->bio_bcount / softc->params.secsize >
+		    (softc->trim_max_ranges - ranges) * ATA_DSM_RANGE_MAX)
+			break;
+	} while (1);
+
+	block_count = (ranges + ATA_DSM_BLK_RANGES - 1) / ATA_DSM_BLK_RANGES;
+	scsi_ata_trim(&ccb->csio,
+		      /*retries*/da_retry_count,
+		      /*cbfcnp*/dadone,
+		      /*tag_action*/MSG_SIMPLE_Q_TAG,
+		      block_count,
+		      /*data_ptr*/buf,
+		      /*dxfer_len*/block_count * ATA_DSM_BLK_SIZE,
+		      /*sense_len*/SSD_FULL_SIZE,
+		      da_default_timeout * 1000);
+	ccb->ccb_h.ccb_state = DA_CCB_DELETE;
+}
+
+/*
+ * We calculate ws_max_blks here based off d_delmaxsize instead
+ * of using softc->ws_max_blks as it is absolute max for the
+ * device not the protocol max which may well be lower
+ */
+static void
+da_delete_ws(struct cam_periph *periph, union ccb *ccb, struct bio *bp)
+{
+	struct da_softc *softc;
+	struct bio *bp1;
+	uint64_t ws_max_blks;
+	uint64_t lba;
+	uint64_t count; /* forward compat with WS32 */
+
+	softc = (struct da_softc *)periph->softc;
+	ws_max_blks = softc->disk->d_delmaxsize / softc->params.secsize;
+	softc->delete_running = 1;
+	lba = bp->bio_pblkno;
+	count = 0;
+	bp1 = bp;
+	do {
+		bioq_remove(&softc->delete_queue, bp1);
+		if (bp1 != bp)
+			bioq_insert_tail(&softc->delete_run_queue, bp1);
+		count += bp1->bio_bcount / softc->params.secsize;
+		if (count > ws_max_blks) {
+			count = min(count, ws_max_blks);
+			xpt_print(periph->path,
+			    "%s issuing short delete %ld > %ld",
+			    da_delete_method_desc[softc->delete_method],
+			    count, ws_max_blks);
+			break;
+		}
+		bp1 = bioq_first(&softc->delete_queue);
+		if (bp1 == NULL || lba + count != bp1->bio_pblkno ||
+		    count + bp1->bio_bcount /
+		    softc->params.secsize > ws_max_blks)
+			break;
+	} while (1);
+
+	scsi_write_same(&ccb->csio,
+			/*retries*/da_retry_count,
+			/*cbfcnp*/dadone,
+			/*tag_action*/MSG_SIMPLE_Q_TAG,
+			/*byte2*/softc->delete_method ==
+			    DA_DELETE_ZERO ? 0 : SWS_UNMAP,
+			softc->delete_method == DA_DELETE_WS16 ? 16 : 10,
+			/*lba*/lba,
+			/*block_count*/count,
+			/*data_ptr*/ __DECONST(void *, zero_region),
+			/*dxfer_len*/ softc->params.secsize,
+			/*sense_len*/SSD_FULL_SIZE,
+			da_default_timeout * 1000);
+	ccb->ccb_h.ccb_state = DA_CCB_DELETE;
+}
+
 static int
 cmd6workaround(union ccb *ccb)
 {
@@ -2766,6 +2797,29 @@ cmd6workaround(union ccb *ccb)
 		bioq_insert_tail(&softc->delete_queue,
 		    (struct bio *)ccb->ccb_h.ccb_bp);
 		ccb->ccb_h.ccb_bp = NULL;
+		return (0);
+	}
+
+	/* Detect unsupported PREVENT ALLOW MEDIUM REMOVAL. */
+	if ((ccb->ccb_h.flags & CAM_CDB_POINTER) == 0 &&
+	    (*cdb == PREVENT_ALLOW) &&
+	    (softc->quirks & DA_Q_NO_PREVENT) == 0) {
+		if (bootverbose)
+			xpt_print(ccb->ccb_h.path,
+			    "PREVENT ALLOW MEDIUM REMOVAL not supported.\n");
+		softc->quirks |= DA_Q_NO_PREVENT;
+		return (0);
+	}
+
+	/* Detect unsupported SYNCHRONIZE CACHE(10). */
+	if ((ccb->ccb_h.flags & CAM_CDB_POINTER) == 0 &&
+	    (*cdb == SYNCHRONIZE_CACHE) &&
+	    (softc->quirks & DA_Q_NO_SYNC_CACHE) == 0) {
+		if (bootverbose)
+			xpt_print(ccb->ccb_h.path,
+			    "SYNCHRONIZE CACHE(10) not supported.\n");
+		softc->quirks |= DA_Q_NO_SYNC_CACHE;
+		softc->disk->d_flags &= ~DISKFLAG_CANFLUSHCACHE;
 		return (0);
 	}
 
@@ -2875,7 +2929,10 @@ dadone(struct cam_periph *periph, union ccb *done_ccb)
 					bp->bio_flags |= BIO_ERROR;
 				}
 			} else if (bp != NULL) {
-				bp->bio_resid = csio->resid;
+				if (state == DA_CCB_DELETE)
+					bp->bio_resid = 0;
+				else
+					bp->bio_resid = csio->resid;
 				bp->bio_error = 0;
 				if (bp->bio_resid != 0)
 					bp->bio_flags |= BIO_ERROR;
@@ -2889,7 +2946,10 @@ dadone(struct cam_periph *periph, union ccb *done_ccb)
 		} else if (bp != NULL) {
 			if ((done_ccb->ccb_h.status & CAM_DEV_QFRZN) != 0)
 				panic("REQ_CMP with QFRZN");
-			bp->bio_resid = csio->resid;
+			if (state == DA_CCB_DELETE)
+				bp->bio_resid = 0;
+			else
+				bp->bio_resid = csio->resid;
 			if (csio->resid > 0)
 				bp->bio_flags |= BIO_ERROR;
 			if (softc->error_inject != 0) {
@@ -2898,7 +2958,6 @@ dadone(struct cam_periph *periph, union ccb *done_ccb)
 				bp->bio_flags |= BIO_ERROR;
 				softc->error_inject = 0;
 			}
-
 		}
 
 		/*
@@ -2910,18 +2969,15 @@ dadone(struct cam_periph *periph, union ccb *done_ccb)
 		if (softc->outstanding_cmds == 0)
 			softc->flags |= DA_FLAG_WENT_IDLE;
 
-		if ((softc->flags & DA_FLAG_PACK_INVALID) != 0) {
-			xpt_print(periph->path, "oustanding %d\n",
-				  softc->outstanding_cmds);
-		}
-
 		if (state == DA_CCB_DELETE) {
 			while ((bp1 = bioq_takefirst(&softc->delete_run_queue))
 			    != NULL) {
-				bp1->bio_resid = bp->bio_resid;
 				bp1->bio_error = bp->bio_error;
-				if (bp->bio_flags & BIO_ERROR)
+				if (bp->bio_flags & BIO_ERROR) {
 					bp1->bio_flags |= BIO_ERROR;
+					bp1->bio_resid = bp1->bio_bcount;
+				} else
+					bp1->bio_resid = 0;
 				biodone(bp1);
 			}
 			softc->delete_running = 0;
@@ -2990,9 +3046,10 @@ dadone(struct cam_periph *periph, union ccb *done_ccb)
 			 * here.
 			 */
 			if (block_size == 0 && maxsector == 0) {
-				snprintf(announce_buf, sizeof(announce_buf),
-				        "0MB (no media?)");
-			} else if (block_size >= MAXPHYS || block_size == 0) {
+				block_size = 512;
+				maxsector = -1;
+			}
+			if (block_size >= MAXPHYS || block_size == 0) {
 				xpt_print(periph->path,
 				    "unsupportable block size %ju\n",
 				    (uintmax_t) block_size);
@@ -3092,6 +3149,7 @@ dadone(struct cam_periph *periph, union ccb *done_ccb)
 					const char *sense_key_desc;
 					const char *asc_desc;
 
+					dasetgeom(periph, 512, -1, NULL, 0);
 					scsi_sense_desc(sense_key, asc, ascq,
 							&cgd.inq_data,
 							&sense_key_desc,
@@ -3470,8 +3528,8 @@ daerror(union ccb *ccb, u_int32_t cam_flags, u_int32_t sense_flags)
 		    asc == 0x28 && ascq == 0x00)
 			disk_media_changed(softc->disk, M_NOWAIT);
 		else if (sense_key == SSD_KEY_NOT_READY &&
-		    asc == 0x3a && (softc->flags & DA_FLAG_SAW_MEDIA)) {
-			softc->flags &= ~DA_FLAG_SAW_MEDIA;
+		    asc == 0x3a && (softc->flags & DA_FLAG_PACK_INVALID) == 0) {
+			softc->flags |= DA_FLAG_PACK_INVALID;
 			disk_media_gone(softc->disk, M_NOWAIT);
 		}
 	}
@@ -3532,7 +3590,7 @@ daprevent(struct cam_periph *periph, int action)
 		     5000);
 
 	error = cam_periph_runccb(ccb, daerror, CAM_RETRY_SELTO,
-	    SF_RETRY_UA | SF_QUIET_IR, softc->disk->d_devstat);
+	    SF_RETRY_UA | SF_NO_PRINT, softc->disk->d_devstat);
 
 	if (error == 0) {
 		if (action == PR_ALLOW)
