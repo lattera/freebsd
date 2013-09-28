@@ -28,6 +28,8 @@
 #
 # LIBCOMPATDIR	Base path for compat libraries. [/usr/lib/compat]
 #
+# LIBPRIVATEDIR	Base path for private libraries. [/usr/lib/private]
+#
 # LIBDATADIR	Base path for misc. utility data files. [/usr/libdata]
 #
 # LIBEXECDIR	Base path for system daemons and utilities. [/usr/libexec]
@@ -144,6 +146,7 @@ KMODMODE?=	${BINMODE}
 
 LIBDIR?=	/usr/lib
 LIBCOMPATDIR?=	/usr/lib/compat
+LIBPRIVATEDIR?=	/usr/lib/private
 LIBDATADIR?=	/usr/libdata
 LIBEXECDIR?=	/usr/libexec
 LINTLIBDIR?=	/usr/libdata/lint
@@ -252,7 +255,6 @@ __DEFAULT_YES_OPTIONS = \
     ATM \
     AUDIT \
     AUTHPF \
-    BIND \
     BIND_DNSSEC \
     BIND_ETC \
     BIND_LIBS_LWRES \
@@ -305,6 +307,7 @@ __DEFAULT_YES_OPTIONS = \
     KERNEL_SYMBOLS \
     KVM \
     LDNS \
+    LDNS_UTILS \
     LEGACY_CONSOLE \
     LIB32 \
     LIBPTHREAD \
@@ -355,6 +358,7 @@ __DEFAULT_YES_OPTIONS = \
     TELNET \
     TEXTPROC \
     TOOLCHAIN \
+    UNBOUND \
     USB \
     UTMPX \
     WIRELESS \
@@ -363,6 +367,7 @@ __DEFAULT_YES_OPTIONS = \
     ZONEINFO
 
 __DEFAULT_NO_OPTIONS = \
+    BIND \
     BIND_IDN \
     BIND_LARGE_FILE \
     BIND_LIBS \
@@ -376,7 +381,7 @@ __DEFAULT_NO_OPTIONS = \
     HESIOD \
     LIBICONV_COMPAT \
     INSTALL_AS_USER \
-    LDNS_UTILS \
+    LLDB \
     NMTREE \
     NAND \
     OFED \
@@ -518,6 +523,7 @@ MK_LIBICONV_COMPAT:=	no
 
 .if ${MK_LDNS} == "no"
 MK_LDNS_UTILS:=	no
+MK_UNBOUND:= no
 .endif
 
 .if ${MK_LDNS_UTILS} != "no"
@@ -583,6 +589,10 @@ MK_GDB:=	no
 MK_CLANG_EXTRAS:= no
 MK_CLANG_FULL:= no
 MK_CLANG_IS_CC:= no
+.endif
+
+.if ${MK_CLANG_IS_CC} == "no"
+MK_LLDB:= no
 .endif
 
 #
