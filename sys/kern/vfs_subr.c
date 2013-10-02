@@ -2218,8 +2218,10 @@ vputx(struct vnode *vp, int func)
 		}
 		break;
 	case VPUTX_VUNREF:
-		if (VOP_ISLOCKED(vp) != LK_EXCLUSIVE)
-			error = EBUSY;
+		if (VOP_ISLOCKED(vp) != LK_EXCLUSIVE) {
+			error = VOP_LOCK(vp, LK_TRYUPGRADE | LK_INTERLOCK);
+			VI_LOCK(vp);
+		}
 		break;
 	}
 	if (vp->v_usecount > 0)
@@ -2890,9 +2892,12 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 	if (mtx_owned(VI_MTX(vp)))
 		printf(" VI_LOCKed");
 	if (vp->v_object != NULL)
-		printf("    v_object %p ref %d pages %d\n",
+		printf("    v_object %p ref %d pages %d "
+		    "cleanbuf %d dirtybuf %d\n",
 		    vp->v_object, vp->v_object->ref_count,
-		    vp->v_object->resident_page_count);
+		    vp->v_object->resident_page_count,
+		    vp->v_bufobj.bo_dirty.bv_cnt,
+		    vp->v_bufobj.bo_clean.bv_cnt);
 	printf("    ");
 	lockmgr_printinfo(vp->v_vnlock);
 	if (vp->v_data != NULL)
