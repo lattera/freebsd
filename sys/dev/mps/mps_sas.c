@@ -308,6 +308,10 @@ mpssas_log_command(struct mps_command *cm, u_int level, const char *fmt, ...)
 	if (cm == NULL)
 		return;
 
+	/* No need to be in here if debugging isn't enabled */
+	if ((cm->cm_sc->mps_debug & level) == 0)
+		return;
+
 	sbuf_new(&sb, str, sizeof(str), 0);
 
 	va_start(ap, fmt);
@@ -961,7 +965,7 @@ mpssas_action(struct cam_sim *sim, union ccb *ccb)
 		cpi->hba_eng_cnt = 0;
 		cpi->max_target = sassc->sc->facts->MaxTargets - 1;
 		cpi->max_lun = 255;
-		cpi->initiator_id = 255;
+		cpi->initiator_id = sassc->sc->facts->MaxTargets - 1;
 		strncpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
 		strncpy(cpi->hba_vid, "LSILogic", HBA_IDLEN);
 		strncpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
@@ -2803,7 +2807,7 @@ mpssas_send_smpcmd(struct mpssas_softc *sassc, union ccb *ccb, uint64_t sasaddr)
 			bus_dma_segment_t *req_sg;
 
 			req_sg = (bus_dma_segment_t *)ccb->smpio.smp_request;
-			request = (uint8_t *)req_sg[0].ds_addr;
+			request = (uint8_t *)(uintptr_t)req_sg[0].ds_addr;
 		} else
 			request = ccb->smpio.smp_request;
 
@@ -2811,7 +2815,7 @@ mpssas_send_smpcmd(struct mpssas_softc *sassc, union ccb *ccb, uint64_t sasaddr)
 			bus_dma_segment_t *rsp_sg;
 
 			rsp_sg = (bus_dma_segment_t *)ccb->smpio.smp_response;
-			response = (uint8_t *)rsp_sg[0].ds_addr;
+			response = (uint8_t *)(uintptr_t)rsp_sg[0].ds_addr;
 		} else
 			response = ccb->smpio.smp_response;
 		break;
@@ -3073,7 +3077,7 @@ mpssas_action_resetdev(struct mpssas_softc *sassc, union ccb *ccb)
 	tm = mps_alloc_command(sc);
 	if (tm == NULL) {
 		mps_dprint(sc, MPS_ERROR,
-		    "comand alloc failure in mpssas_action_resetdev\n");
+		    "command alloc failure in mpssas_action_resetdev\n");
 		ccb->ccb_h.status = CAM_RESRC_UNAVAIL;
 		xpt_done(ccb);
 		return;
