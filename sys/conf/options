@@ -904,3 +904,8 @@ RACCT		opt_global.h
 
 # Resource Limits
 RCTL		opt_global.h
+
+# PaX - hardening options
+PAX_ASLR		opt_pax.h
+PAX_ASLR_MAX_SEC	opt_pax.h
+PAX_ASLR_DEBUG		opt_pax.h

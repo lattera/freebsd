@@ -31,6 +31,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_hwpmc_hooks.h"
 #include "opt_kdtrace.h"
 #include "opt_ktrace.h"
+#include "opt_pax.h"
 #include "opt_vm.h"
 
 #include <sys/param.h>
@@ -94,6 +95,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/dtrace_bsd.h>
 dtrace_execexit_func_t	dtrace_fasttrap_exec;
 #endif
+
+#ifdef PAX_ASLR
+#include <sys/pax.h>
+#endif /* PAX_ASLR */
 
 SDT_PROVIDER_DECLARE(proc);
 SDT_PROBE_DEFINE1(proc, kernel, , exec, exec, "char *");
@@ -1042,6 +1047,10 @@ exec_new_vmspace(imgp, sv)
 		map = &vmspace->vm_map;
 	}
 
+#ifdef PAX_ASLR
+	pax_aslr_init(curthread, imgp);
+#endif /* PAX_ASLR */
+
 	/* Map a shared page */
 	obj = sv->sv_shared_page_obj;
 	if (obj != NULL) {
@@ -1219,6 +1228,9 @@ exec_copyout_strings(imgp)
 	int argc, envc;
 	char **vectp;
 	char *stringp, *destp;
+#ifdef	PAX_ASLR
+	char *orig_destp;
+#endif /* PAX_ASLR */
 	register_t *stack_base;
 	struct ps_strings *arginfo;
 	struct proc *p;
@@ -1249,6 +1261,10 @@ exec_copyout_strings(imgp)
 	    roundup(sizeof(canary), sizeof(char *)) -
 	    roundup(szps, sizeof(char *)) -
 	    roundup((ARG_MAX - imgp->args->stringspace), sizeof(char *));
+#ifdef PAX_ASLR
+	orig_destp = destp;
+	pax_aslr_stack(curthread, &destp, orig_destp);
+#endif /* PAX_ASLR */
 
 	/*
 	 * install sigcode
