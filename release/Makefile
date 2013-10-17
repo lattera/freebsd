@@ -125,7 +125,8 @@ system: packagesystem
 # Install system
 	mkdir -p release
 	cd ${WORLDDIR} && ${IMAKE} installkernel installworld distribution \
-	    DESTDIR=${.OBJDIR}/release WITHOUT_RESCUE=1 WITHOUT_KERNEL_SYMBOLS=1 KERNCONF=${KERNCONF}
+	    DESTDIR=${.OBJDIR}/release WITHOUT_RESCUE=1 WITHOUT_KERNEL_SYMBOLS=1 KERNCONF=${KERNCONF} \
+		WITHOUT_PROFILE=1
 # Copy distfiles
 	mkdir -p release/usr/freebsd-dist
 	cp *.txz MANIFEST release/usr/freebsd-dist
