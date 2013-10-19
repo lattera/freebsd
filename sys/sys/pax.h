@@ -144,6 +144,7 @@ struct vm_offset_t;
 #endif /* PAX_ASLR_COMPAT_DELTA_EXEC_MAX_LEN */
 
 extern int pax_aslr_status;
+extern int pax_aslr_debug;
 extern int pax_aslr_compat_status;
 
 extern int pax_aslr_mmap_len;

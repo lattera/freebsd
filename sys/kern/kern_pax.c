@@ -60,6 +60,7 @@ static int sysctl_pax_aslr_exec(SYSCTL_HANDLER_ARGS);
  * sysctls and tunables
  */
 int pax_aslr_status = PAX_ASLR_ENABLED;
+int pax_aslr_debug = 0;
 
 #ifdef PAX_ASLR_MAX_SEC
 int pax_aslr_mmap_len = PAX_ASLR_DELTA_MMAP_MAX_LEN;
@@ -86,6 +87,9 @@ SYSCTL_PROC(_security_pax_aslr, OID_AUTO, status,
 	"2 - global enabled, "
 	"3 - force global enabled");
 TUNABLE_INT("security.pax.aslr.status", &pax_aslr_status);
+
+SYSCTL_INT(_security_pax_aslr, OID_AUTO, debug, CTLFLAG_RWTUN, &pax_aslr_debug, 0, "ASLR debug mode");
+TUNABLE_INT("security.pax.aslr.debug", &pax_aslr_debug);
 
 SYSCTL_PROC(_security_pax_aslr, OID_AUTO, mmap_len,
 	CTLTYPE_INT|CTLFLAG_RW|CTLFLAG_TUN,
@@ -417,23 +421,19 @@ pax_aslr_mmap(struct thread *td, vm_offset_t *addr, vm_offset_t orig_addr, int f
 		return;
 
 	if (!(flags & MAP_FIXED) && ((orig_addr == 0) || !(flags & MAP_ANON))) {
-#ifdef PAX_ASLR_DEBUG
-		uprintf("[PaX ASLR] applying to %p orig_addr=%p f=%x\n",
-		    (void *)*addr, (void *)orig_addr, flags);
-#endif /* PAX_ASLR_DEBUG */
+        if (pax_aslr_debug)
+            uprintf("[PaX ASLR] applying to %p orig_addr=%p f=%x\n",
+                (void *)*addr, (void *)orig_addr, flags);
 		if (!(td->td_proc->p_vmspace->vm_map.flags & MAP_ENTRY_GROWS_DOWN))
 			*addr += td->td_proc->p_vmspace->vm_aslr_delta_mmap;
 		else
 			*addr -= td->td_proc->p_vmspace->vm_aslr_delta_mmap;
-#ifdef PAX_ASLR_DEBUG
-		uprintf("[PaX ASLR] result %p\n", (void *)*addr);
-#endif /* PAX_ASLR_DEBUG */
+        if (pax_aslr_debug)
+            uprintf("[PaX ASLR] result %p\n", (void *)*addr);
 	}
-#ifdef PAX_ASLR_DEBUG
-	else
+	else if (pax_aslr_debug)
 	    uprintf("[PaX ASLR] not applying to %p orig_addr=%p f=%x\n",
 		(void *)*addr, (void *)orig_addr, flags);
-#endif /* PAX_ASLR_DEBUG */
 }
 
 void
@@ -443,8 +443,7 @@ pax_aslr_stack(struct thread *td, char **addr, char *orig_addr)
 		return;
 
 	*addr -= td->td_proc->p_vmspace->vm_aslr_delta_stack;
-#ifdef PAX_ASLR_DEBUG
-	uprintf("[PaX ASLR] orig_addr=%p, addr=%p\n",
-	    (void *)orig_addr, (void *)*addr);
-#endif /* PAX_ASLR_DEBUG */
+    if (pax_aslr_debug)
+        uprintf("[PaX ASLR] orig_addr=%p, addr=%p\n",
+            (void *)orig_addr, (void *)*addr);
 }

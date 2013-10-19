@@ -343,4 +343,3 @@ device		snd_uaudio	# USB Audio
 device		snd_via8233	# VIA VT8233x Audio
 
 options PAX_ASLR
-options PAX_ASLR_DEBUG
