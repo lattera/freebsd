@@ -3163,10 +3163,11 @@ restart:
 				ccb = xpt_get_ccb(periph);
 				goto restart;
 			}
-			if (periph->flags & CAM_PERIPH_RUN_TASK) {
+			if (periph->flags & CAM_PERIPH_RUN_TASK)
 				break;
-			}
-			cam_periph_acquire(periph);
+			xpt_lock_buses();
+			periph->refcount++;	/* Unconditionally acquire */
+			xpt_unlock_buses();
 			periph->flags |= CAM_PERIPH_RUN_TASK;
 			taskqueue_enqueue(xsoftc.xpt_taskq,
 			    &periph->periph_run_task);
@@ -5238,6 +5239,7 @@ xpt_done_process(struct ccb_hdr *ccb_h)
 	}
 
 	/* Call the peripheral driver's callback */
+	ccb_h->pinfo.index = CAM_UNQUEUED_INDEX;
 	(*ccb_h->cbfcnp)(ccb_h->path->periph, (union ccb *)ccb_h);
 	if (mtx != NULL)
 		mtx_unlock(mtx);
@@ -5269,7 +5271,6 @@ xpt_done_td(void *arg)
 		THREAD_NO_SLEEPING();
 		while ((ccb_h = STAILQ_FIRST(&doneq)) != NULL) {
 			STAILQ_REMOVE_HEAD(&doneq, sim_links.stqe);
-			ccb_h->pinfo.index = CAM_UNQUEUED_INDEX;
 			xpt_done_process(ccb_h);
 		}
 		THREAD_SLEEPING_OK();
@@ -5292,7 +5293,6 @@ camisr_runqueue(void)
 		while ((ccb_h = STAILQ_FIRST(&queue->cam_doneq)) != NULL) {
 			STAILQ_REMOVE_HEAD(&queue->cam_doneq, sim_links.stqe);
 			mtx_unlock(&queue->cam_doneq_mtx);
-			ccb_h->pinfo.index = CAM_UNQUEUED_INDEX;
 			xpt_done_process(ccb_h);
 			mtx_lock(&queue->cam_doneq_mtx);
 		}
