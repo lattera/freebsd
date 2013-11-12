@@ -1738,7 +1738,7 @@ iwn4965_read_eeprom(struct iwn_softc *sc)
 	iwn_read_prom_data(sc, IWN4965_EEPROM_DOMAIN, sc->eeprom_domain, 4);
 
 	/* Read the list of authorized channels (20MHz ones only). */
-	for (i = 0; i < 7; i++) {
+	for (i = 0; i < IWN_NBANDS - 1; i++) {
 		addr = iwn4965_regulatory_bands[i];
 		iwn_read_eeprom_channels(sc, i, addr);
 	}
@@ -1768,7 +1768,7 @@ iwn4965_read_eeprom(struct iwn_softc *sc)
 #ifdef IWN_DEBUG
 	/* Print samples. */
 	if (sc->sc_debug & IWN_DEBUG_ANY) {
-		for (i = 0; i < IWN_NBANDS; i++)
+		for (i = 0; i < IWN_NBANDS - 1; i++)
 			iwn4965_print_power_group(sc, i);
 	}
 #endif
@@ -1829,7 +1829,7 @@ iwn5000_read_eeprom(struct iwn_softc *sc)
 	    sc->eeprom_domain, 4);
 
 	/* Read the list of authorized channels (20MHz ones only). */
-	for (i = 0; i < 7; i++) {
+	for (i = 0; i < IWN_NBANDS - 1; i++) {
 		if (sc->hw_type >= IWN_HW_REV_TYPE_6000)
 			addr = base + iwn6000_regulatory_bands[i];
 		else
@@ -2987,12 +2987,24 @@ iwn_ampdu_tx_done(struct iwn_softc *sc, int qid, int idx, int nframes,
 
 	DPRINTF(sc, IWN_DEBUG_TRACE, "->%s begin\n", __func__);
 
-#ifdef NOT_YET
 	if (nframes == 1) {
-		if ((*status & 0xff) != 1 && (*status & 0xff) != 2)
+		if ((*status & 0xff) != 1 && (*status & 0xff) != 2) {
+#ifdef	NOT_YET
 			printf("ieee80211_send_bar()\n");
-	}
 #endif
+			/*
+			 * If we completely fail a transmit, make sure a
+			 * notification is pushed up to the rate control
+			 * layer.
+			 */
+			tap = sc->qid2tap[qid];
+			tid = tap->txa_tid;
+			wn = (void *)tap->txa_ni;
+			ni = tap->txa_ni;
+			ieee80211_ratectl_tx_complete(ni->ni_vap, ni,
+			    IEEE80211_RATECTL_TX_FAILURE, &nframes, NULL);
+		}
+	}
 
 	bitmap = 0;
 	start = idx;
@@ -3104,7 +3116,7 @@ iwn_notif_intr(struct iwn_softc *sc)
 		    desc->type, iwn_intr_str(desc->type),
 		    le16toh(desc->len));
 
-		if (!(desc->qid & 0x80))	/* Reply to a command. */
+		if (!(desc->qid & IWN_UNSOLICITED_RX_NOTIF))	/* Reply to a command. */
 			iwn_cmd_done(sc, desc);
 
 		switch (desc->type) {
@@ -3623,6 +3635,8 @@ iwn_tx_data(struct iwn_softc *sc, struct mbuf *m, struct ieee80211_node *ni)
 		rate = tp->mcastrate;
 	else if (tp->ucastrate != IEEE80211_FIXED_RATE_NONE)
 		rate = tp->ucastrate;
+	else if (m->m_flags & M_EAPOL)
+		rate = tp->mgmtrate;
 	else {
 		/* XXX pass pktlen */
 		(void) ieee80211_ratectl_rate(ni, NULL, 0);
@@ -4308,7 +4322,7 @@ iwn_set_link_quality(struct iwn_softc *sc, struct ieee80211_node *ni)
 {
 #define	RV(v)	((v) & IEEE80211_RATE_VAL)
 	struct iwn_node *wn = (void *)ni;
-	struct ieee80211_rateset *rs = &ni->ni_rates;
+	struct ieee80211_rateset *rs;
 	struct iwn_cmd_link_quality linkq;
 	uint8_t txant;
 	int i, rate, txrate;
@@ -4332,10 +4346,13 @@ iwn_set_link_quality(struct iwn_softc *sc, struct ieee80211_node *ni)
 	 * 11n _and_ we have some 11n rates, or don't
 	 * try.
 	 */
-	if (IEEE80211_IS_CHAN_HT(ni->ni_chan) && ni->ni_htrates.rs_nrates > 0)
+	if (IEEE80211_IS_CHAN_HT(ni->ni_chan) && ni->ni_htrates.rs_nrates > 0) {
+		rs = (struct ieee80211_rateset *) &ni->ni_htrates;
 		is_11n = 1;
-	else
+	} else {
+		rs = &ni->ni_rates;
 		is_11n = 0;
+	}
 
 	/* Start at highest available bit-rate. */
 	if (is_11n)
@@ -4346,7 +4363,7 @@ iwn_set_link_quality(struct iwn_softc *sc, struct ieee80211_node *ni)
 		uint32_t plcp;
 
 		if (is_11n)
-			rate = IEEE80211_RATE_MCS | txrate;
+			rate = IEEE80211_RATE_MCS | rs->rs_rates[txrate];
 		else
 			rate = RV(rs->rs_rates[txrate]);
 
@@ -4354,7 +4371,17 @@ iwn_set_link_quality(struct iwn_softc *sc, struct ieee80211_node *ni)
 		plcp = iwn_rate_to_plcp(sc, ni, rate);
 		linkq.retry[i] = plcp;
 
-		/* Special case for dual-stream rates? */
+		/*
+		 * The mimo field is an index into the table which
+		 * indicates the first index where it and subsequent entries
+		 * will not be using MIMO.
+		 *
+		 * Since we're filling linkq from 0..15 and we're filling
+		 * from the higest MCS rates to the lowest rates, if we
+		 * _are_ doing a dual-stream rate, set mimo to idx+1 (ie,
+		 * the next entry.)  That way if the next entry is a non-MIMO
+		 * entry, we're already pointing at it.
+		 */
 		if ((le32toh(plcp) & IWN_RFLAG_MCS) &&
 		    RV(le32toh(plcp)) > 7)
 			linkq.mimo = i + 1;
