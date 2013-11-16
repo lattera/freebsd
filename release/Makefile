@@ -204,7 +204,7 @@ clean:
 	rm -f *.txz MANIFEST
 	rm -f system
 	rm -rf release bootonly
-	rm -f disc1.iso bootonly.iso memstick.img
+	rm -f disc1.iso bootonly.iso memstick.img mini-memstick.img
 
 install:
 .if defined(DESTDIR) && !empty(DESTDIR)
