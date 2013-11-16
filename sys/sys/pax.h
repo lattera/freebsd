@@ -153,6 +153,7 @@ extern int pax_aslr_exec_len;
 #endif /* PAX_ASLR */
 
 void pax_init(void);
+void pax_aslr_init_prison(struct prison *pr);
 bool pax_aslr_active(struct thread *td);
 void pax_aslr_init(struct thread *td, struct image_params *imgp);
 void pax_aslr_mmap(struct thread *td, vm_offset_t *addr,

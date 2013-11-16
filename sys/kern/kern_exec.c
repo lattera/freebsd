@@ -1062,6 +1062,9 @@ exec_new_vmspace(imgp, sv)
 	}
 
 #ifdef PAX_ASLR
+    if (pax_aslr_debug >= 2)
+        uprintf("[PaX ASLR] sv_minuser = 0x%016lx\n", sv_minuser);
+
 	pax_aslr_init(curthread, imgp);
 #endif /* PAX_ASLR */
 
@@ -1069,6 +1072,10 @@ exec_new_vmspace(imgp, sv)
 	obj = sv->sv_shared_page_obj;
 	if (obj != NULL) {
 		vm_object_reference(obj);
+#ifdef PAX_ASLR
+        if (pax_aslr_debug >= 2)
+            uprintf("[PaX ASLR] sv_shared_page_base = 0x%016lx\n", sv->sv_shared_page_base);
+#endif
 		error = vm_map_fixed(map, obj, 0,
 		    sv->sv_shared_page_base, sv->sv_shared_page_len,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
