@@ -722,6 +722,8 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 		ifp = scb->ifp;
 		/* Assign a hopefully unique, locally administered etheraddr. */
 		eaddr[0] = 0x02;
+        eaddr[1] = (uint8_t)(arc4random() % 0xff);
+        eaddr[2] = (uint8_t)(arc4random() % 0xff);
 		eaddr[3] = (ifp->if_index >> 8) & 0xff;
 		eaddr[4] = ifp->if_index & 0xff;
 		eaddr[5] = 0x0b;
@@ -817,6 +819,8 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	ifp->if_snd.ifq_maxlen = ifqmaxlen;
 	/* Assign a hopefully unique, locally administered etheraddr. */
 	eaddr[0] = 0x02;
+    eaddr[1] = (uint8_t)(arc4random() % 0xff);
+    eaddr[2] = (uint8_t)(arc4random() % 0xff);
 	eaddr[3] = (ifp->if_index >> 8) & 0xff;
 	eaddr[4] = ifp->if_index & 0xff;
 	eaddr[5] = 0x0a;
