@@ -369,12 +369,13 @@ bucket_alloc(uma_zone_t zone, void *udata, int flags)
 	 * buckets via the allocation path or bucket allocations in the
 	 * free path.
 	 */
-	if ((uintptr_t)udata & UMA_ZFLAG_BUCKET)
-		return (NULL);
 	if ((zone->uz_flags & UMA_ZFLAG_BUCKET) == 0)
 		udata = (void *)(uintptr_t)zone->uz_flags;
-	else
+	else {
+		if ((uintptr_t)udata & UMA_ZFLAG_BUCKET)
+			return (NULL);
 		udata = (void *)((uintptr_t)udata | UMA_ZFLAG_BUCKET);
+	}
 	if ((uintptr_t)udata & UMA_ZFLAG_CACHEONLY)
 		flags |= M_NOVM;
 	ubz = bucket_zone_lookup(zone->uz_count);
@@ -1317,6 +1318,7 @@ keg_small_init(uma_keg_t keg)
 static void
 keg_large_init(uma_keg_t keg)
 {
+	u_int shsize;
 
 	KASSERT(keg != NULL, ("Keg is null in keg_large_init"));
 	KASSERT((keg->uk_flags & UMA_ZFLAG_CACHEONLY) == 0,
@@ -1333,8 +1335,21 @@ keg_large_init(uma_keg_t keg)
 	if (keg->uk_flags & UMA_ZFLAG_INTERNAL)
 		return;
 
-	keg->uk_flags |= UMA_ZONE_OFFPAGE;
-	if ((keg->uk_flags & UMA_ZONE_VTOSLAB) == 0)
+	/* Check whether we have enough space to not do OFFPAGE. */
+	if ((keg->uk_flags & UMA_ZONE_OFFPAGE) == 0) {
+		shsize = sizeof(struct uma_slab);
+		if (keg->uk_flags & UMA_ZONE_REFCNT)
+			shsize += keg->uk_ipers * sizeof(uint32_t);
+		if (shsize & UMA_ALIGN_PTR)
+			shsize = (shsize & ~UMA_ALIGN_PTR) +
+			    (UMA_ALIGN_PTR + 1);
+
+		if ((PAGE_SIZE * keg->uk_ppera) - keg->uk_rsize < shsize)
+			keg->uk_flags |= UMA_ZONE_OFFPAGE;
+	}
+
+	if ((keg->uk_flags & UMA_ZONE_OFFPAGE) &&
+	    (keg->uk_flags & UMA_ZONE_VTOSLAB) == 0)
 		keg->uk_flags |= UMA_ZONE_HASH;
 }
 
@@ -2508,7 +2523,7 @@ zone_alloc_bucket(uma_zone_t zone, void *udata, int flags)
 	/* Don't wait for buckets, preserve caller's NOVM setting. */
 	bucket = bucket_alloc(zone, udata, M_NOWAIT | (flags & M_NOVM));
 	if (bucket == NULL)
-		goto out;
+		return (NULL);
 
 	max = MIN(bucket->ub_entries, zone->uz_count);
 	bucket->ub_cnt = zone->uz_import(zone->uz_arg, bucket->ub_bucket,
@@ -2539,10 +2554,8 @@ zone_alloc_bucket(uma_zone_t zone, void *udata, int flags)
 		}
 	}
 
-out:
-	if (bucket == NULL || bucket->ub_cnt == 0) {
-		if (bucket != NULL)
-			bucket_free(zone, bucket, udata);
+	if (bucket->ub_cnt == 0) {
+		bucket_free(zone, bucket, udata);
 		atomic_add_long(&zone->uz_fails, 1);
 		return (NULL);
 	}
