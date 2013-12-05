@@ -5,6 +5,7 @@
 # User-driven targets:
 #  cdrom: Builds release CD-ROM media (disc1.iso)
 #  memstick: Builds memory stick image (memstick.img)
+#  mini-memstick: Builds minimal memory stick image (mini-memstick.img)
 #  ftp: Sets up FTP distribution area (ftp)
 #  release: Build all media and FTP distribution area
 #  install: Copies all release media into ${DESTDIR}
@@ -75,7 +76,9 @@ IMAGES+=	disc1.iso bootonly.iso
 .endif
 .if exists(${.CURDIR}/${TARGET}/make-memstick.sh)
 RELEASE_TARGETS+= memstick.img
+RELEASE_TARGETS+= mini-memstick.img
 IMAGES+=	memstick.img
+IMAGES+=	mini-memstick.img
 .endif
 
 .include <bsd.obj.mk>
@@ -126,6 +129,7 @@ system: packagesystem
 	mkdir -p release
 	cd ${WORLDDIR} && ${IMAKE} installkernel installworld distribution \
 	    DESTDIR=${.OBJDIR}/release WITHOUT_RESCUE=1 WITHOUT_KERNEL_SYMBOLS=1 KERNCONF=${KERNCONF}
+		WITHOUT_PROFILE=1
 # Copy distfiles
 	mkdir -p release/usr/freebsd-dist
 	cp *.txz MANIFEST release/usr/freebsd-dist
@@ -183,6 +187,10 @@ bootonly.iso: bootonly bootonly/cdrom.inf
 memstick: memstick.img
 memstick.img: system
 	sh ${.CURDIR}/${TARGET}/make-memstick.sh release ${.TARGET}
+
+mini-memstick: mini-memstick.img
+mini-memstick.img: system
+	sh ${.CURDIR}/${TARGET}/make-memstick.sh bootonly ${.TARGET}
 
 packagesystem: base.txz kernel.txz ${EXTRA_PACKAGES}
 	sh ${.CURDIR}/scripts/make-manifest.sh *.txz > MANIFEST
