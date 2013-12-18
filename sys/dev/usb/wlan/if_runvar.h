@@ -25,17 +25,11 @@
 
 #define RUN_MAX_RXSZ			\
 	MIN(4096, MJUMPAGESIZE)
-#if 0
-	(sizeof (uint32_t) +		\
-	 sizeof (struct rt2860_rxwi) +	\
-	 sizeof (uint16_t) +		\
-	 MCLBYTES +			\
-	 sizeof (struct rt2870_rxd))
-#endif
+
 /* NB: "11" is the maximum number of padding bytes needed for Tx */
 #define RUN_MAX_TXSZ			\
 	(sizeof (struct rt2870_txd) +	\
-	 sizeof (struct rt2860_rxwi) +	\
+	 sizeof (struct rt2860_txwi) +	\
 	 MCLBYTES + 11)
 
 #define RUN_TX_TIMEOUT	5000	/* ms */
@@ -58,7 +52,7 @@ struct run_rx_radiotap_header {
 	int8_t		wr_dbm_antsignal;
 	uint8_t		wr_antenna;
 	uint8_t		wr_antsignal;
-} __packed;
+} __packed __aligned(8);
 
 #define RUN_RX_RADIOTAP_PRESENT				\
 	(1 << IEEE80211_RADIOTAP_FLAGS |		\
@@ -75,7 +69,7 @@ struct run_tx_radiotap_header {
 	uint16_t	wt_chan_freq;
 	uint16_t	wt_chan_flags;
 	uint8_t		wt_hwqueue;
-} __packed;
+} __packed __aligned(8);
 
 #define IEEE80211_RADIOTAP_HWQUEUE 15
 
@@ -170,7 +164,7 @@ struct run_softc {
 
 	uint16_t			mac_ver;
 	uint16_t			mac_rev;
-	uint8_t				rf_rev;
+	uint16_t			rf_rev;
 	uint8_t				freq;
 	uint8_t				ntxchains;
 	uint8_t				nrxchains;
@@ -239,6 +233,7 @@ struct run_softc {
 	uint8_t				sta_running;
 	uint8_t				rvp_cnt;
 	uint8_t				rvp_bmap;
+	uint8_t				sc_detached;
 
 	union {
 		struct run_rx_radiotap_header th;

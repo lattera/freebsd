@@ -1185,7 +1185,7 @@ struct zyd_rx_radiotap_header {
 	uint16_t		wr_chan_flags;
 	int8_t			wr_antsignal;
 	int8_t			wr_antnoise;
-} __packed;
+} __packed __aligned(8);
 
 #define ZYD_RX_RADIOTAP_PRESENT						\
 	((1 << IEEE80211_RADIOTAP_FLAGS) |				\
@@ -1200,7 +1200,7 @@ struct zyd_tx_radiotap_header {
 	uint8_t			wt_rate;
 	uint16_t		wt_chan_freq;
 	uint16_t		wt_chan_flags;
-} __packed;
+} __packed __aligned(8);
 
 #define ZYD_TX_RADIOTAP_PRESENT						\
 	((1 << IEEE80211_RADIOTAP_FLAGS) |				\
@@ -1259,6 +1259,7 @@ struct zyd_softc {
 #define	ZYD_FLAG_FWLOADED		(1 << 0)
 #define	ZYD_FLAG_INITONCE		(1 << 1)
 #define	ZYD_FLAG_INITDONE		(1 << 2)
+#define	ZYD_FLAG_DETACHED		(1 << 3)
 
 	struct zyd_rf		sc_rf;
 
