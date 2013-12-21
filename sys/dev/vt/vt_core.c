@@ -113,7 +113,7 @@ const struct terminal_class vt_termclass = {
 int sc_txtmouse_no_retrace_wait;
 
 static SYSCTL_NODE(_kern, OID_AUTO, vt, CTLFLAG_RD, 0, "Newcons parameters");
-VT_SYSCTL_INT(enable_altgr, 0, "Enable AltGr key (Do not assume R.Alt as Alt)");
+VT_SYSCTL_INT(enable_altgr, 1, "Enable AltGr key (Do not assume R.Alt as Alt)");
 VT_SYSCTL_INT(debug, 0, "Newcons debug level");
 VT_SYSCTL_INT(deadtimer, 15, "Time to wait busy process in VT_PROCESS mode");
 VT_SYSCTL_INT(suspendswitch, 1, "Switch to VT0 before suspend");
@@ -632,6 +632,9 @@ vtterm_param(struct terminal *tm, int cmd, unsigned int arg)
 	switch (cmd) {
 	case TP_SHOWCURSOR:
 		vtbuf_cursor_visibility(&vw->vw_buf, arg);
+		break;
+	case TP_MOUSE:
+		vw->vw_mouse_level = arg;
 		break;
 	}
 }
@@ -1206,7 +1209,7 @@ vt_mouse_event(int type, int x, int y, int event, int cnt, int mlevel)
 	 * under mouse pointer when nothing changed.
 	 */
 
-	if (mlevel > 0)
+	if (vw->vw_mouse_level > 0)
 		vt_mouse_terminput(vd, type, x, y, event, cnt);
 
 	switch (type) {
