@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_capsicum.h"
 #include "opt_compat.h"
 #include "opt_core.h"
+#include "opt_pax.h"
 
 #include <sys/param.h>
 #include <sys/capability.h>
@@ -47,7 +48,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/mount.h>
 #include <sys/mman.h>
 #include <sys/namei.h>
+#include <sys/pax.h>
 #include <sys/pioctl.h>
+#include <sys/jail.h>
 #include <sys/proc.h>
 #include <sys/procfs.h>
 #include <sys/racct.h>
@@ -663,6 +666,12 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		error = ENOEXEC;
 		goto fail;
 	}
+
+#ifdef PAX_ASLR
+    if (imgp->proc->p_ucred->cr_prison->pr_pax_aslr_status) {
+        rbase += round_page(PAX_ASLR_DELTA(arc4random(), PAX_ASLR_DELTA_EXEC_LSB, imgp->proc->p_ucred->cr_prison->pr_pax_aslr_exec_len));
+    }
+#endif
 
 	/* Only support headers that fit within first page for now      */
 	if ((hdr->e_phoff > PAGE_SIZE) ||

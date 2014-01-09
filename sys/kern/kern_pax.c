@@ -522,6 +522,7 @@ pax_aslr_init(struct thread *td, struct image_params *imgp)
     vm->vm_aslr_delta_stack = PAX_ASLR_DELTA(arc4random(),
         PAX_ASLR_DELTA_STACK_LSB, (pr != NULL) ? pr->pr_pax_aslr_stack_len : pax_aslr_stack_len);
     vm->vm_aslr_delta_stack = ALIGN(vm->vm_aslr_delta_stack);
+    vm->vm_aslr_delta_exec = round_page(PAX_ASLR_DELTA(arc4random(), PAX_ASLR_DELTA_EXEC_LSB, (pr != NULL) ? pr->pr_pax_aslr_exec_len : pax_aslr_exec_len));
 #else /* COMPAT_FREEBSD32 */
     if ((sv_flags & SV_LP64) != 0) {
         vm->vm_aslr_delta_mmap = PAX_ASLR_DELTA(arc4random(),
