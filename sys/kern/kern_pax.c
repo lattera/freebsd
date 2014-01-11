@@ -52,8 +52,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 
-static struct prison *pax_aslr_get_prison(struct thread *td);
-
 static int sysctl_pax_aslr_status(SYSCTL_HANDLER_ARGS);
 static int sysctl_pax_aslr_mmap(SYSCTL_HANDLER_ARGS);
 static int sysctl_pax_aslr_stack(SYSCTL_HANDLER_ARGS);
@@ -122,7 +120,7 @@ sysctl_pax_aslr_status(SYSCTL_HANDLER_ARGS)
     int val;
     struct prison *pr=NULL;
 
-    pr = pax_aslr_get_prison(req->td);
+    pr = pax_aslr_get_prison(req->td, NULL);
 
     if ((pr) && !(pr->pr_pax_set))
         pax_aslr_init_prison(pr);
@@ -155,7 +153,7 @@ sysctl_pax_aslr_mmap(SYSCTL_HANDLER_ARGS)
     int val;
     struct prison *pr=NULL;
 
-    pr = pax_aslr_get_prison(req->td);
+    pr = pax_aslr_get_prison(req->td, NULL);
 
     if ((pr) && !(pr->pr_pax_set))
         pax_aslr_init_prison(pr);
@@ -183,7 +181,7 @@ sysctl_pax_aslr_stack(SYSCTL_HANDLER_ARGS)
     int val;
     struct prison *pr=NULL;
 
-    pr = pax_aslr_get_prison(req->td);
+    pr = pax_aslr_get_prison(req->td, NULL);
 
     if ((pr) && !(pr->pr_pax_set))
         pax_aslr_init_prison(pr);
@@ -211,7 +209,7 @@ sysctl_pax_aslr_exec(SYSCTL_HANDLER_ARGS)
     int val;
     struct prison *pr=NULL;
 
-    pr = pax_aslr_get_prison(req->td);
+    pr = pax_aslr_get_prison(req->td, NULL);
 
     if ((pr) && !(pr->pr_pax_set))
         pax_aslr_init_prison(pr);
@@ -295,7 +293,7 @@ sysctl_pax_aslr_compat_status(SYSCTL_HANDLER_ARGS)
     int val, *ptr;
     struct prison *pr=NULL;
 
-    pr = pax_aslr_get_prison(req->td);
+    pr = pax_aslr_get_prison(req->td, NULL);
     ptr = (pr != NULL) ? &(pr->pr_pax_aslr_compat_status) : &pax_aslr_compat_status;
 
     if ((pr) && !(pr->pr_pax_set))
@@ -328,7 +326,7 @@ sysctl_pax_aslr_compat_mmap(SYSCTL_HANDLER_ARGS)
     int val, *ptr;
     struct prison *pr=NULL;
 
-    pr = pax_aslr_get_prison(req->td);
+    pr = pax_aslr_get_prison(req->td, NULL);
     ptr = (pr != NULL) ? &(pr->pr_pax_aslr_compat_mmap_len) : &pax_aslr_compat_mmap_len;
 
     if ((pr) && !(pr->pr_pax_set))
@@ -356,7 +354,7 @@ sysctl_pax_aslr_compat_stack(SYSCTL_HANDLER_ARGS)
     int val, *ptr;
     struct prison *pr=NULL;
 
-    pr = pax_aslr_get_prison(req->td);
+    pr = pax_aslr_get_prison(req->td, NULL);
     ptr = (pr != NULL) ? &(pr->pr_pax_aslr_compat_stack_len) : &pax_aslr_compat_stack_len;
 
     if ((pr) && !(pr->pr_pax_set))
@@ -384,7 +382,7 @@ sysctl_pax_aslr_compat_exec(SYSCTL_HANDLER_ARGS)
     int val, *ptr;
     struct prison *pr=NULL;
 
-    pr = pax_aslr_get_prison(req->td);
+    pr = pax_aslr_get_prison(req->td, NULL);
     ptr = (pr != NULL) ? &(pr->pr_pax_aslr_compat_exec_len) : &pax_aslr_compat_exec_len;
 
     if ((pr) && !(pr->pr_pax_set))
@@ -420,7 +418,7 @@ pax_aslr_active(struct thread *td)
 
     flags = td->td_proc->p_pax;
 #endif /* notyet */
-    pr = pax_aslr_get_prison(td);
+    pr = pax_aslr_get_prison(td, NULL);
 
     if ((pr) && !(pr->pr_pax_set))
         pax_aslr_init_prison(pr);
@@ -451,19 +449,20 @@ pax_aslr_active(struct thread *td)
     return (true);
 }
 
-static struct prison *
-pax_aslr_get_prison(struct thread *td)
+struct prison *
+pax_aslr_get_prison(struct thread *td, struct proc *proc)
 {
-    if (!(td))
+    if ((td)) {
+        if ((td->td_proc) && (td->td_proc->p_ucred))
+            return td->td_proc->p_ucred->cr_prison;
+
+        return NULL;
+    }
+
+    if (!(proc))
         return NULL;
 
-    if (!(td->td_proc))
-        return NULL;
-
-    if (!(td->td_proc->p_ucred))
-        return NULL;
-
-    return td->td_proc->p_ucred->cr_prison;
+    return proc->p_ucred->cr_prison;
 }
 
 void
@@ -501,7 +500,7 @@ pax_aslr_init(struct thread *td, struct image_params *imgp)
     u_int sv_flags;
     struct prison *pr=NULL;
 
-    pr = pax_aslr_get_prison(td);
+    pr = pax_aslr_get_prison(td, NULL);
 
     if ((pr) && !(pr->pr_pax_set))
         pax_aslr_init_prison(pr);
@@ -545,7 +544,7 @@ pax_aslr_mmap(struct thread *td, vm_offset_t *addr, vm_offset_t orig_addr, int f
 {
     struct prison *pr=NULL;
 
-    pr = pax_aslr_get_prison(td);
+    pr = pax_aslr_get_prison(td, NULL);
 
     if (!pax_aslr_active(td))
         return;
@@ -571,7 +570,7 @@ pax_aslr_stack(struct thread *td, char **addr, char *orig_addr)
 {
     struct prison *pr=NULL;
 
-    pr = pax_aslr_get_prison(td);
+    pr = pax_aslr_get_prison(td, NULL);
 
     if (!pax_aslr_active(td))
         return;

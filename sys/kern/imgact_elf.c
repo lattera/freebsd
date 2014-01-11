@@ -603,6 +603,7 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	u_long rbase;
 	u_long base_addr = 0;
 	int error, i, numsegs;
+    struct prison *pr; /* For ASLR */
 
 #ifdef CAPABILITY_MODE
 	/*
@@ -668,8 +669,9 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	}
 
 #ifdef PAX_ASLR
-    if (imgp->proc->p_ucred->cr_prison->pr_pax_aslr_status) {
-        rbase += round_page(PAX_ASLR_DELTA(arc4random(), PAX_ASLR_DELTA_EXEC_LSB, imgp->proc->p_ucred->cr_prison->pr_pax_aslr_exec_len));
+    pr = pax_aslr_get_prison(NULL, imgp->proc);
+    if (pr->pr_pax_aslr_status) {
+        rbase += round_page(PAX_ASLR_DELTA(arc4random(), PAX_ASLR_DELTA_EXEC_LSB, pr->pr_pax_aslr_exec_len));
     }
 #endif
 
