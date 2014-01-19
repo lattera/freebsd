@@ -1,6 +1,5 @@
 /*-
- * Copyright (c) 2007 Pawel Jakub Dawidek <pjd@FreeBSD.org>
- * Copyright (c) 2013 iXsystems, Inc.
+ * Copyright (c) 2013 EMC Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,51 +26,26 @@
  * $FreeBSD$
  */
 
-#ifndef _OPENSOLARIS_SYS_CONDVAR_H_
-#define	_OPENSOLARIS_SYS_CONDVAR_H_
-
-#include <sys/param.h>
-#include <sys/proc.h>
+#ifndef _OPENSOLARIS_SYS_VM_H_
+#define	_OPENSOLARIS_SYS_VM_H_
 
 #ifdef _KERNEL
 
-#include <sys/mutex.h>
-#include <sys/condvar.h>
-#include <sys/kernel.h>
-#include <sys/time.h>
+#include <sys/sf_buf.h>
 
-typedef struct cv	kcondvar_t;
-
-typedef enum {
-	CV_DEFAULT,
-	CV_DRIVER
-} kcv_type_t;
-
-#define	zfs_cv_init(cv, name, type, arg)	do {			\
-	const char *_name;						\
-	ASSERT((type) == CV_DEFAULT);					\
-	for (_name = #cv; *_name != '\0'; _name++) {			\
-		if (*_name >= 'a' && *_name <= 'z')			\
-			break;						\
-	}								\
-	if (*_name == '\0')						\
-		_name = #cv;						\
-	cv_init((cv), _name);						\
-} while (0)
-#define	cv_init(cv, name, type, arg)	zfs_cv_init((cv), (name), (type), (arg))
-
-static clock_t
-cv_timedwait_hires(kcondvar_t *cvp, kmutex_t *mp, hrtime_t tim, hrtime_t res,
-    int flag)
+static inline caddr_t
+zfs_map_page(vm_page_t pp, struct sf_buf **sfp)
 {
-	/* XXX real hires is not available. */
+	*sfp = sf_buf_alloc(pp, 0);
+	return ((caddr_t)sf_buf_kva(*sfp));
+}
 
-	/* We do not attempt to support any flags yet. */
-	ASSERT(flag == 0);
-
-	return (cv_timedwait(cvp, mp, NSEC_TO_TICK(tim)));
+static inline void
+zfs_unmap_page(struct sf_buf *sf)
+{
+	sf_buf_free(sf);
 }
 
 #endif	/* _KERNEL */
 
-#endif	/* _OPENSOLARIS_SYS_CONDVAR_H_ */
+#endif	/* _OPENSOLARIS_SYS_VM_H_ */
