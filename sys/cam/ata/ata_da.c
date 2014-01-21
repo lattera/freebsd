@@ -81,7 +81,7 @@ typedef enum {
 	ADA_FLAG_CAN_NCQ	= 0x0008,
 	ADA_FLAG_CAN_DMA	= 0x0010,
 	ADA_FLAG_NEED_OTAG	= 0x0020,
-	ADA_FLAG_WENT_IDLE	= 0x0040,
+	ADA_FLAG_WAS_OTAG	= 0x0040,
 	ADA_FLAG_CAN_TRIM	= 0x0080,
 	ADA_FLAG_OPEN		= 0x0100,
 	ADA_FLAG_SCTX_INIT	= 0x0200,
@@ -124,21 +124,20 @@ struct disk_params {
 
 #define TRIM_MAX_BLOCKS	8
 #define TRIM_MAX_RANGES	(TRIM_MAX_BLOCKS * ATA_DSM_BLK_RANGES)
-#define TRIM_MAX_BIOS	(TRIM_MAX_RANGES * 4)
 struct trim_request {
 	uint8_t		data[TRIM_MAX_RANGES * ATA_DSM_RANGE_SIZE];
-	struct bio	*bps[TRIM_MAX_BIOS];
+	TAILQ_HEAD(, bio) bps;
 };
 
 struct ada_softc {
 	struct	 bio_queue_head bio_queue;
 	struct	 bio_queue_head trim_queue;
+	int	 outstanding_cmds;	/* Number of active commands */
+	int	 refcount;		/* Active xpt_action() calls */
 	ada_state state;
-	ada_flags flags;	
+	ada_flags flags;
 	ada_quirks quirks;
 	int	 sort_io_queue;
-	int	 ordered_tag_count;
-	int	 outstanding_cmds;
 	int	 trim_max_ranges;
 	int	 trim_running;
 	int	 read_ahead;
@@ -1424,10 +1423,11 @@ adastart(struct cam_periph *periph, union ccb *start_ccb)
 			struct trim_request *req = &softc->trim_req;
 			struct bio *bp1;
 			uint64_t lastlba = (uint64_t)-1;
-			int bps = 0, c, lastcount = 0, off, ranges = 0;
+			int c, lastcount = 0, off, ranges = 0;
 
 			softc->trim_running = 1;
 			bzero(req, sizeof(*req));
+			TAILQ_INIT(&req->bps);
 			bp1 = bp;
 			do {
 				uint64_t lba = bp1->bio_pblkno;
@@ -1470,10 +1470,9 @@ adastart(struct cam_periph *periph, union ccb *start_ccb)
 					 */
 				}
 				lastlba = lba;
-				req->bps[bps++] = bp1;
+				TAILQ_INSERT_TAIL(&req->bps, bp1, bio_queue);
 				bp1 = bioq_first(&softc->trim_queue);
-				if (bps >= TRIM_MAX_BIOS ||
-				    bp1 == NULL ||
+				if (bp1 == NULL ||
 				    bp1->bio_bcount / softc->params.secsize >
 				    (softc->trim_max_ranges - ranges) *
 				    ATA_DSM_RANGE_MAX)
@@ -1505,7 +1504,7 @@ adastart(struct cam_periph *periph, union ccb *start_ccb)
 		if ((bp->bio_flags & BIO_ORDERED) != 0
 		 || (softc->flags & ADA_FLAG_NEED_OTAG) != 0) {
 			softc->flags &= ~ADA_FLAG_NEED_OTAG;
-			softc->ordered_tag_count++;
+			softc->flags |= ADA_FLAG_WAS_OTAG;
 			tag_code = 0;
 		} else {
 			tag_code = 1;
@@ -1760,25 +1759,24 @@ adadone(struct cam_periph *periph, union ccb *done_ccb)
 		}
 		softc->outstanding_cmds--;
 		if (softc->outstanding_cmds == 0)
-			softc->flags |= ADA_FLAG_WENT_IDLE;
+			softc->flags |= ADA_FLAG_WAS_OTAG;
 		if (state == ADA_CCB_TRIM) {
-			struct trim_request *req =
-			    (struct trim_request *)ataio->data_ptr;
-			int i;
+			TAILQ_HEAD(, bio) queue;
+			struct bio *bp1;
 
-			for (i = 1; i < TRIM_MAX_BIOS && req->bps[i]; i++) {
-				struct bio *bp1 = req->bps[i];
-
-				bp1->bio_error = bp->bio_error;
-				if (bp->bio_flags & BIO_ERROR) {
+			TAILQ_INIT(&queue);
+			TAILQ_CONCAT(&queue, &softc->trim_req.bps, bio_queue);
+			softc->trim_running = 0;
+			while ((bp1 = TAILQ_FIRST(&queue)) != NULL) {
+				TAILQ_REMOVE(&queue, bp1, bio_queue);
+				bp1->bio_error = error;
+				if (error != 0) {
 					bp1->bio_flags |= BIO_ERROR;
 					bp1->bio_resid = bp1->bio_bcount;
 				} else
 					bp1->bio_resid = 0;
 				biodone(bp1);
 			}
-			softc->trim_running = 0;
-			biodone(bp);
 			adaschedule(periph);
 		} else
 			biodone(bp);
@@ -1925,14 +1923,11 @@ adasendorderedtag(void *arg)
 	struct ada_softc *softc = arg;
 
 	if (ada_send_ordered) {
-		if ((softc->ordered_tag_count == 0) 
-		 && ((softc->flags & ADA_FLAG_WENT_IDLE) == 0)) {
-			softc->flags |= ADA_FLAG_NEED_OTAG;
+		if (softc->outstanding_cmds > 0) {
+			if ((softc->flags & ADA_FLAG_WAS_OTAG) == 0)
+				softc->flags |= ADA_FLAG_NEED_OTAG;
+			softc->flags &= ~ADA_FLAG_WAS_OTAG;
 		}
-		if (softc->outstanding_cmds > 0)
-			softc->flags &= ~ADA_FLAG_WENT_IDLE;
-
-		softc->ordered_tag_count = 0;
 	}
 	/* Queue us up again */
 	callout_reset(&softc->sendordered_c,
