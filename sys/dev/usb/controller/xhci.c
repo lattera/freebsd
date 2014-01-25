@@ -1544,23 +1544,26 @@ void
 xhci_interrupt(struct xhci_softc *sc)
 {
 	uint32_t status;
+	uint32_t temp;
 
 	USB_BUS_LOCK(&sc->sc_bus);
 
 	status = XREAD4(sc, oper, XHCI_USBSTS);
-	if (status == 0)
-		goto done;
 
-	/* acknowledge interrupts */
-
-	XWRITE4(sc, oper, XHCI_USBSTS, status);
-
-	DPRINTFN(16, "real interrupt (status=0x%08x)\n", status);
- 
-	if (status & XHCI_STS_EINT) {
-		/* check for event(s) */
-		xhci_interrupt_poll(sc);
+	/* acknowledge interrupts, if any */
+	if (status != 0) {
+		XWRITE4(sc, oper, XHCI_USBSTS, status);
+		DPRINTFN(16, "real interrupt (status=0x%08x)\n", status);
 	}
+
+	temp = XREAD4(sc, runt, XHCI_IMAN(0));
+
+	/* force clearing of pending interrupts */
+	if (temp & XHCI_IMAN_INTR_PEND)
+		XWRITE4(sc, runt, XHCI_IMAN(0), temp);
+ 
+	/* check for event(s) */
+	xhci_interrupt_poll(sc);
 
 	if (status & (XHCI_STS_PCD | XHCI_STS_HCH |
 	    XHCI_STS_HSE | XHCI_STS_HCE)) {
@@ -1584,7 +1587,6 @@ xhci_interrupt(struct xhci_softc *sc)
 			   __FUNCTION__);
 		}
 	}
-done:
 	USB_BUS_UNLOCK(&sc->sc_bus);
 }
 
@@ -2542,7 +2544,11 @@ xhci_configure_device(struct usb_device *udev)
 
 	xhci_ctx_set_le32(sc, &pinp->ctx_slot.dwSctx2, temp);
 
-	temp = XHCI_SCTX_3_DEV_ADDR_SET(udev->address) |
+	/*
+	 * These fields should be initialized to zero, according to
+	 * XHCI section 6.2.2 - slot context:
+	 */
+	temp = XHCI_SCTX_3_DEV_ADDR_SET(0) |
 	    XHCI_SCTX_3_SLOT_STATE_SET(0);
 
 	xhci_ctx_set_le32(sc, &pinp->ctx_slot.dwSctx3, temp);
