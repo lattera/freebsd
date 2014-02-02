@@ -23,6 +23,8 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD$
+ *
+ * Enhancements made by Shawn "lattera" Webb under the direction of SoldierX.
  */
 
 #include <sys/cdefs.h>

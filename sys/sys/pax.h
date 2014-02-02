@@ -23,6 +23,8 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD$
+ *
+ * Enhancements made by Shawn "lattera" Webb under the direction of SoldierX.
  */
 
 #ifndef	__SYS_PAX_H
