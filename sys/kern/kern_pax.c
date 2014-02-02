@@ -409,16 +409,21 @@ sysctl_pax_aslr_compat_exec(SYSCTL_HANDLER_ARGS)
  * ASLR functions
  */
 bool
-pax_aslr_active(struct thread *td)
+pax_aslr_active(struct thread *td, struct proc *proc)
 {
     int status;
     struct prison *pr=NULL;
 #ifdef  notyet
     uint32_t    flags;
-
-    flags = td->td_proc->p_pax;
 #endif /* notyet */
-    pr = pax_aslr_get_prison(td, NULL);
+
+    if (!(td) && !(proc))
+        return (true);
+
+#ifdef notyet
+    flags = (td != NULL) ? td->td_proc->p_pax : proc->p_pax;
+#endif /* notyet */
+    pr = pax_aslr_get_prison(td, proc);
 
     if ((pr) && !(pr->pr_pax_set))
         pax_aslr_init_prison(pr);
@@ -509,7 +514,7 @@ pax_aslr_init(struct thread *td, struct image_params *imgp)
         panic("[PaX ASLR] pax_aslr_init - imgp == NULL");
     }
 
-    if (!pax_aslr_active(td))
+    if (!pax_aslr_active(td, NULL))
         return;
 
     vm = imgp->proc->p_vmspace;
@@ -546,7 +551,7 @@ pax_aslr_mmap(struct thread *td, vm_offset_t *addr, vm_offset_t orig_addr, int f
 
     pr = pax_aslr_get_prison(td, NULL);
 
-    if (!pax_aslr_active(td))
+    if (!pax_aslr_active(td, NULL))
         return;
 
     if (!(flags & MAP_FIXED) && ((orig_addr == 0) || !(flags & MAP_ANON))) {
@@ -572,7 +577,7 @@ pax_aslr_stack(struct thread *td, char **addr, char *orig_addr)
 
     pr = pax_aslr_get_prison(td, NULL);
 
-    if (!pax_aslr_active(td))
+    if (!pax_aslr_active(td, NULL))
         return;
 
     *addr -= td->td_proc->p_vmspace->vm_aslr_delta_stack;
