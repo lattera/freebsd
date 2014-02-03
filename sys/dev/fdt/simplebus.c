@@ -128,6 +128,9 @@ static int
 simplebus_probe(device_t dev)
 {
  
+	if (!ofw_bus_status_okay(dev))
+		return (ENXIO);
+
 	if (!ofw_bus_is_compatible(dev, "simple-bus") &&
 	    (ofw_bus_get_type(dev) == NULL || strcmp(ofw_bus_get_type(dev),
 	     "soc") != 0))
@@ -287,11 +290,23 @@ simplebus_setup_dinfo(device_t dev, phandle_t node)
 	nintr = OF_getencprop_alloc(node, "interrupts",  sizeof(*intr),
 	    (void **)&intr);
 	if (nintr > 0) {
-		iparent = 0;
-		OF_searchencprop(node, "interrupt-parent", &iparent,
-		    sizeof(iparent));
-		OF_searchencprop(OF_xref_phandle(iparent), "#interrupt-cells",
-		    &icells, sizeof(icells));
+		if (OF_searchencprop(node, "interrupt-parent", &iparent,
+		    sizeof(iparent)) == -1) {
+			device_printf(dev, "No interrupt-parent found, "
+			    "assuming direct parent\n");
+			iparent = OF_parent(node);
+		}
+		if (OF_searchencprop(OF_xref_phandle(iparent), 
+		    "#interrupt-cells", &icells, sizeof(icells)) == -1) {
+			device_printf(dev, "Missing #interrupt-cells property, "
+			    "assuming <1>\n");
+			icells = 1;
+		}
+		if (icells < 1 || icells > nintr) {
+			device_printf(dev, "Invalid #interrupt-cells property "
+			    "value <%d>, assuming <1>\n", icells);
+			icells = 1;
+		}
 		for (i = 0, k = 0; i < nintr; i += icells, k++) {
 			intr[i] = ofw_bus_map_intr(dev, iparent, icells,
 			    &intr[i]);

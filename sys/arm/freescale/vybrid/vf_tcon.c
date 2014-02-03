@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013 Ganbold Tsagaankhuu <ganbold@gmail.com>
+ * Copyright (c) 2014 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,10 @@
  * SUCH DAMAGE.
  */
 
-/* General Register File for Rockchip RK30xx */
+/*
+ * Vybrid Family Timing Controller (TCON)
+ * Chapter 58, Vybrid Reference Manual, Rev. 5, 07/2013
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -39,9 +42,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/timeet.h>
 #include <sys/timetc.h>
 #include <sys/watchdog.h>
-#include <machine/bus.h>
-#include <machine/cpu.h>
-#include <machine/intr.h>
 
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/openfirm.h>
@@ -50,83 +50,89 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus.h>
 #include <machine/fdt.h>
+#include <machine/cpu.h>
+#include <machine/intr.h>
 
-#include "rk30xx_grf.h"
+#include <arm/freescale/vybrid/vf_common.h>
 
-struct rk30_grf_softc {
-	struct resource		*res;
+#define	TCON0_CTRL1	0x00
+#define	TCON_BYPASS	(1 << 29)
+
+struct tcon_softc {
+	struct resource		*res[1];
 	bus_space_tag_t		bst;
 	bus_space_handle_t	bsh;
 };
 
-static struct rk30_grf_softc *rk30_grf_sc = NULL;
+struct tcon_softc *tcon_sc;
 
-#define	grf_read_4(sc, reg)		\
-	bus_space_read_4((sc)->bst, (sc)->bsh, (reg))
-#define	grf_write_4(sc, reg, val)	\
-	bus_space_write_4((sc)->bst, (sc)->bsh, (reg), (val))
+static struct resource_spec tcon_spec[] = {
+	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
+	{ -1, 0 }
+};
+
+uint32_t
+tcon_bypass(void)
+{
+	struct tcon_softc *sc;
+
+	if (tcon_sc == NULL)
+		return (1);
+
+	sc = tcon_sc;
+
+	WRITE4(tcon_sc, TCON0_CTRL1, TCON_BYPASS);
+
+	return (0);
+}
 
 static int
-rk30_grf_probe(device_t dev)
+tcon_probe(device_t dev)
 {
 
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
-	if (ofw_bus_is_compatible(dev, "rockchip,rk30xx-grf")) {
-		device_set_desc(dev, "RK30XX General Register File");
-		return(BUS_PROBE_DEFAULT);
-	}
+	if (!ofw_bus_is_compatible(dev, "fsl,mvf600-tcon"))
+		return (ENXIO);
 
-	return (ENXIO);
+	device_set_desc(dev, "Vybrid Family Timing Controller (TCON)");
+	return (BUS_PROBE_DEFAULT);
 }
 
 static int
-rk30_grf_attach(device_t dev)
+tcon_attach(device_t dev)
 {
-	struct rk30_grf_softc *sc = device_get_softc(dev);
-	int rid = 0;
+	struct tcon_softc *sc;
 
-	if (rk30_grf_sc)
-		return (ENXIO);
+	sc = device_get_softc(dev);
 
-	sc->res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid, RF_ACTIVE);
-	if (!sc->res) {
-		device_printf(dev, "could not allocate resource\n");
+	if (bus_alloc_resources(dev, tcon_spec, sc->res)) {
+		device_printf(dev, "could not allocate resources\n");
 		return (ENXIO);
 	}
 
-	sc->bst = rman_get_bustag(sc->res);
-	sc->bsh = rman_get_bushandle(sc->res);
+	/* Memory interface */
+	sc->bst = rman_get_bustag(sc->res[0]);
+	sc->bsh = rman_get_bushandle(sc->res[0]);
 
-	rk30_grf_sc = sc;
+	tcon_sc = sc;
 
 	return (0);
 }
 
-static device_method_t rk30_grf_methods[] = {
-	DEVMETHOD(device_probe,		rk30_grf_probe),
-	DEVMETHOD(device_attach,	rk30_grf_attach),
+static device_method_t tcon_methods[] = {
+	DEVMETHOD(device_probe,		tcon_probe),
+	DEVMETHOD(device_attach,	tcon_attach),
 	{ 0, 0 }
 };
 
-static driver_t rk30_grf_driver = {
-	"rk30_grf",
-	rk30_grf_methods,
-	sizeof(struct rk30_grf_softc),
+static driver_t tcon_driver = {
+	"tcon",
+	tcon_methods,
+	sizeof(struct tcon_softc),
 };
 
-static devclass_t rk30_grf_devclass;
+static devclass_t tcon_devclass;
 
-DRIVER_MODULE(rk30_grf, simplebus, rk30_grf_driver, rk30_grf_devclass, 0, 0);
-
-void
-rk30_grf_gpio_pud(uint32_t bank, uint32_t pin, uint32_t state)
-{
-	uint32_t offset;
-
-	offset = GRF_GPIO0B_PULL - 4 + (bank * 16) + ((pin / 8) * 4);
-	pin = (7 - (pin % 8)) * 2;
-	grf_write_4(rk30_grf_sc, offset, (0x3 << (16 + pin)) | (state << pin));
-}
-
+DRIVER_MODULE(tcon, simplebus, tcon_driver, tcon_devclass, 0, 0);
