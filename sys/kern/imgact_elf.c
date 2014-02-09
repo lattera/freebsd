@@ -603,7 +603,9 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	u_long rbase;
 	u_long base_addr = 0;
 	int error, i, numsegs;
-    struct prison *pr; /* For ASLR */
+#ifdef PAX_ASLR
+    struct prison *pr;
+#endif
 
 #ifdef CAPABILITY_MODE
 	/*
@@ -659,21 +661,20 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	hdr = (const Elf_Ehdr *)imgp->image_header;
 	if ((error = __elfN(check_header)(hdr)) != 0)
 		goto fail;
-	if (hdr->e_type == ET_DYN)
+	if (hdr->e_type == ET_DYN) {
 		rbase = *addr;
-	else if (hdr->e_type == ET_EXEC)
+#ifdef PAX_ASLR
+        pr = pax_aslr_get_prison(NULL, imgp->proc);
+        if (pax_aslr_active(NULL, imgp->proc)) {
+            rbase += round_page(PAX_ASLR_DELTA(arc4random(), PAX_ASLR_DELTA_EXEC_LSB, pr->pr_pax_aslr_exec_len));
+        }
+#endif
+    } else if (hdr->e_type == ET_EXEC) {
 		rbase = 0;
-	else {
+    } else {
 		error = ENOEXEC;
 		goto fail;
 	}
-
-#ifdef PAX_ASLR
-    pr = pax_aslr_get_prison(NULL, imgp->proc);
-    if (pax_aslr_active(NULL, imgp->proc)) {
-        rbase += round_page(PAX_ASLR_DELTA(arc4random(), PAX_ASLR_DELTA_EXEC_LSB, pr->pr_pax_aslr_exec_len));
-    }
-#endif
 
 	/* Only support headers that fit within first page for now      */
 	if ((hdr->e_phoff > PAGE_SIZE) ||
