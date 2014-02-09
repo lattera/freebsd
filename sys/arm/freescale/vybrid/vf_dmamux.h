@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003 Alan L. Cox <alc@cs.rice.edu>
+ * Copyright (c) 2014 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,36 +26,23 @@
  * $FreeBSD$
  */
 
-#ifndef _MACHINE_SF_BUF_H_
-#define _MACHINE_SF_BUF_H_
+int dmamux_configure(int mux, int source, int channel, int enable);
 
-#include <sys/queue.h>
-
-struct vm_page;
-
-struct sf_buf {
-	LIST_ENTRY(sf_buf) list_entry;	/* list of buffers */
-	TAILQ_ENTRY(sf_buf) free_entry;	/* list of buffers */
-	struct		vm_page *m;	/* currently mapped page */
-	vm_offset_t	kva;		/* va of mapping */
-	int		ref_count;	/* usage of this mapping */
+enum mux_num {
+	MUX0,
+	MUX1,
+	MUX2,
+	MUX3,
 };
 
-static __inline vm_offset_t
-sf_buf_kva(struct sf_buf *sf)
-{
+enum mux_grp {
+	MUXGRP0, /* MUX[0,3] */
+	MUXGRP1, /* MUX[1,2] */
+};
 
-	return (sf->kva);
-}
+/* DMAMUX */
+#define	MUX_READ1(_sc, _mux, _reg)				\
+	bus_space_read_1(_sc->bst[_mux], _sc->bsh[_mux], _reg)
 
-static __inline struct vm_page *
-sf_buf_page(struct sf_buf *sf)
-{
-
-	return (sf->m);
-}
-
-struct sf_buf *	sf_buf_alloc(struct vm_page *m, int flags);
-void sf_buf_free(struct sf_buf *sf);
-
-#endif /* !_MACHINE_SF_BUF_H_ */
+#define	MUX_WRITE1(_sc, _mux, _reg, _val)			\
+	bus_space_write_1(_sc->bst[_mux], _sc->bsh[_mux], _reg, _val)
