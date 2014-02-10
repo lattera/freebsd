@@ -56,6 +56,12 @@ int drm_notyet_flag = 0;
 unsigned int drm_vblank_offdelay = 5000;    /* Default to 5000 msecs. */
 unsigned int drm_timestamp_precision = 20;  /* Default to 20 usecs. */
 
+/*
+ * Default to use monotonic timestamps for wait-for-vblank and page-flip
+ * complete events.
+ */
+unsigned int drm_timestamp_monotonic = 1;
+
 static int drm_load(struct drm_device *dev);
 static void drm_unload(struct drm_device *dev);
 static drm_pci_id_list_t *drm_find_description(int vendor, int device,
@@ -207,13 +213,22 @@ static struct drm_msi_blacklist_entry drm_msi_blacklist[] = {
 	{0, 0}
 };
 
-static int drm_msi_is_blacklisted(int vendor, int device)
+static int drm_msi_is_blacklisted(struct drm_device *dev, unsigned long flags)
 {
 	int i = 0;
 
+	if (dev->driver->use_msi != NULL) {
+		int use_msi;
+
+		use_msi = dev->driver->use_msi(dev, flags);
+
+		return (!use_msi);
+	}
+
+	/* TODO: Maybe move this to a callback in i915? */
 	for (i = 0; drm_msi_blacklist[i].vendor != 0; i++) {
-		if ((drm_msi_blacklist[i].vendor == vendor) &&
-		    (drm_msi_blacklist[i].device == device)) {
+		if ((drm_msi_blacklist[i].vendor == dev->pci_vendor) &&
+		    (drm_msi_blacklist[i].device == dev->pci_device)) {
 			return 1;
 		}
 	}
@@ -262,10 +277,16 @@ int drm_attach(device_t kdev, drm_pci_id_list_t *idlist)
 
 	dev->pci_vendor = pci_get_vendor(dev->device);
 	dev->pci_device = pci_get_device(dev->device);
+	dev->pci_subvendor = pci_get_subvendor(dev->device);
+	dev->pci_subdevice = pci_get_subdevice(dev->device);
+
+	id_entry = drm_find_description(dev->pci_vendor,
+	    dev->pci_device, idlist);
+	dev->id_entry = id_entry;
 
 	if (drm_core_check_feature(dev, DRIVER_HAVE_IRQ)) {
 		if (drm_msi &&
-		    !drm_msi_is_blacklisted(dev->pci_vendor, dev->pci_device)) {
+		    !drm_msi_is_blacklisted(dev, dev->id_entry->driver_private)) {
 			msicount = pci_msi_count(dev->device);
 			DRM_DEBUG("MSI count = %d\n", msicount);
 			if (msicount > 1)
@@ -295,13 +316,23 @@ int drm_attach(device_t kdev, drm_pci_id_list_t *idlist)
 	mtx_init(&dev->event_lock, "drmev", NULL, MTX_DEF);
 	sx_init(&dev->dev_struct_lock, "drmslk");
 
-	id_entry = drm_find_description(dev->pci_vendor,
-	    dev->pci_device, idlist);
-	dev->id_entry = id_entry;
-
 	error = drm_load(dev);
-	if (error == 0)
-		error = drm_create_cdevs(kdev);
+	if (error)
+		goto error;
+
+	error = drm_create_cdevs(kdev);
+	if (error)
+		goto error;
+
+	return (error);
+error:
+	if (dev->irqr) {
+		bus_release_resource(dev->device, SYS_RES_IRQ,
+		    dev->irqrid, dev->irqr);
+	}
+	if (dev->msi_enabled) {
+		pci_release_msi(dev->device);
+	}
 	return (error);
 }
 
@@ -559,7 +590,7 @@ static int drm_load(struct drm_device *dev)
 			DRM_ERROR("Request to enable bus-master failed.\n");
 		DRM_UNLOCK(dev);
 		if (retcode != 0)
-			goto error;
+			goto error1;
 	}
 
 	DRM_INFO("Initialized %s %d.%d.%d %s\n",
@@ -573,7 +604,9 @@ static int drm_load(struct drm_device *dev)
 
 error1:
 	delete_unrhdr(dev->drw_unrhdr);
+	drm_gem_destroy(dev);
 error:
+	drm_ctxbitmap_cleanup(dev);
 	drm_sysctl_cleanup(dev);
 	DRM_LOCK(dev);
 	drm_lastclose(dev);

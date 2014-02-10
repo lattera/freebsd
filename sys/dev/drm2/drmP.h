@@ -316,6 +316,9 @@ typedef int8_t s8;
 
 #define DRM_HZ			hz
 #define DRM_UDELAY(udelay)	DELAY(udelay)
+#define DRM_MDELAY(msecs)	do { int loops = (msecs);		\
+	                          while (loops--) DELAY(1000);		\
+				} while (0)
 #define DRM_TIME_SLICE		(hz/20)  /* Time slice for GLXContexts	  */
 
 #define DRM_GET_PRIV_SAREA(_dev, _ctx, _map) do {	\
@@ -694,6 +697,7 @@ struct drm_gem_object {
 
 struct drm_driver_info {
 	int	(*load)(struct drm_device *, unsigned long flags);
+	int	(*use_msi)(struct drm_device *, unsigned long flags);
 	int	(*firstopen)(struct drm_device *);
 	int	(*open)(struct drm_device *, struct drm_file *);
 	void	(*preclose)(struct drm_device *, struct drm_file *file_priv);
@@ -732,6 +736,8 @@ struct drm_driver_info {
 
 	int	(*gem_init_object)(struct drm_gem_object *obj);
 	void	(*gem_free_object)(struct drm_gem_object *obj);
+	int	(*gem_open_object)(struct drm_gem_object *, struct drm_file *);
+	void	(*gem_close_object)(struct drm_gem_object *, struct drm_file *);
 
 	struct cdev_pager_ops *gem_pager_ops;
 
@@ -825,8 +831,10 @@ struct drm_device {
 	struct drm_driver_info *driver;
 	drm_pci_id_list_t *id_entry;	/* PCI ID, name, and chipset private */
 
-	u_int16_t pci_device;		/* PCI device id */
-	u_int16_t pci_vendor;		/* PCI vendor id */
+	uint16_t pci_device;		/* PCI device id */
+	uint16_t pci_vendor;		/* PCI vendor id */
+	uint16_t pci_subdevice;		/* PCI subsystem device id */
+	uint16_t pci_subvendor;		/* PCI subsystem vendor id */
 
 	char		  *unique;	/* Unique identifier: e.g., busid  */
 	int		  unique_len;	/* Length of unique field	   */
@@ -997,6 +1005,7 @@ extern int	drm_debug_flag;
 extern int	drm_notyet_flag;
 extern unsigned int drm_vblank_offdelay;
 extern unsigned int drm_timestamp_precision;
+extern unsigned int drm_timestamp_monotonic;
 
 /* Device setup support (drm_drv.c) */
 int	drm_probe(device_t kdev, drm_pci_id_list_t *idlist);
@@ -1401,6 +1410,28 @@ do {									\
 
 #define	KTR_DRM		KTR_DEV
 #define	KTR_DRM_REG	KTR_SPARE3
+
+/* Error codes conversion from Linux to FreeBSD. */
+/* XXXKIB what is the right code for EREMOTEIO on FreeBSD? */
+#define	EREMOTEIO	ENXIO
+#define	ERESTARTSYS	ERESTART
+
+#define	PCI_VENDOR_ID_APPLE		0x106b
+#define	PCI_VENDOR_ID_ASUSTEK		0x1043
+#define	PCI_VENDOR_ID_ATI		0x1002
+#define	PCI_VENDOR_ID_DELL		0x1028
+#define	PCI_VENDOR_ID_HP		0x103c
+#define	PCI_VENDOR_ID_IBM		0x1014
+#define	PCI_VENDOR_ID_INTEL		0x8086
+#define	PCI_VENDOR_ID_SERVERWORKS	0x1166
+#define	PCI_VENDOR_ID_SONY		0x104d
+#define	PCI_VENDOR_ID_VIA		0x1106
+
+#define DRM_PCIE_SPEED_25 1
+#define DRM_PCIE_SPEED_50 2
+#define DRM_PCIE_SPEED_80 4
+
+extern int drm_pcie_get_speed_cap_mask(struct drm_device *dev, u32 *speed_mask);
 
 #endif /* __KERNEL__ */
 #endif /* _DRM_P_H_ */
