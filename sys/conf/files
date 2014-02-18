@@ -1599,7 +1599,13 @@ dev/my/if_my.c			optional my
 dev/ncv/ncr53c500.c		optional ncv
 dev/ncv/ncr53c500_pccard.c	optional ncv pccard
 dev/netmap/netmap.c		optional netmap
+dev/netmap/netmap_freebsd.c	optional netmap
+dev/netmap/netmap_generic.c	optional netmap
+dev/netmap/netmap_mbq.c		optional netmap
 dev/netmap/netmap_mem2.c	optional netmap
+dev/netmap/netmap_offloadings.c	optional netmap
+dev/netmap/netmap_pipe.c	optional netmap
+dev/netmap/netmap_vale.c	optional netmap
 dev/nge/if_nge.c		optional nge
 dev/nxge/if_nxge.c		optional nxge \
 	compile-with "${NORMAL_C} ${NO_WSELF_ASSIGN}"
@@ -2013,6 +2019,7 @@ dev/usb/usb_util.c		optional usb
 #
 dev/usb/net/if_aue.c		optional aue
 dev/usb/net/if_axe.c		optional axe
+dev/usb/net/if_axge.c		optional axge
 dev/usb/net/if_cdce.c		optional cdce
 dev/usb/net/if_cue.c		optional cue
 dev/usb/net/if_ipheth.c		optional ipheth
@@ -2022,8 +2029,8 @@ dev/usb/net/if_rue.c		optional rue
 dev/usb/net/if_udav.c		optional udav
 dev/usb/net/if_usie.c		optional usie
 dev/usb/net/ruephy.c		optional rue
-dev/usb/net/usb_ethernet.c	optional aue | axe | cdce | cue | kue | mos | \
-					 rue | udav | ipheth
+dev/usb/net/usb_ethernet.c	optional aue | axe | axge | cdce | cue | kue | \
+					 mos | rue | udav | ipheth
 dev/usb/net/uhso.c		optional uhso
 #
 # USB WLAN drivers
@@ -2747,7 +2754,8 @@ net80211/ieee80211.c		optional wlan
 net80211/ieee80211_acl.c	optional wlan wlan_acl
 net80211/ieee80211_action.c	optional wlan
 net80211/ieee80211_ageq.c	optional wlan
-net80211/ieee80211_adhoc.c	optional wlan
+net80211/ieee80211_adhoc.c	optional wlan \
+	compile-with "${NORMAL_C} -Wno-unused-function"
 net80211/ieee80211_ageq.c	optional wlan
 net80211/ieee80211_amrr.c	optional wlan | wlan_amrr
 net80211/ieee80211_crypto.c	optional wlan \
@@ -2759,7 +2767,8 @@ net80211/ieee80211_crypto_wep.c	optional wlan wlan_wep
 net80211/ieee80211_ddb.c	optional wlan ddb
 net80211/ieee80211_dfs.c	optional wlan
 net80211/ieee80211_freebsd.c	optional wlan
-net80211/ieee80211_hostap.c	optional wlan
+net80211/ieee80211_hostap.c	optional wlan \
+	compile-with "${NORMAL_C} -Wno-unused-function"
 net80211/ieee80211_ht.c		optional wlan
 net80211/ieee80211_hwmp.c	optional wlan ieee80211_support_mesh
 net80211/ieee80211_input.c	optional wlan
@@ -2779,7 +2788,8 @@ net80211/ieee80211_regdomain.c	optional wlan
 net80211/ieee80211_rssadapt.c	optional wlan wlan_rssadapt
 net80211/ieee80211_scan.c	optional wlan
 net80211/ieee80211_scan_sta.c	optional wlan
-net80211/ieee80211_sta.c	optional wlan
+net80211/ieee80211_sta.c	optional wlan \
+	compile-with "${NORMAL_C} -Wno-unused-function"
 net80211/ieee80211_superg.c	optional wlan ieee80211_support_superg
 net80211/ieee80211_tdma.c	optional wlan ieee80211_support_tdma
 net80211/ieee80211_wds.c	optional wlan
@@ -3239,7 +3249,7 @@ ofed/drivers/net/mlx4/main.c			optional mlx4ib | mlxen	\
 	compile-with "${OFED_C_NOIMP} -I$S/ofed/drivers/net/mlx4/"
 ofed/drivers/net/mlx4/mcg.c			optional mlx4ib | mlxen	\
 	no-depend obj-prefix "mlx4_"					\
-	compile-with "${OFED_C_NOIMP} -I$S/ofed/drivers/net/mlx4/"
+	compile-with "${OFED_C_NOIMP} -I$S/ofed/drivers/net/mlx4/ -Wno-unused"
 ofed/drivers/net/mlx4/mr.c			optional mlx4ib | mlxen	\
 	no-depend obj-prefix "mlx4_"					\
 	compile-with "${OFED_C_NOIMP} -I$S/ofed/drivers/net/mlx4/"
@@ -3346,7 +3356,8 @@ pci/amdpm.c			optional amdpm pci | nfpm pci
 pci/amdsmb.c			optional amdsmb pci
 pci/if_rl.c			optional rl pci
 pci/intpm.c			optional intpm pci
-pci/ncr.c			optional ncr pci
+pci/ncr.c			optional ncr pci \
+	compile-with "${NORMAL_C} -Wno-unused"
 pci/nfsmb.c			optional nfsmb pci
 pci/viapm.c			optional viapm pci
 rpc/auth_none.c			optional krpc | nfslockd | nfsclient | nfsserver | nfscl | nfsd

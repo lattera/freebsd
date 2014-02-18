@@ -1275,6 +1275,15 @@ spa_unload(spa_t *spa)
 
 	bpobj_close(&spa->spa_deferred_bpobj);
 
+	spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
+
+	/*
+	 * Close all vdevs.
+	 */
+	if (spa->spa_root_vdev)
+		vdev_free(spa->spa_root_vdev);
+	ASSERT(spa->spa_root_vdev == NULL);
+
 	/*
 	 * Close the dsl pool.
 	 */
@@ -1286,19 +1295,11 @@ spa_unload(spa_t *spa)
 
 	ddt_unload(spa);
 
-	spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
 
 	/*
 	 * Drop and purge level 2 cache
 	 */
 	spa_l2cache_drop(spa);
-
-	/*
-	 * Close all vdevs.
-	 */
-	if (spa->spa_root_vdev)
-		vdev_free(spa->spa_root_vdev);
-	ASSERT(spa->spa_root_vdev == NULL);
 
 	for (i = 0; i < spa->spa_spares.sav_count; i++)
 		vdev_free(spa->spa_spares.sav_vdevs[i]);
@@ -3505,6 +3506,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	    (error = spa_validate_aux(spa, nvroot, txg,
 	    VDEV_ALLOC_ADD)) == 0) {
 		for (int c = 0; c < rvd->vdev_children; c++) {
+			vdev_ashift_optimize(rvd->vdev_child[c]);
 			vdev_metaslab_set_size(rvd->vdev_child[c]);
 			vdev_expand(rvd->vdev_child[c], txg);
 		}
@@ -4714,7 +4716,7 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	}
 
 	/* mark the device being resilvered */
-	newvd->vdev_resilvering = B_TRUE;
+	newvd->vdev_resilver_txg = txg;
 
 	/*
 	 * If the parent is not a mirror, or if we're replacing, insert the new
@@ -4766,7 +4768,9 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	vdev_dirty(tvd, VDD_DTL, newvd, txg);
 
 	/*
-	 * Restart the resilver
+	 * Schedule the resilver to restart in the future. We do this to
+	 * ensure that dmu_sync-ed blocks have been stitched into the
+	 * respective datasets.
 	 */
 	dsl_resilver_restart(spa->spa_dsl_pool, dtl_max_txg);
 
@@ -5395,7 +5399,7 @@ spa_vdev_remove_evacuate(spa_t *spa, vdev_t *vd)
 	ASSERT0(vd->vdev_stat.vs_alloc);
 	txg = spa_vdev_config_enter(spa);
 	vd->vdev_removing = B_TRUE;
-	vdev_dirty(vd, 0, NULL, txg);
+	vdev_dirty_leaves(vd, VDD_DTL, txg);
 	vdev_config_dirty(vd);
 	spa_vdev_config_exit(spa, NULL, txg, 0, FTAG);
 
@@ -5578,13 +5582,6 @@ spa_vdev_resilver_done_hunt(vdev_t *vd)
 			return (oldvd);
 	}
 
-	if (vd->vdev_resilvering && vdev_dtl_empty(vd, DTL_MISSING) &&
-	    vdev_dtl_empty(vd, DTL_OUTAGE)) {
-		ASSERT(vd->vdev_ops->vdev_op_leaf);
-		vd->vdev_resilvering = B_FALSE;
-		vdev_config_dirty(vd->vdev_top);
-	}
-
 	/*
 	 * Check for a completed replacement.  We always consider the first
 	 * vdev in the list to be the oldest vdev, and the last one to be
@@ -5674,6 +5671,8 @@ spa_vdev_resilver_done(spa_t *spa)
 			ASSERT(pvd->vdev_ops == &vdev_replacing_ops);
 			sguid = ppvd->vdev_child[1]->vdev_guid;
 		}
+		ASSERT(vd->vdev_resilver_txg == 0 || !vdev_dtl_required(vd));
+
 		spa_config_exit(spa, SCL_ALL, FTAG);
 		if (spa_vdev_detach(spa, guid, pguid, B_TRUE) != 0)
 			return;
@@ -6244,7 +6243,7 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 			ASSERT(zpool_prop_feature(nvpair_name(elem)));
 
 			fname = strchr(nvpair_name(elem), '@') + 1;
-			VERIFY3U(0, ==, zfeature_lookup_name(fname, &feature));
+			VERIFY0(zfeature_lookup_name(fname, &feature));
 
 			spa_feature_enable(spa, feature, tx);
 			spa_history_log_internal(spa, "set", tx,
@@ -6252,7 +6251,7 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 			break;
 
 		case ZPOOL_PROP_VERSION:
-			VERIFY(nvpair_value_uint64(elem, &intval) == 0);
+			intval = fnvpair_value_uint64(elem);
 			/*
 			 * The version is synced seperatly before other
 			 * properties and should be correct by now.
@@ -6276,7 +6275,7 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 			 */
 			break;
 		case ZPOOL_PROP_COMMENT:
-			VERIFY(nvpair_value_string(elem, &strval) == 0);
+			strval = fnvpair_value_string(elem);
 			if (spa->spa_comment != NULL)
 				spa_strfree(spa->spa_comment);
 			spa->spa_comment = spa_strdup(strval);
@@ -6308,23 +6307,23 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 
 			if (nvpair_type(elem) == DATA_TYPE_STRING) {
 				ASSERT(proptype == PROP_TYPE_STRING);
-				VERIFY(nvpair_value_string(elem, &strval) == 0);
-				VERIFY(zap_update(mos,
+				strval = fnvpair_value_string(elem);
+				VERIFY0(zap_update(mos,
 				    spa->spa_pool_props_object, propname,
-				    1, strlen(strval) + 1, strval, tx) == 0);
+				    1, strlen(strval) + 1, strval, tx));
 				spa_history_log_internal(spa, "set", tx,
 				    "%s=%s", nvpair_name(elem), strval);
 			} else if (nvpair_type(elem) == DATA_TYPE_UINT64) {
-				VERIFY(nvpair_value_uint64(elem, &intval) == 0);
+				intval = fnvpair_value_uint64(elem);
 
 				if (proptype == PROP_TYPE_INDEX) {
 					const char *unused;
-					VERIFY(zpool_prop_index_to_string(
-					    prop, intval, &unused) == 0);
+					VERIFY0(zpool_prop_index_to_string(
+					    prop, intval, &unused));
 				}
-				VERIFY(zap_update(mos,
+				VERIFY0(zap_update(mos,
 				    spa->spa_pool_props_object, propname,
-				    8, 1, &intval, tx) == 0);
+				    8, 1, &intval, tx));
 				spa_history_log_internal(spa, "set", tx,
 				    "%s=%lld", nvpair_name(elem), intval);
 			} else {

@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
+ * Copyright (c) 2014 by Saso Kiselkov. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -4593,6 +4593,13 @@ l2arc_write_done(zio_t *zio)
 	 */
 	for (ab = list_prev(buflist, head); ab; ab = ab_prev) {
 		ab_prev = list_prev(buflist, ab);
+		abl2 = ab->b_l2hdr;
+
+		/*
+		 * Release the temporary compressed buffer as soon as possible.
+		 */
+		if (abl2->b_compress != ZIO_COMPRESS_OFF)
+			l2arc_release_cdata_buf(ab);
 
 		hash_lock = HDR_LOCK(ab);
 		if (!mutex_tryenter(hash_lock)) {
@@ -4604,14 +4611,6 @@ l2arc_write_done(zio_t *zio)
 			ARCSTAT_BUMP(arcstat_l2_writes_hdr_miss);
 			continue;
 		}
-
-		abl2 = ab->b_l2hdr;
-
-		/*
-		 * Release the temporary compressed buffer as soon as possible.
-		 */
-		if (abl2->b_compress != ZIO_COMPRESS_OFF)
-			l2arc_release_cdata_buf(ab);
 
 		if (zio->io_error != 0) {
 			/*
@@ -5197,7 +5196,7 @@ l2arc_compress_buf(l2arc_buf_hdr_t *l2hdr)
 	len = l2hdr->b_asize;
 	cdata = zio_data_buf_alloc(len);
 	csize = zio_compress_data(ZIO_COMPRESS_LZ4, l2hdr->b_tmp_cdata,
-	    cdata, l2hdr->b_asize);
+	    cdata, l2hdr->b_asize, (size_t)SPA_MINBLOCKSIZE);
 
 	if (csize == 0) {
 		/* zero block, indicate that there's nothing to write */
@@ -5436,6 +5435,8 @@ l2arc_add_vdev(spa_t *spa, vdev_t *vd)
 	l2arc_dev_t *adddev;
 
 	ASSERT(!l2arc_vdev_present(vd));
+
+	vdev_ashift_optimize(vd);
 
 	/*
 	 * Create a new l2arc device entry.

@@ -233,6 +233,7 @@ MAN=	accept_filter.9 \
 	rwlock.9 \
 	sbuf.9 \
 	scheduler.9 \
+	SDT.9 \
 	securelevel_gt.9 \
 	selrecord.9 \
 	sema.9 \
@@ -1128,6 +1129,11 @@ MLINKS+=scheduler.9 curpriority_cmp.9 \
 	scheduler.9 sched_setup.9 \
 	scheduler.9 setrunnable.9 \
 	scheduler.9 updatepri.9
+MLINKS+=SDT.9 SDT_PROVIDER_DECLARE.9 \
+	SDT.9 SDT_PROVIDER_DEFINE.9 \
+	SDT.9 SDT_PROBE_DECLARE.9 \
+	SDT.9 SDT_PROBE_DEFINE.9 \
+	SDT.9 SDT_PROBE.9
 MLINKS+=securelevel_gt.9 securelevel_ge.9
 MLINKS+=selrecord.9 seldrain.9 \
 	selrecord.9 selwakeup.9
@@ -1302,6 +1308,7 @@ MLINKS+=sysctl_ctx_init.9 sysctl_ctx_entry_add.9 \
 MLINKS+=SYSINIT.9 SYSUNINIT.9
 MLINKS+=taskqueue.9 TASK_INIT.9 \
 	taskqueue.9 TASK_INITIALIZER.9 \
+	taskqueue.9 taskqueue_block.9 \
 	taskqueue.9 taskqueue_cancel.9 \
 	taskqueue.9 taskqueue_create.9 \
 	taskqueue.9 taskqueue_create_fast.9 \
@@ -1309,13 +1316,15 @@ MLINKS+=taskqueue.9 TASK_INIT.9 \
 	taskqueue.9 TASKQUEUE_DEFINE.9 \
 	taskqueue.9 TASKQUEUE_DEFINE_THREAD.9 \
 	taskqueue.9 taskqueue_drain.9 \
+	taskqueue.9 taskqueue_drain_all.9 \
 	taskqueue.9 taskqueue_enqueue.9 \
 	taskqueue.9 taskqueue_enqueue_fast.9 \
 	taskqueue.9 TASKQUEUE_FAST_DEFINE.9 \
 	taskqueue.9 TASKQUEUE_FAST_DEFINE_THREAD.9 \
 	taskqueue.9 taskqueue_free.9 \
 	taskqueue.9 taskqueue_member.9 \
-	taskqueue.9 taskqueue_run.9
+	taskqueue.9 taskqueue_run.9 \
+	taskqueue.9 taskqueue_unblock.9
 MLINKS+=time.9 boottime.9 \
 	time.9 time_second.9 \
 	time.9 time_uptime.9
