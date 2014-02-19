@@ -35,6 +35,8 @@ typedef enum {
 	AR8X16_SWITCH_AR8226,
 	AR8X16_SWITCH_AR8316,
 	AR8X16_SWITCH_AR9340,
+	AR8X16_SWITCH_AR8327,
+	AR8X16_SWITCH_AR8337,
 } ar8x16_switch_type;
 
 /*
@@ -53,6 +55,9 @@ struct arswitch_softc {
 	int		is_mii;		/* PHY mode is MII (XXX which PHY?) */
 	int		page;
 	int		is_internal_switch;
+	int		chip_ver;
+	int		chip_rev;
+	int		mii_lo_first;
 	ar8x16_switch_type	sc_switchtype;
 	char		*ifname[AR8X16_NUM_PHYS];
 	device_t	miibus[AR8X16_NUM_PHYS];
