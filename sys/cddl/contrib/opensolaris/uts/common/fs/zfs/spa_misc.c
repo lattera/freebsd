@@ -304,6 +304,9 @@ SYSCTL_INT(_vfs_zfs, OID_AUTO, deadman_enabled, CTLFLAG_RDTUN,
  *     (VDEV_RAIDZ_MAXPARITY + 1) * SPA_DVAS_PER_BP * 2 == 24
  */
 int spa_asize_inflation = 24;
+TUNABLE_INT("vfs.zfs.spa_asize_inflation", &spa_asize_inflation);
+SYSCTL_INT(_vfs_zfs, OID_AUTO, spa_asize_inflation, CTLFLAG_RWTUN,
+    &spa_asize_inflation, 0, "Worst case inflation factor for single sector writes");
 
 #ifndef illumos
 #ifdef _KERNEL
@@ -1766,6 +1769,7 @@ spa_init(int mode)
 	unique_init();
 	range_tree_init();
 	zio_init();
+	lz4_init();
 	dmu_init();
 	zil_init();
 	vdev_cache_stat_init();
@@ -1791,6 +1795,7 @@ spa_fini(void)
 	vdev_cache_stat_fini();
 	zil_fini();
 	dmu_fini();
+	lz4_fini();
 	zio_fini();
 	range_tree_fini();
 	unique_fini();
