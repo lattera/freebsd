@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2007 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2007 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,10 +32,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "statfoo.h"
+#include "bsdstat.h"
 
 static void
-statfoo_setfmt(struct statfoo *sf, const char *fmt0)
+bsdstat_setfmt(struct bsdstat *sf, const char *fmt0)
 {
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
 	char fmt[4096];
@@ -53,46 +53,52 @@ statfoo_setfmt(struct statfoo *sf, const char *fmt0)
 				"skipped\n", sf->name, tok);
 			continue;
 		}
-		if (j+3 > sizeof(sf->fmts)) {
+		if (j+3 > (int) sizeof(sf->fmts)) {
 			fprintf(stderr, "%s: not enough room for all stats; "
 				"stopped at %s\n", sf->name, tok);
 			break;
 		}
 		if (j != 0)
 			sf->fmts[j++] = ' ';
-		sf->fmts[j++] = 0x80 | i;
+		sf->fmts[j++] = FMTS_IS_STAT;
+		sf->fmts[j++] = i & 0xff;
+		sf->fmts[j++] = (i >> 8) & 0xff;
 	}
 	sf->fmts[j] = '\0';
 #undef N
 }
 
 static void 
-statfoo_collect(struct statfoo *sf)
+bsdstat_collect(struct bsdstat *sf)
 {
 	fprintf(stderr, "%s: don't know how to collect data\n", sf->name);
 }
 
 static void 
-statfoo_update_tot(struct statfoo *sf)
+bsdstat_update_tot(struct bsdstat *sf)
 {
 	fprintf(stderr, "%s: don't know how to update total data\n", sf->name);
 }
 
 static int 
-statfoo_get(struct statfoo *sf, int s, char b[], size_t bs)
+bsdstat_get(struct bsdstat *sf, int s, char b[], size_t bs)
 {
 	fprintf(stderr, "%s: don't know how to get stat #%u\n", sf->name, s);
 	return 0;
 }
 
 static void
-statfoo_print_header(struct statfoo *sf, FILE *fd)
+bsdstat_print_header(struct bsdstat *sf, FILE *fd)
 {
 	const unsigned char *cp;
+	int i;
+	const struct fmt *f;
 
 	for (cp = sf->fmts; *cp != '\0'; cp++) {
-		if (*cp & 0x80) {
-			const struct fmt *f = &sf->stats[*cp &~ 0x80];
+		if (*cp == FMTS_IS_STAT) {
+			i = *(++cp);
+			i |= ((int) *(++cp)) << 8;
+			f = &sf->stats[i];
 			fprintf(fd, "%*s", f->width, f->label);
 		} else
 			putc(*cp, fd);
@@ -101,15 +107,19 @@ statfoo_print_header(struct statfoo *sf, FILE *fd)
 }
 
 static void
-statfoo_print_current(struct statfoo *sf, FILE *fd)
+bsdstat_print_current(struct bsdstat *sf, FILE *fd)
 {
 	char buf[32];
 	const unsigned char *cp;
+	int i;
+	const struct fmt *f;
 
 	for (cp = sf->fmts; *cp != '\0'; cp++) {
-		if (*cp & 0x80) {
-			const struct fmt *f = &sf->stats[*cp &~ 0x80];
-			if (sf->get_curstat(sf, *cp &~ 0x80, buf, sizeof(buf)))
+		if (*cp == FMTS_IS_STAT) {
+			i = *(++cp);
+			i |= ((int) *(++cp)) << 8;
+			f = &sf->stats[i];
+			if (sf->get_curstat(sf, i, buf, sizeof(buf)))
 				fprintf(fd, "%*s", f->width, buf);
 		} else
 			putc(*cp, fd);
@@ -118,36 +128,48 @@ statfoo_print_current(struct statfoo *sf, FILE *fd)
 }
 
 static void
-statfoo_print_total(struct statfoo *sf, FILE *fd)
+bsdstat_print_total(struct bsdstat *sf, FILE *fd)
 {
 	char buf[32];
 	const unsigned char *cp;
-
-	for (cp = sf->fmts; *cp != '\0'; cp++) {
-		if (*cp & 0x80) {
-			const struct fmt *f = &sf->stats[*cp &~ 0x80];
-			if (sf->get_totstat(sf, *cp &~ 0x80, buf, sizeof(buf)))
-				fprintf(fd, "%*s", f->width, buf);
-		} else
-			putc(*cp, fd);
-	}
-	putc('\n', fd);
-}
-
-static void
-statfoo_print_verbose(struct statfoo *sf, FILE *fd)
-{
-	char s[32];
+	const struct fmt *f;
 	int i;
 
+	for (cp = sf->fmts; *cp != '\0'; cp++) {
+		if (*cp == FMTS_IS_STAT) {
+			i = *(++cp);
+			i |= ((int) *(++cp)) << 8;
+			f = &sf->stats[i];
+			if (sf->get_totstat(sf, i, buf, sizeof(buf)))
+				fprintf(fd, "%*s", f->width, buf);
+		} else
+			putc(*cp, fd);
+	}
+	putc('\n', fd);
+}
+
+static void
+bsdstat_print_verbose(struct bsdstat *sf, FILE *fd)
+{
+	const struct fmt *f;
+	char s[32];
+	int i, width;
+
+	width = 0;
 	for (i = 0; i < sf->nstats; i++) {
+		f = &sf->stats[i];
+		if (f->width > width)
+			width = f->width;
+	}
+	for (i = 0; i < sf->nstats; i++) {
+		f = &sf->stats[i];
 		if (sf->get_totstat(sf, i, s, sizeof(s)) && strcmp(s, "0"))
-			fprintf(fd, "%s %s\n", s, sf->stats[i].desc);
+			fprintf(fd, "%-*s %s\n", width, s, f->desc);
 	}
 }
 
 static void
-statfoo_print_fields(struct statfoo *sf, FILE *fd)
+bsdstat_print_fields(struct bsdstat *sf, FILE *fd)
 {
 	int i, w, width;
 
@@ -165,20 +187,20 @@ statfoo_print_fields(struct statfoo *sf, FILE *fd)
 }
 
 void
-statfoo_init(struct statfoo *sf, const char *name, const struct fmt *stats, int nstats)
+bsdstat_init(struct bsdstat *sf, const char *name, const struct fmt *stats, int nstats)
 {
 	sf->name = name;
 	sf->stats = stats;
 	sf->nstats = nstats;
-	sf->setfmt = statfoo_setfmt;
-	sf->collect_cur = statfoo_collect;
-	sf->collect_tot = statfoo_collect;
-	sf->update_tot = statfoo_update_tot;
-	sf->get_curstat = statfoo_get;
-	sf->get_totstat = statfoo_get;
-	sf->print_header = statfoo_print_header;
-	sf->print_current = statfoo_print_current;
-	sf->print_total = statfoo_print_total;
-	sf->print_verbose = statfoo_print_verbose;
-	sf->print_fields = statfoo_print_fields;
+	sf->setfmt = bsdstat_setfmt;
+	sf->collect_cur = bsdstat_collect;
+	sf->collect_tot = bsdstat_collect;
+	sf->update_tot = bsdstat_update_tot;
+	sf->get_curstat = bsdstat_get;
+	sf->get_totstat = bsdstat_get;
+	sf->print_header = bsdstat_print_header;
+	sf->print_current = bsdstat_print_current;
+	sf->print_total = bsdstat_print_total;
+	sf->print_verbose = bsdstat_print_verbose;
+	sf->print_fields = bsdstat_print_fields;
 }

@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef _STATFOO_H_
-#define	_STATFOO_H_
+#ifndef	_BSDSTAT_H_
+#define	_BSDSTAT_H_
 /*
  * Base class for managing+displaying periodically collected statistics.
  */
@@ -47,7 +47,7 @@ struct fmt {
 	const char* desc;		/* verbose description */
 };
 
-#define	STATFOO_DECL_METHODS(_p) \
+#define	BSDSTAT_DECL_METHODS(_p) \
 	/* set the format of the statistics to display */	\
 	void (*setfmt)(_p, const char *);			\
 	/* collect+store ``current statistics'' */		\
@@ -75,20 +75,20 @@ struct fmt {
  * Statistics base class.  This class is not usable; only
  * classes derived from it are useful.
  */
-struct statfoo {
+struct bsdstat {
 	const char *name;		/* statistics name, e.g. wlanstats */
 	const struct fmt *stats;	/* statistics in class */
 	int nstats;			/* number of stats */
-	int fields[128];		/* index of field referenced in fmts */
+#define	FMTS_IS_STAT	0x80	/* the following two bytes are the stat id */
 	unsigned char fmts[4096];	/* private: compiled stats to display */
 
-	STATFOO_DECL_METHODS(struct statfoo *);
+	BSDSTAT_DECL_METHODS(struct bsdstat *);
 };
 
-void	statfoo_init(struct statfoo *, const char *name,
-		const struct fmt *stats, int nstats);
+extern	void bsdstat_init(struct bsdstat *, const char *name,
+		    const struct fmt *stats, int nstats);
 
-#define	STATFOO_DEFINE_BOUNCE(_t) \
+#define	BSDSTAT_DEFINE_BOUNCE(_t) \
 static void _t##_setfmt(struct _t *wf, const char *fmt0)	\
 	{ wf->base.setfmt(&wf->base, fmt0); }			\
 static void _t##_collect_cur(struct _t *wf)			\
@@ -112,7 +112,7 @@ static void _t##_print_verbose(struct _t *wf, FILE *fd)		\
 static void _t##_print_fields(struct _t *wf, FILE *fd)		\
 	{ wf->base.print_fields(&wf->base, fd); }
 
-#define	STATFOO_BOUNCE(_p, _t) do {				\
+#define	BSDSTAT_BOUNCE(_p, _t) do {				\
 	_p->base.setfmt = _t##_setfmt;				\
 	_p->base.collect_cur = _t##_collect_cur;		\
 	_p->base.collect_tot = _t##_collect_tot;		\
@@ -125,4 +125,4 @@ static void _t##_print_fields(struct _t *wf, FILE *fd)		\
 	_p->base.print_verbose = _t##_print_verbose;		\
 	_p->base.print_fields = _t##_print_fields;		\
 } while (0)
-#endif /* _STATFOO_H_ */
+#endif /* _BSDSTAT_H_ */
