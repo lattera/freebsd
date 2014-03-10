@@ -115,16 +115,8 @@ Lprefetch_abort_handler_address:
 	.global	_C_LABEL(prefetch_abort_handler_address)
 
 _C_LABEL(prefetch_abort_handler_address):
-	.word	abortprefetch
+	.word	prefetch_abort_handler
 
-	.text
-abortprefetch:
-        adr     r0, abortprefetchmsg
-	b	_C_LABEL(panic)
-
-abortprefetchmsg:
-        .asciz  "abortprefetch"
-        .align  0
 END(prefetch_abort_entry)
 
 /*
@@ -151,16 +143,8 @@ Ldata_abort_handler_address:
 	.data
 	.global	_C_LABEL(data_abort_handler_address)
 _C_LABEL(data_abort_handler_address):
-	.word	abortdata
+	.word	data_abort_handler
 
-	.text
-abortdata:
-        adr     r0, abortdatamsg
-	b	_C_LABEL(panic)
-
-abortdatamsg:
-        .asciz  "abortdata"
-        .align  0
 END(data_abort_entry)
 
 /*
@@ -218,46 +202,25 @@ END(exception_exit)
  *	look like direct entry from the vector.
  */
 ASENTRY_NP(undefined_entry)
-	stmfd	sp!, {r0, r1}
-	ldr	r0, Lundefined_handler_indirection
-	ldr	r1, [sp], #0x0004
-	str	r1, [r0, #0x0000]
-	ldr	r1, [sp], #0x0004
-	str	r1, [r0, #0x0004]
-	ldmia	r0, {r0, r1, pc}
 
-
-Lundefined_handler_indirection:
-	.word	Lundefined_handler_indirection_data
+        sub     lr, lr, #0x00000004     /* Adjust the lr */
+	PUSHFRAMEINSVC			/* Push trap frame and switch */
+					/* to SVC32 mode */
+	ldr	r1, Lundefined_handler_address
+	adr	lr, exception_exit
+	mov	r0, sp			/* pass the stack pointer as r0 */
+	ldr	pc, [r1]
 END(undefined_entry)
 
-/*
- * assembly bounce code for calling the kernel
- * undefined instruction handler. This uses
- * a standard trap frame and is called in SVC mode.
- */
+ASENTRY_NP(undefinedinstruction_bounce)
+	b	undefinedinstruction
+END(undefinedinstruction_bounce)
 
-ENTRY_NP(undefinedinstruction_bounce)
-	PUSHFRAMEINSVC
-
-	mov	r0, sp
-	adr	lr, exception_exit
-	b	_C_LABEL(undefinedinstruction)
+Lundefined_handler_address:
+	.word	_C_LABEL(undefined_handler_address)
 
 	.data
-	.align	0
-
-/*
- * Indirection data
- * 2 words use for preserving r0 and r1
- * 3rd word contains the undefined handler address.
- */
-
-Lundefined_handler_indirection_data:
-	.word	0
-	.word	0
-
 	.global	_C_LABEL(undefined_handler_address)
 _C_LABEL(undefined_handler_address):
-	.word	_C_LABEL(undefinedinstruction_bounce)
-END(undefinedinstruction_bounce)
+	.word	undefinedinstruction_bounce
+

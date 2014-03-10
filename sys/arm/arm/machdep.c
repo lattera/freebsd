@@ -143,10 +143,6 @@ extern vm_offset_t ksym_start, ksym_end;
 
 static struct pv_addr kernel_pt_table[KERNEL_PT_MAX];
 
-extern u_int data_abort_handler_address;
-extern u_int prefetch_abort_handler_address;
-extern u_int undefined_handler_address;
-
 vm_paddr_t pmap_pa;
 
 struct pv_addr systempage;
@@ -993,6 +989,7 @@ init_proc0(vm_offset_t kstack)
 	thread0.td_pcb = (struct pcb *)
 		(thread0.td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
 	thread0.td_pcb->pcb_flags = 0;
+	thread0.td_pcb->pcb_vfpcpu = -1;
 	thread0.td_frame = &proc0_tf;
 	pcpup->pc_curpcb = thread0.td_pcb;
 }
@@ -1278,10 +1275,6 @@ initarm(struct arm_boot_params *abp)
 	 */
 	cpu_idcache_wbinv_all();
 
-	/* Set stack for exception handlers */
-	data_abort_handler_address = (u_int)data_abort_handler;
-	prefetch_abort_handler_address = (u_int)prefetch_abort_handler;
-	undefined_handler_address = (u_int)undefinedinstruction_bounce;
 	undefined_init();
 
 	init_proc0(kernelstack.pv_va);
