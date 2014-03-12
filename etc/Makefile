@@ -50,6 +50,10 @@ BIN1=	crontab \
 	syslog.conf \
 	termcap.small
 
+.if ${TARGET_ARCH} == "amd64" || ${TARGET_ARCH} == "powerpc64"
+BIN1+=	libmap32.conf
+.endif
+
 .if exists(${.CURDIR}/etc.${MACHINE}/ttys)
 BIN1+=	etc.${MACHINE}/ttys
 .elif exists(${.CURDIR}/etc.${MACHINE_ARCH}/ttys)
@@ -224,6 +228,9 @@ distribution:
 	${_+_}cd ${.CURDIR}/devd; ${MAKE} install
 	${_+_}cd ${.CURDIR}/gss; ${MAKE} install
 	${_+_}cd ${.CURDIR}/periodic; ${MAKE} install
+.if ${MK_PKGBOOTSTRAP} != "no"
+	${_+_}cd ${.CURDIR}/pkg; ${MAKE} install
+.endif
 	${_+_}cd ${.CURDIR}/rc.d; ${MAKE} install
 	${_+_}cd ${.CURDIR}/../gnu/usr.bin/send-pr; ${MAKE} etc-gnats-freefall
 	${_+_}cd ${.CURDIR}/../share/termcap; ${MAKE} etc-termcap
