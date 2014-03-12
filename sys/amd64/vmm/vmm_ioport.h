@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1990 The Regents of the University of California.
+ * Copyright (c) 2014 Tycho Nightingale <tycho.nightingale@pluribusnetworks.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -10,14 +10,11 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -26,44 +23,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	from: @(#)sys_machdep.c	5.5 (Berkeley) 1/19/91
+ * $FreeBSD$
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#ifndef	_VMM_IOPORT_H_
+#define	_VMM_IOPORT_H_
 
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/proc.h>
-#include <sys/sysproto.h>
-#include <sys/syscall.h>
-#include <sys/sysent.h>
+typedef int (*ioport_handler_func_t)(void *vm, int vcpuid,
+    struct vm_exit *vmexit);
 
-#include <machine/sysarch.h>
+int emulate_ioport(struct vm *vm, int vcpuid, struct vm_exit *vmexit);
 
-#ifndef _SYS_SYSPROTO_H_
-struct sysarch_args {
-	int op;
-	char *parms;
-};
-#endif
-
-int
-sysarch(struct thread *td, struct sysarch_args *uap)
-{
-	int error;
-	void *tlsbase;
-
-	switch (uap->op) {
-	case MIPS_SET_TLS:
-		td->td_md.md_tls = uap->parms;
-		return (0);
-	case MIPS_GET_TLS: 
-		tlsbase = td->td_md.md_tls;
-		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
-		return (error);
-	default:
-		break;
-	}
-	return (EINVAL);
-}
+#endif	/* _VMM_IOPORT_H_ */
