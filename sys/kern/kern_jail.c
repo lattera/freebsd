@@ -3715,11 +3715,6 @@ prison_priv_check(struct ucred *cred, int priv)
 
 #ifdef notyet
 		/*
-		 * AppleTalk privileges.
-		 */
-	case PRIV_NETATALK_RESERVEDPORT:
-
-		/*
 		 * ATM privileges.
 		 */
 	case PRIV_NETATM_CFG:

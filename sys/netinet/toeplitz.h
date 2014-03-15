@@ -1,11 +1,6 @@
 /*-
- * Copyright (c) 2007-2009 Robert N. M. Watson
+ * Copyright (c) 2010 David Malone <dwmalone@FreeBSD.org>
  * All rights reserved.
- *
- * This software was developed by Robert Watson for the TrustedBSD Project.
- *
- * This software was developed at the University of Cambridge Computer
- * Laboratory with support from a grant from Google, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,47 +22,19 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#ifndef _NETINET_TOEPLITZ_H_
+#define	_NETINET_TOEPLITZ_H_
 
-#include "opt_mac.h"
+/*
+ * Toeplitz (RSS) hash algorithm; possibly we should cache intermediate
+ * results between runs, in which case we'll need explicit init/destroy and
+ * state management.
+ */
+uint32_t	toeplitz_hash(u_int keylen, const uint8_t *key,
+		    u_int datalen, const uint8_t *data);
 
-#include <sys/param.h>
-#include <sys/kernel.h>
-#include <sys/lock.h>
-#include <sys/malloc.h>
-#include <sys/mutex.h>
-#include <sys/sbuf.h>
-#include <sys/systm.h>
-#include <sys/mount.h>
-#include <sys/file.h>
-#include <sys/namei.h>
-#include <sys/protosw.h>
-#include <sys/socket.h>
-#include <sys/socketvar.h>
-#include <sys/sysctl.h>
-
-#include <net/if.h>
-#include <net/if_var.h>
-
-#include <security/mac/mac_framework.h>
-#include <security/mac/mac_internal.h>
-#include <security/mac/mac_policy.h>
-
-void
-mac_netatalk_aarp_send(struct ifnet *ifp, struct mbuf *m)
-{
-	struct label *mlabel;
-
-	if (mac_policy_count == 0)
-		return;
-
-	mlabel = mac_mbuf_to_label(m);
-
-	MAC_IFNET_LOCK(ifp);
-	MAC_POLICY_PERFORM_NOSLEEP(netatalk_aarp_send, ifp, ifp->if_label, m,
-	    mlabel);
-	MAC_IFNET_UNLOCK(ifp);
-}
+#endif /* !_NETINET_TOEPLITZ_H_ */

@@ -38,6 +38,18 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20140314: AppleTalk
+OLD_DIRS+=usr/include/netatalk
+OLD_FILES+=usr/include/netatalk/aarp.h
+OLD_FILES+=usr/include/netatalk/at.h
+OLD_FILES+=usr/include/netatalk/at_extern.h
+OLD_FILES+=usr/include/netatalk/at_var.h
+OLD_FILES+=usr/include/netatalk/ddp.h
+OLD_FILES+=usr/include/netatalk/ddp_pcb.h
+OLD_FILES+=usr/include/netatalk/ddp_var.h
+OLD_FILES+=usr/include/netatalk/endian.h
+OLD_FILES+=usr/include/netatalk/phase2.h
+
 # 20140314: Remove IPX/SPX
 OLD_LIBS+=lib/libipx.so.5
 OLD_FILES+=usr/include/netipx/ipx.h
@@ -60,6 +72,8 @@ OLD_FILES+=usr/sbin/IPXrouted
 OLD_FILES+=usr/share/man/man3/ipx.3.gz
 OLD_FILES+=usr/share/man/man3/ipx_addr.3.gz
 OLD_FILES+=usr/share/man/man3/ipx_ntoa.3.gz
+OLD_FILES+=usr/share/man/man4/ef.4.gz
+OLD_FILES+=usr/share/man/man4/if_ef.4.gz
 OLD_FILES+=usr/share/man/man8/IPXrouted.8.gz
 
 # 20140223: Remove libyaml

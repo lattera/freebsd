@@ -30,11 +30,11 @@
  * $FreeBSD$
  */
 
-#include "opt_atalk.h"
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_netgraph.h"
 #include "opt_mbuf_profiling.h"
+#include "opt_rss.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -71,6 +71,7 @@
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet/if_ether.h>
+#include <netinet/in_rss.h>
 #include <netinet/ip_carp.h>
 #include <netinet/ip_var.h>
 #endif
@@ -81,18 +82,6 @@
 int (*ef_inputp)(struct ifnet*, struct ether_header *eh, struct mbuf *m);
 int (*ef_outputp)(struct ifnet *ifp, struct mbuf **mp,
 		const struct sockaddr *dst, short *tp, int *hlen);
-
-#ifdef NETATALK
-#include <netatalk/at.h>
-#include <netatalk/at_var.h>
-#include <netatalk/at_extern.h>
-
-#define llc_snap_org_code llc_un.type_snap.org_code
-#define llc_snap_ether_type llc_un.type_snap.ether_type
-
-extern u_char	at_org_code[3];
-extern u_char	aarp_org_code[3];
-#endif /* NETATALK */
 
 #include <security/mac/mac_framework.h>
 
@@ -243,42 +232,6 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 		type = htons(ETHERTYPE_IPV6);
 		break;
 #endif
-#ifdef NETATALK
-	case AF_APPLETALK:
-	  {
-	    struct at_ifaddr *aa;
-
-	    if ((aa = at_ifawithnet((const struct sockaddr_at *)dst)) == NULL)
-		    senderr(EHOSTUNREACH); /* XXX */
-	    if (!aarpresolve(ifp, m, (const struct sockaddr_at *)dst, edst)) {
-		    ifa_free(&aa->aa_ifa);
-		    return (0);
-	    }
-	    /*
-	     * In the phase 2 case, need to prepend an mbuf for the llc header.
-	     */
-	    if ( aa->aa_flags & AFA_PHASE2 ) {
-		struct llc llc;
-
-		ifa_free(&aa->aa_ifa);
-		M_PREPEND(m, LLC_SNAPFRAMELEN, M_NOWAIT);
-		if (m == NULL)
-			senderr(ENOBUFS);
-		llc.llc_dsap = llc.llc_ssap = LLC_SNAP_LSAP;
-		llc.llc_control = LLC_UI;
-		bcopy(at_org_code, llc.llc_snap_org_code, sizeof(at_org_code));
-		llc.llc_snap_ether_type = htons( ETHERTYPE_AT );
-		bcopy(&llc, mtod(m, caddr_t), LLC_SNAPFRAMELEN);
-		type = htons(m->m_pkthdr.len);
-		hlen = LLC_SNAPFRAMELEN + ETHER_HDR_LEN;
-	    } else {
-		ifa_free(&aa->aa_ifa);
-		type = htons(ETHERTYPE_AT);
-	    }
-	    break;
-	  }
-#endif /* NETATALK */
-
 	case pseudo_AF_HDRCMPLT:
 	    {
 		const struct ether_header *eh;
@@ -632,7 +585,22 @@ ether_input_internal(struct ifnet *ifp, struct mbuf *m)
 
 /*
  * Ethernet input dispatch; by default, direct dispatch here regardless of
- * global configuration.
+ * global configuration.  However, if RSS is enabled, hook up RSS affinity
+ * so that when deferred or hybrid dispatch is enabled, we can redistribute
+ * load based on RSS.
+ *
+ * XXXRW: Would be nice if the ifnet passed up a flag indicating whether or
+ * not it had already done work distribution via multi-queue.  Then we could
+ * direct dispatch in the event load balancing was already complete and
+ * handle the case of interfaces with different capabilities better.
+ *
+ * XXXRW: Sort of want an M_DISTRIBUTED flag to avoid multiple distributions
+ * at multiple layers?
+ *
+ * XXXRW: For now, enable all this only if RSS is compiled in, although it
+ * works fine without RSS.  Need to characterise the performance overhead
+ * of the detour through the netisr code in the event the result is always
+ * direct dispatch.
  */
 static void
 ether_nh_input(struct mbuf *m)
@@ -645,8 +613,14 @@ static struct netisr_handler	ether_nh = {
 	.nh_name = "ether",
 	.nh_handler = ether_nh_input,
 	.nh_proto = NETISR_ETHER,
+#ifdef RSS
+	.nh_policy = NETISR_POLICY_CPU,
+	.nh_dispatch = NETISR_DISPATCH_DIRECT,
+	.nh_m2cpuid = rss_m2cpuid,
+#else
 	.nh_policy = NETISR_POLICY_SOURCE,
 	.nh_dispatch = NETISR_DISPATCH_DIRECT,
+#endif
 };
 
 static void
@@ -720,9 +694,6 @@ ether_demux(struct ifnet *ifp, struct mbuf *m)
 	struct ether_header *eh;
 	int i, isr;
 	u_short ether_type;
-#if defined(NETATALK)
-	struct llc *l;
-#endif
 
 	KASSERT(ifp != NULL, ("%s: NULL interface pointer", __func__));
 
@@ -798,38 +769,7 @@ ether_demux(struct ifnet *ifp, struct mbuf *m)
 		isr = NETISR_IPV6;
 		break;
 #endif
-#ifdef NETATALK
-	case ETHERTYPE_AT:
-		isr = NETISR_ATALK1;
-		break;
-	case ETHERTYPE_AARP:
-		isr = NETISR_AARP;
-		break;
-#endif /* NETATALK */
 	default:
-#if defined(NETATALK)
-		if (ether_type > ETHERMTU)
-			goto discard;
-		l = mtod(m, struct llc *);
-		if (l->llc_dsap == LLC_SNAP_LSAP &&
-		    l->llc_ssap == LLC_SNAP_LSAP &&
-		    l->llc_control == LLC_UI) {
-			if (bcmp(&(l->llc_snap_org_code)[0], at_org_code,
-			    sizeof(at_org_code)) == 0 &&
-			    ntohs(l->llc_snap_ether_type) == ETHERTYPE_AT) {
-				m_adj(m, LLC_SNAPFRAMELEN);
-				isr = NETISR_ATALK2;
-				break;
-			}
-			if (bcmp(&(l->llc_snap_org_code)[0], aarp_org_code,
-			    sizeof(aarp_org_code)) == 0 &&
-			    ntohs(l->llc_snap_ether_type) == ETHERTYPE_AARP) {
-				m_adj(m, LLC_SNAPFRAMELEN);
-				isr = NETISR_AARP;
-				break;
-			}
-		}
-#endif /* NETATALK */
 		goto discard;
 	}
 	netisr_dispatch(isr, m);

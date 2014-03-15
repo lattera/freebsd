@@ -422,12 +422,12 @@ LIBMCHAIN
 MBUF_PROFILING
 MBUF_STRESS_TEST
 MROUTING		opt_mrouting.h
-NETATALK		opt_atalk.h
 NFSLOCKD
 PCBGROUP		opt_pcbgroup.h
 PF_DEFAULT_TO_DROP	opt_pf.h
 RADIX_MPATH		opt_mpath.h
 ROUTETABLES		opt_route.h
+RSS			opt_rss.h
 SLIP_IFF_OPTS		opt_slip.h
 TCPDEBUG
 TCP_OFFLOAD		opt_inet.h # Enable code to dispatch TCP offloading
@@ -548,7 +548,6 @@ VP0_DEBUG		opt_vpo.h
 LPT_DEBUG		opt_lpt.h
 PLIP_DEBUG		opt_plip.h
 LOCKF_DEBUG		opt_debug_lockf.h
-NETATALKDEBUG		opt_atalk.h
 SI_DEBUG		opt_debug_si.h
 
 # Fb options
