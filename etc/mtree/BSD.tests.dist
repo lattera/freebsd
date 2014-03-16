@@ -68,6 +68,14 @@
                 ..
             ..
         ..
+        sbin
+            dhclient
+            ..
+            growfs
+            ..
+            mdconfig
+            ..
+        ..
         share
             examples
                 tests
@@ -86,6 +94,16 @@
             atf
                 atf-sh
                 ..
+            ..
+            lastcomm
+            ..
+        ..
+        usr.sbin
+            etcupdate
+            ..
+            newsyslog
+            ..
+            sa
             ..
         ..
     ..
