@@ -572,7 +572,7 @@ pax_aslr_mmap(struct thread *td, vm_offset_t *addr, vm_offset_t orig_addr, int f
 }
 
 void
-pax_aslr_stack(struct thread *td, char **addr, char *orig_addr)
+pax_aslr_stack(struct thread *td, uintptr_t *addr, uintptr_t orig_addr)
 {
     struct prison *pr=NULL;
 
