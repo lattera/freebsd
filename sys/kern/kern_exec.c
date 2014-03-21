@@ -1251,7 +1251,6 @@ exec_copyout_strings(imgp)
 	size_t execpath_len;
 	int szsigcode, szps;
 	char canary[sizeof(long) * 8];
-    unsigned int sgap;
 
 	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	/*
@@ -1269,7 +1268,6 @@ exec_copyout_strings(imgp)
 		if (p->p_sysent->sv_szsigcode != NULL)
 			szsigcode = *(p->p_sysent->sv_szsigcode);
 	}
-    sgap=(unsigned int)(ALIGN(arc4random()&((64*1024)-1)));
 	destp =	(uintptr_t)arginfo;
 #ifdef PAX_ASLR
 	orig_destp = destp;
