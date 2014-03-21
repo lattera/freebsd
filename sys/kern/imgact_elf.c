@@ -664,8 +664,8 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	if (hdr->e_type == ET_DYN) {
 		rbase = *addr;
 #ifdef PAX_ASLR
-        pr = pax_aslr_get_prison(NULL, imgp->proc);
         if (pax_aslr_active(NULL, imgp->proc)) {
+            pr = pax_aslr_get_prison(NULL, imgp->proc);
             rbase += round_page(PAX_ASLR_DELTA(arc4random(), PAX_ASLR_DELTA_EXEC_LSB, pr->pr_pax_aslr_exec_len));
         }
 #endif
@@ -741,6 +741,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	Elf_Brandinfo *brand_info;
 	char *path;
 	struct sysentvec *sv;
+#ifdef PAX_ASLR
+    struct prison *pr;
+#endif
 
 	/*
 	 * Do we have a valid ELF header ?
@@ -805,10 +808,18 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		 * Honour the base load address from the dso if it is
 		 * non-zero for some reason.
 		 */
-		if (baddr == 0)
+		if (baddr == 0) {
+#ifdef PAX_ASLR
+            if (pax_aslr_active(NULL, imgp->proc)) {
+                pr = pax_aslr_get_prison(NULL, imgp->proc);
+                et_dyn_addr = trunc_page(PAX_ASLR_DELTA(arc4random(), PAX_ASLR_DELTA_EXEC_LSB, pr->pr_pax_aslr_exec_len));
+            }
+#else
 			et_dyn_addr = ET_DYN_LOAD_ADDR;
-		else
+#endif
+        } else {
 			et_dyn_addr = 0;
+        }
 	} else
 		et_dyn_addr = 0;
 	sv = brand_info->sysvec;
