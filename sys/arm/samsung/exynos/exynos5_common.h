@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011 NetApp, Inc.
+ * Copyright (c) 2014 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY NETAPP, INC ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL NETAPP, INC OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -26,27 +26,15 @@
  * $FreeBSD$
  */
 
-#ifndef	_FBSDRUN_H_
-#define	_FBSDRUN_H_
-
-#ifndef CTASSERT		/* Allow lint to override */
-#define	CTASSERT(x)		_CTASSERT(x, __LINE__)
-#define	_CTASSERT(x, y)		__CTASSERT(x, y)
-#define	__CTASSERT(x, y)	typedef char __assert ## y[(x) ? 1 : -1]
-#endif
-
-struct vmctx;
-extern int guest_ncpus;
-extern char *guest_uuid_str;
-extern char *vmname;
-
-void *paddr_guest2host(struct vmctx *ctx, uintptr_t addr, size_t len);
-
-void fbsdrun_set_capabilities(struct vmctx *ctx, int cpu);
-void fbsdrun_addcpu(struct vmctx *ctx, int fromcpu, int newcpu, uint64_t rip);
-int  fbsdrun_muxed(void);
-int  fbsdrun_vmexit_on_hlt(void);
-int  fbsdrun_vmexit_on_pause(void);
-int  fbsdrun_disable_x2apic(void);
-int  fbsdrun_virtio_msix(void);
-#endif
+#define	READ4(_sc, _reg)	\
+	bus_space_read_4(_sc->bst, _sc->bsh, _reg)
+#define	WRITE4(_sc, _reg, _val)	\
+	bus_space_write_4(_sc->bst, _sc->bsh, _reg, _val)
+#define	READ2(_sc, _reg)	\
+	bus_space_read_2(_sc->bst, _sc->bsh, _reg)
+#define	WRITE2(_sc, _reg, _val)	\
+	bus_space_write_2(_sc->bst, _sc->bsh, _reg, _val)
+#define	READ1(_sc, _reg)	\
+	bus_space_read_1(_sc->bst, _sc->bsh, _reg)
+#define	WRITE1(_sc, _reg, _val)	\
+	bus_space_write_1(_sc->bst, _sc->bsh, _reg, _val)
