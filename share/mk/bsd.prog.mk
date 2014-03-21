@@ -10,6 +10,12 @@
 CFLAGS+=${COPTS}
 .endif
 
+.if ${MK_PIE} != "no" && defined(CAN_PIE)
+.if !defined(RESCUE) && !defined(NO_SHARED) || (defined(NO_SHARED) && ${NO_SHARED} == "no" || ${NO_SHARED} == "NO")
+CFLAGS+= -fPIE -pie
+.endif
+.endif
+
 .if ${MK_ASSERT_DEBUG} == "no"
 CFLAGS+= -DNDEBUG
 NO_WERROR=
