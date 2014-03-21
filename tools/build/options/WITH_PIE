@@ -1,3 +1,2 @@
 Enable building of Position-Independent Executables (PIEs) for the following applications:
-    bin/sh
     usr/sbin/sshd
