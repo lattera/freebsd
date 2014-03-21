@@ -813,6 +813,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
             if (pax_aslr_active(NULL, imgp->proc)) {
                 pr = pax_aslr_get_prison(NULL, imgp->proc);
                 et_dyn_addr = trunc_page(PAX_ASLR_DELTA(arc4random(), PAX_ASLR_DELTA_EXEC_LSB, pr->pr_pax_aslr_exec_len));
+            } else {
+                et_dyn_addr = ET_DYN_LOAD_ADDR;
             }
 #else
 			et_dyn_addr = ET_DYN_LOAD_ADDR;
