@@ -1,2 +1,9 @@
 Enable building of Position-Independent Executables (PIEs) for the following applications:
     usr/sbin/sshd
+    sbin/casperd
+    sbin/dhclient
+    sbin/natd
+    sbin/rtsol
+    usr/sbin/auditd
+    usr/sbin/auditdistd
+    usr/sbin/syslogd
