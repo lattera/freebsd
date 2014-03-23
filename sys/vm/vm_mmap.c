@@ -323,7 +323,6 @@ sys_mmap(td, uap)
 		    lim_max(td->td_proc, RLIMIT_DATA)))) {
                 addr = round_page((vm_offset_t)vms->vm_daddr +
                     lim_max(td->td_proc, RLIMIT_DATA));
-                addr = round_page(addr + (arc4random()&(256*1024*1024-1)));
         }
 		PROC_UNLOCK(td->td_proc);
 	}
