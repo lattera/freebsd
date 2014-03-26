@@ -355,13 +355,6 @@ device_sysctl_fini(device_t dev)
  * tested since 3.4 or 2.2.8!
  */
 
-/* Deprecated way to adjust queue length */
-static int sysctl_devctl_disable(SYSCTL_HANDLER_ARGS);
-/* XXX Need to support old-style tunable hw.bus.devctl_disable" */
-SYSCTL_PROC(_hw_bus, OID_AUTO, devctl_disable, CTLTYPE_INT | CTLFLAG_RW |
-    CTLFLAG_MPSAFE, NULL, 0, sysctl_devctl_disable, "I",
-    "devctl disable -- deprecated");
-
 #define DEVCTL_DEFAULT_QUEUE_LEN 1000
 static int sysctl_devctl_queue(SYSCTL_HANDLER_ARGS);
 static int devctl_queue_length = DEVCTL_DEFAULT_QUEUE_LEN;
@@ -421,8 +414,6 @@ static int
 devopen(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
 
-	if (devsoftc.inuse)
-		return (EBUSY);
 	mtx_lock(&devsoftc.mtx);
 	if (devsoftc.inuse) {
 		mtx_unlock(&devsoftc.mtx);
@@ -499,6 +490,21 @@ devioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread *t
 			devsoftc.nonblock = 0;
 		return (0);
 	case FIOASYNC:
+		/*
+		 * FIXME:
+		 * Since this is a simple assignment there is no guarantee that
+		 * devsoftc.async_proc consumers will get a valid pointer.
+		 *
+		 * Example scenario where things break (processes A and B):
+		 * 1. A opens devctl
+		 * 2. A sends fd to B
+		 * 3. B sets itself as async_proc
+		 * 4. B exits
+		 *
+		 * However, normally this requires root privileges and the only
+		 * in-tree consumer does not behave in a dangerous way so the
+		 * issue is not critical.
+		 */
 		if (*(int*)data)
 			devsoftc.async_proc = td->td_proc;
 		else
@@ -584,6 +590,7 @@ devctl_queue_data_f(char *data, int flags)
 	cv_broadcast(&devsoftc.cv);
 	mtx_unlock(&devsoftc.mtx);
 	selwakeup(&devsoftc.sel);
+	/* XXX see a comment in devioctl */
 	p = devsoftc.async_proc;
 	if (p != NULL) {
 		PROC_LOCK(p);
@@ -654,9 +661,9 @@ devctl_notify(const char *system, const char *subsystem, const char *type,
  * Common routine that tries to make sending messages as easy as possible.
  * We allocate memory for the data, copy strings into that, but do not
  * free it unless there's an error.  The dequeue part of the driver should
- * free the data.  We don't send data when the device is disabled.  We do
- * send data, even when we have no listeners, because we wish to avoid
- * races relating to startup and restart of listening applications.
+ * free the data.  We don't send data when queue length is 0.  We do send
+ * data, even when we have no listeners, because we wish to avoid races
+ * relating to startup and restart of listening applications.
  *
  * devaddq is designed to string together the type of event, with the
  * object of that event, plus the plug and play info and location info
@@ -745,33 +752,6 @@ static void
 devnomatch(device_t dev)
 {
 	devaddq("?", "", dev);
-}
-
-static int
-sysctl_devctl_disable(SYSCTL_HANDLER_ARGS)
-{
-	struct dev_event_info *n1;
-	int dis, error;
-
-	dis = devctl_queue_length == 0;
-	error = sysctl_handle_int(oidp, &dis, 0, req);
-	if (error || !req->newptr)
-		return (error);
-	mtx_lock(&devsoftc.mtx);
-	if (dis) {
-		while (!TAILQ_EMPTY(&devsoftc.devq)) {
-			n1 = TAILQ_FIRST(&devsoftc.devq);
-			TAILQ_REMOVE(&devsoftc.devq, n1, dei_link);
-			free(n1->dei_data, M_BUS);
-			free(n1, M_BUS);
-		}
-		devsoftc.queued = 0;
-		devctl_queue_length = 0;
-	} else {
-		devctl_queue_length = DEVCTL_DEFAULT_QUEUE_LEN;
-	}
-	mtx_unlock(&devsoftc.mtx);
-	return (0);
 }
 
 static int
