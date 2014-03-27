@@ -9,6 +9,7 @@ Enable building of Position-Independent Executables (PIEs) for the following app
     usr/sbin/auditd
     usr/sbin/auditdistd
     usr/sbin/bsnmpd
+    usr/sbin/ctld
     usr/sbin/daemon
     usr/sbin/iscsid
     usr/sbin/jail
