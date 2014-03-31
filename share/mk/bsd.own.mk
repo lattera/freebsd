@@ -229,10 +229,7 @@ COMPRESS_EXT?=	.gz
     MAN \
     PROFILE
 .if defined(NO_${var})
-.if defined(WITH_${var})
-.undef WITH_${var}
-.endif
-WITHOUT_${var}=
+MK_${var}:=no
 .endif
 .endfor
 
@@ -447,12 +444,15 @@ __DEFAULT_NO_OPTIONS+=FDT
 .error WITH_${var} and WITHOUT_${var} can't both be set.
 .endif
 .if defined(MK_${var})
+.if ${.MAKE.LEVEL} == 0
 .error MK_${var} can't be set by a user.
 .endif
+.else
 .if defined(WITHOUT_${var})
 MK_${var}:=	no
 .else
 MK_${var}:=	yes
+.endif
 .endif
 .endfor
 .undef __DEFAULT_YES_OPTIONS
@@ -465,12 +465,15 @@ MK_${var}:=	yes
 .error WITH_${var} and WITHOUT_${var} can't both be set.
 .endif
 .if defined(MK_${var})
+.if ${.MAKE.LEVEL} == 0
 .error MK_${var} can't be set by a user.
 .endif
+.else
 .if defined(WITH_${var})
 MK_${var}:=	yes
 .else
 MK_${var}:=	no
+.endif
 .endif
 .endfor
 .undef __DEFAULT_NO_OPTIONS
@@ -545,20 +548,6 @@ MK_CLANG_EXTRAS:= no
 MK_CLANG_FULL:= no
 .endif
 
-.if defined(NO_TESTS)
-# This should be handled above along the handling of all other NO_*  options.
-# However, the above is broken when WITH_*=yes are passed to make(1) as
-# command line arguments.  See PR bin/183762.
-#
-# Because the TESTS option is new and it will default to yes, it's likely
-# that people will pass WITHOUT_TESTS=yes to make(1) directly and get a broken
-# build.  So, just in case, it's better to explicitly handle this case here.
-#
-# TODO(jmmv): Either fix make to allow us putting this override where it
-# belongs above or fix this file to cope with the make bug.
-MK_TESTS:= no
-.endif
-
 #
 # Set defaults for the MK_*_SUPPORT variables.
 #
@@ -621,8 +610,10 @@ MK_${vv:H}:=	${MK_${vv:T}}
 .error WITH_${var} and WITHOUT_${var} can't both be set.
 .endif
 .if defined(MK_${var})
+.if ${.MAKE.LEVEL} == 0
 .error MK_${var} can't be set by a user.
 .endif
+.else
 .if ${COMPILER_FEATURES:Mc++11}
 .if defined(WITHOUT_${var})
 MK_${var}:=	no
@@ -634,6 +625,7 @@ MK_${var}:=	yes
 MK_${var}:=	yes
 .else
 MK_${var}:=	no
+.endif
 .endif
 .endif
 .endfor
