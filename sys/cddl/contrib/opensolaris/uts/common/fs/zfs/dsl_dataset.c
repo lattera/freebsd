@@ -49,6 +49,7 @@
 #include <sys/dsl_deadlist.h>
 #include <sys/dsl_destroy.h>
 #include <sys/dsl_userhold.h>
+#include <sys/dsl_bookmark.h>
 
 #define	SWITCH64(x, y) \
 	{ \
@@ -121,17 +122,16 @@ int
 dsl_dataset_block_kill(dsl_dataset_t *ds, const blkptr_t *bp, dmu_tx_t *tx,
     boolean_t async)
 {
+	int used = bp_get_dsize_sync(tx->tx_pool->dp_spa, bp);
+	int compressed = BP_GET_PSIZE(bp);
+	int uncompressed = BP_GET_UCSIZE(bp);
+
 	if (BP_IS_HOLE(bp))
 		return (0);
 
 	ASSERT(dmu_tx_is_syncing(tx));
 	ASSERT(bp->blk_birth <= tx->tx_txg);
 
-	int used = bp_get_dsize_sync(tx->tx_pool->dp_spa, bp);
-	int compressed = BP_GET_PSIZE(bp);
-	int uncompressed = BP_GET_UCSIZE(bp);
-
-	ASSERT(used > 0);
 	if (ds == NULL) {
 		dsl_free(tx->tx_pool, tx->tx_txg, bp);
 		dsl_pool_mos_diduse_space(tx->tx_pool,
@@ -229,7 +229,8 @@ boolean_t
 dsl_dataset_block_freeable(dsl_dataset_t *ds, const blkptr_t *bp,
     uint64_t blk_birth)
 {
-	if (blk_birth <= dsl_dataset_prev_snap_txg(ds))
+	if (blk_birth <= dsl_dataset_prev_snap_txg(ds) ||
+	    (bp != NULL && BP_IS_HOLE(bp)))
 		return (B_FALSE);
 
 	ddt_prefetch(dsl_dataset_get_spa(ds), bp);
@@ -358,7 +359,7 @@ dsl_dataset_hold_obj(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 
 	/* Make sure dsobj has the correct object type. */
 	dmu_object_info_from_db(dbuf, &doi);
-	if (doi.doi_type != DMU_OT_DSL_DATASET) {
+	if (doi.doi_bonus_type != DMU_OT_DSL_DATASET) {
 		dmu_buf_rele(dbuf, tag);
 		return (SET_ERROR(EINVAL));
 	}
@@ -405,6 +406,14 @@ dsl_dataset_hold_obj(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 				err = dsl_dataset_hold_obj(dp,
 				    ds->ds_phys->ds_prev_snap_obj,
 				    ds, &ds->ds_prev);
+			}
+			if (doi.doi_type == DMU_OTN_ZAP_METADATA) {
+				int zaperr = zap_lookup(mos, ds->ds_object,
+				    DS_FIELD_BOOKMARK_NAMES,
+				    sizeof (ds->ds_bookmarks), 1,
+				    &ds->ds_bookmarks);
+				if (zaperr != ENOENT)
+					VERIFY0(zaperr);
 			}
 		} else {
 			if (zfs_flags & ZFS_DEBUG_SNAPNAMES)
@@ -1774,6 +1783,7 @@ dsl_dataset_handoff_check(dsl_dataset_t *ds, void *owner, dmu_tx_t *tx)
 typedef struct dsl_dataset_rollback_arg {
 	const char *ddra_fsname;
 	void *ddra_owner;
+	nvlist_t *ddra_result;
 } dsl_dataset_rollback_arg_t;
 
 static int
@@ -1800,6 +1810,28 @@ dsl_dataset_rollback_check(void *arg, dmu_tx_t *tx)
 		dsl_dataset_rele(ds, FTAG);
 		return (SET_ERROR(EINVAL));
 	}
+
+	/* must not have any bookmarks after the most recent snapshot */
+	nvlist_t *proprequest = fnvlist_alloc();
+	fnvlist_add_boolean(proprequest, zfs_prop_to_name(ZFS_PROP_CREATETXG));
+	nvlist_t *bookmarks = fnvlist_alloc();
+	error = dsl_get_bookmarks_impl(ds, proprequest, bookmarks);
+	fnvlist_free(proprequest);
+	if (error != 0)
+		return (error);
+	for (nvpair_t *pair = nvlist_next_nvpair(bookmarks, NULL);
+	    pair != NULL; pair = nvlist_next_nvpair(bookmarks, pair)) {
+		nvlist_t *valuenv =
+		    fnvlist_lookup_nvlist(fnvpair_value_nvlist(pair),
+		    zfs_prop_to_name(ZFS_PROP_CREATETXG));
+		uint64_t createtxg = fnvlist_lookup_uint64(valuenv, "value");
+		if (createtxg > ds->ds_phys->ds_prev_snap_txg) {
+			fnvlist_free(bookmarks);
+			dsl_dataset_rele(ds, FTAG);
+			return (SET_ERROR(EEXIST));
+		}
+	}
+	fnvlist_free(bookmarks);
 
 	error = dsl_dataset_handoff_check(ds, ddra->ddra_owner, tx);
 	if (error != 0) {
@@ -1845,8 +1877,12 @@ dsl_dataset_rollback_sync(void *arg, dmu_tx_t *tx)
 	dsl_pool_t *dp = dmu_tx_pool(tx);
 	dsl_dataset_t *ds, *clone;
 	uint64_t cloneobj;
+	char namebuf[ZFS_MAXNAMELEN];
 
 	VERIFY0(dsl_dataset_hold(dp, ddra->ddra_fsname, FTAG, &ds));
+
+	dsl_dataset_name(ds->ds_prev, namebuf);
+	fnvlist_add_string(ddra->ddra_result, "target", namebuf);
 
 	cloneobj = dsl_dataset_create_sync(ds->ds_dir, "%rollback",
 	    ds->ds_prev, DS_CREATE_FLAG_NODIRTY, kcred, tx);
@@ -1863,8 +1899,11 @@ dsl_dataset_rollback_sync(void *arg, dmu_tx_t *tx)
 }
 
 /*
- * If owner != NULL:
+ * Rolls back the given filesystem or volume to the most recent snapshot.
+ * The name of the most recent snapshot will be returned under key "target"
+ * in the result nvlist.
  *
+ * If owner != NULL:
  * - The existing dataset MUST be owned by the specified owner at entry
  * - Upon return, dataset will still be held by the same owner, whether we
  *   succeed or not.
@@ -1873,15 +1912,16 @@ dsl_dataset_rollback_sync(void *arg, dmu_tx_t *tx)
  * notes above zfs_suspend_fs() for further details.
  */
 int
-dsl_dataset_rollback(const char *fsname, void *owner)
+dsl_dataset_rollback(const char *fsname, void *owner, nvlist_t *result)
 {
 	dsl_dataset_rollback_arg_t ddra;
 
 	ddra.ddra_fsname = fsname;
 	ddra.ddra_owner = owner;
+	ddra.ddra_result = result;
 
 	return (dsl_sync_task(fsname, dsl_dataset_rollback_check,
-	    dsl_dataset_rollback_sync, (void *)&ddra, 1));
+	    dsl_dataset_rollback_sync, &ddra, 1));
 }
 
 struct promotenode {
@@ -3014,18 +3054,25 @@ dsl_dataset_space_wouldfree(dsl_dataset_t *firstsnap,
  * 'earlier' is before 'later'.  Or 'earlier' could be the origin of
  * 'later's filesystem.  Or 'earlier' could be an older snapshot in the origin's
  * filesystem.  Or 'earlier' could be the origin's origin.
+ *
+ * If non-zero, earlier_txg is used instead of earlier's ds_creation_txg.
  */
 boolean_t
-dsl_dataset_is_before(dsl_dataset_t *later, dsl_dataset_t *earlier)
+dsl_dataset_is_before(dsl_dataset_t *later, dsl_dataset_t *earlier,
+	uint64_t earlier_txg)
 {
 	dsl_pool_t *dp = later->ds_dir->dd_pool;
 	int error;
 	boolean_t ret;
 
 	ASSERT(dsl_pool_config_held(dp));
+	ASSERT(dsl_dataset_is_snapshot(earlier) || earlier_txg != 0);
 
-	if (earlier->ds_phys->ds_creation_txg >=
-	    later->ds_phys->ds_creation_txg)
+	if (earlier_txg == 0)
+		earlier_txg = earlier->ds_phys->ds_creation_txg;
+
+	if (dsl_dataset_is_snapshot(later) &&
+	    earlier_txg >= later->ds_phys->ds_creation_txg)
 		return (B_FALSE);
 
 	if (later->ds_dir == earlier->ds_dir)
@@ -3040,7 +3087,15 @@ dsl_dataset_is_before(dsl_dataset_t *later, dsl_dataset_t *earlier)
 	    later->ds_dir->dd_phys->dd_origin_obj, FTAG, &origin);
 	if (error != 0)
 		return (B_FALSE);
-	ret = dsl_dataset_is_before(origin, earlier);
+	ret = dsl_dataset_is_before(origin, earlier, earlier_txg);
 	dsl_dataset_rele(origin, FTAG);
 	return (ret);
+}
+
+
+void
+dsl_dataset_zapify(dsl_dataset_t *ds, dmu_tx_t *tx)
+{
+	objset_t *mos = ds->ds_dir->dd_pool->dp_meta_objset;
+	dmu_object_zapify(mos, ds->ds_object, DMU_OT_DSL_DATASET, tx);
 }

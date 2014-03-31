@@ -32,7 +32,6 @@ SUBDIR=	libclanganalysis \
 	${_libclangstaticanalyzer} \
 	\
 	libllvmanalysis \
-	libllvmarchive \
 	libllvmasmparser \
 	libllvmasmprinter \
 	libllvmbitreader \
@@ -49,6 +48,7 @@ SUBDIR=	libclanganalysis \
 	libllvmmcparser \
 	libllvmobjcarcopts \
 	libllvmobject \
+	libllvmoption \
 	libllvmscalaropts \
 	libllvmselectiondag \
 	libllvmsupport \
@@ -74,6 +74,12 @@ SUBDIR=	libclanganalysis \
 	libllvmpowerpcdesc \
 	libllvmpowerpcinfo \
 	libllvmpowerpcinstprinter \
+	libllvmsparcasmparser \
+	libllvmsparccodegen \
+	libllvmsparcdesc \
+	libllvmsparcdisassembler \
+	libllvmsparcinfo \
+	libllvmsparcinstprinter \
 	libllvmx86asmparser \
 	libllvmx86codegen \
 	libllvmx86desc \
