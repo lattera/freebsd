@@ -327,7 +327,6 @@ __DEFAULT_YES_OPTIONS = \
     PAM \
     PC_SYSINSTALL \
     PF \
-    PIE \
     PKGBOOTSTRAP \
     PMC \
     PORTSNAP \
@@ -373,6 +372,7 @@ __DEFAULT_NO_OPTIONS = \
     OFED \
     OPENSSH_NONE_CIPHER \
     SHARED_TOOLCHAIN \
+    PIE \
     SVN \
     TESTS \
     USB_GADGET_EXAMPLES
