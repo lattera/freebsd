@@ -165,5 +165,6 @@ void pax_aslr_mmap(struct thread *td, vm_offset_t *addr,
 			vm_offset_t orig_addr, int flags);
 void pax_aslr_stack(struct thread *td, uintptr_t *addr, uintptr_t orig_addr);
 struct prison *pax_aslr_get_prison(struct thread *td, struct proc *proc);
+int pax_aslr_debug_enabled(struct prison *pr);
 
 #endif /* __SYS_PAX_H */

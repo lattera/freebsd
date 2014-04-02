@@ -510,6 +510,11 @@ _pax_aslr_init(struct vmspace *vm, struct prison *pr)
         PAX_ASLR_DELTA_STACK_LSB, (pr != NULL) ? pr->pr_pax_aslr_stack_len : pax_aslr_stack_len);
 
     vm->vm_aslr_delta_stack = ALIGN(vm->vm_aslr_delta_stack);
+
+    if (pax_aslr_debug_enabled(pr)) {
+        uprintf("[PaX ASLR] %s: vm_aslr_delta_mmap=%p\n", __func__, (void *) vm->vm_aslr_delta_mmap);
+        uprintf("[PaX ASLR] %s: vm_aslr_delta_stack=%p\n", __func__, (void *) vm->vm_aslr_delta_stack);
+    }
 }
 
 #ifdef COMPAT_FREEBSD32
@@ -523,6 +528,11 @@ _pax_aslr_init32(struct vmspace *vm, struct prison *pr)
         PAX_ASLR_COMPAT_DELTA_STACK_LSB, (pr != NULL) ? pr->pr_pax_aslr_compat_stack_len : pax_aslr_compat_stack_len);
 
     vm->vm_aslr_delta_stack = ALIGN(vm->vm_aslr_delta_stack);
+
+    if (pax_aslr_debug_enabled(pr)) {
+        uprintf("[PaX ASLR] %s: vm_aslr_delta_mmap=%p\n", __func__, (void *) vm->vm_aslr_delta_mmap);
+        uprintf("[PaX ASLR] %s: vm_aslr_delta_stack=%p\n", __func__, (void *) vm->vm_aslr_delta_stack);
+    }
 }
 #endif
 
@@ -530,7 +540,6 @@ void
 pax_aslr_init(struct thread *td, struct image_params *imgp)
 {
     struct vmspace *vm;
-    u_int sv_flags;
     struct prison *pr=NULL;
 
     pr = pax_aslr_get_prison(td, NULL);
@@ -539,17 +548,16 @@ pax_aslr_init(struct thread *td, struct image_params *imgp)
         pax_aslr_init_prison(pr);
 
     if (imgp == NULL) {
-        panic("[PaX ASLR] pax_aslr_init - imgp == NULL");
+        panic("[PaX ASLR] pax_aslr_init: imgp == NULL");
     }
 
     if (!pax_aslr_active(td, NULL))
         return;
 
     vm = imgp->proc->p_vmspace;
-    sv_flags = imgp->proc->p_sysent->sv_flags;
 
     if (imgp->proc->p_sysent->sv_pax_aslr_init != NULL) {
-        imgp->proc->p_sysent->sv_pax_aslr_init(vm, pr);
+        imgp->sysent->sv_pax_aslr_init(vm, pr);
     }
 }
 
@@ -565,17 +573,17 @@ pax_aslr_mmap(struct thread *td, vm_offset_t *addr, vm_offset_t orig_addr, int f
 
     if (!(flags & MAP_FIXED) && ((orig_addr == 0) || !(flags & MAP_ANON))) {
         if (pax_aslr_debug)
-            uprintf("[PaX ASLR] applying to %p orig_addr=%p f=%x\n",
+            uprintf("[PaX ASLR] pax_aslr_mmap: applying to %p orig_addr=%p flags=%x\n",
                 (void *)*addr, (void *)orig_addr, flags);
         if (!(td->td_proc->p_vmspace->vm_map.flags & MAP_ENTRY_GROWS_DOWN))
             *addr += td->td_proc->p_vmspace->vm_aslr_delta_mmap;
         else
             *addr -= td->td_proc->p_vmspace->vm_aslr_delta_mmap;
         if (pax_aslr_debug)
-            uprintf("[PaX ASLR] result %p\n", (void *)*addr);
+            uprintf("[PaX ASLR] pax_aslr_mmap: result %p\n", (void *)*addr);
     }
     else if (pax_aslr_debug)
-        uprintf("[PaX ASLR] not applying to %p orig_addr=%p f=%x\n",
+        uprintf("[PaX ASLR] pax_aslr_mmap: not applying to %p orig_addr=%p flags=%x\n",
         (void *)*addr, (void *)orig_addr, flags);
 }
 
@@ -591,6 +599,14 @@ pax_aslr_stack(struct thread *td, uintptr_t *addr, uintptr_t orig_addr)
 
     *addr -= td->td_proc->p_vmspace->vm_aslr_delta_stack;
     if ((pr) && pr->pr_pax_aslr_debug)
-        uprintf("[PaX ASLR] orig_addr=%p, addr=%p\n",
+        uprintf("[PaX ASLR] pax_aslr_stack: orig_addr=%p, new_addr=%p\n",
             (void *)orig_addr, (void *)*addr);
+}
+
+int pax_aslr_debug_enabled(struct prison *pr)
+{
+    if (pr != NULL)
+        return pr->pr_pax_aslr_debug;
+
+    return pax_aslr_debug;
 }
