@@ -392,6 +392,7 @@ FBSD_1.3 {
 	nvis;
 	pwcache_userdb;
 	pwcache_groupdb;
+	scandir_b;
 	snvis;
 	strenvisx;
 	strnunvis;
