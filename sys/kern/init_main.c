@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ddb.h"
 #include "opt_init_path.h"
+#include "opt_pax.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -60,6 +61,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
+#ifdef PAX_ASLR
+#include <sys/pax.h>
+#endif
 #include <sys/proc.h>
 #include <sys/racct.h>
 #include <sys/resourcevar.h>
@@ -410,6 +414,7 @@ struct sysentvec null_sysvec = {
 	.sv_fetch_syscall_args = null_fetch_syscall_args,
 	.sv_syscallnames = NULL,
 	.sv_schedtail	= NULL,
+    .sv_pax_aslr_init = NULL,
 };
 
 /*
