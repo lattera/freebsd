@@ -272,6 +272,7 @@ __DEFAULT_YES_OPTIONS = \
     DYNAMICROOT \
     ED_CRYPTO \
     EXAMPLES \
+    FDT \
     FLOPPY \
     FMTREE \
     FORMAT_EXTENSIONS \
@@ -282,6 +283,7 @@ __DEFAULT_YES_OPTIONS = \
     GCOV \
     GDB \
     GNU \
+    GNU_GREP_COMPAT \
     GPIB \
     GPIO \
     GPL_DTC \
@@ -309,6 +311,7 @@ __DEFAULT_YES_OPTIONS = \
     LOCATE \
     LPR \
     LS_COLORS \
+    LZMA_SUPPORT \
     MAIL \
     MAILWRAPPER \
     MAKE \
@@ -382,8 +385,7 @@ __DEFAULT_NO_OPTIONS = \
 # this means that we have to test TARGET_ARCH (the buildworld case) as well
 # as MACHINE_ARCH (the non-buildworld case).  Normally TARGET_ARCH is not
 # used at all in bsd.*.mk, but we have to make an exception here if we want
-# to allow defaults for some things like clang and fdt to vary by target
-# architecture.
+# to allow defaults for some things like clang to vary by target architecture.
 #
 .if defined(TARGET_ARCH)
 __T=${TARGET_ARCH}
@@ -409,32 +411,19 @@ __DEFAULT_NO_OPTIONS+=CLANG CLANG_FULL
 .if ${__T} == "amd64" || ${__T} == "arm" || ${__T} == "armv6" || \
     ${__T} == "armv6hf" || ${__T} == "i386"
 __DEFAULT_YES_OPTIONS+=CLANG_IS_CC
+__DEFAULT_NO_OPTIONS+=GNUCXX
 # The pc98 bootloader requires gcc to build and so we must leave gcc enabled
 # for pc98 for now.
 .if ${__TT} == "pc98"
-__DEFAULT_NO_OPTIONS+=GNUCXX
 __DEFAULT_YES_OPTIONS+=GCC
 .else
-__DEFAULT_NO_OPTIONS+=GCC GNUCXX
+__DEFAULT_NO_OPTIONS+=GCC
 .endif
 .else
 # If clang is not cc, then build gcc by default
 __DEFAULT_NO_OPTIONS+=CLANG_IS_CC
-__DEFAULT_YES_OPTIONS+=GCC
-# And if g++ is c++, build the rest of the GNU C++ stack
-.if defined(WITHOUT_CXX)
-__DEFAULT_NO_OPTIONS+=GNUCXX
-.else
-__DEFAULT_YES_OPTIONS+=GNUCXX
+__DEFAULT_YES_OPTIONS+=GCC GNUCXX
 .endif
-.endif
-# FDT is needed only for arm, mips and powerpc
-.if ${__T:Marm*} || ${__T:Mpowerpc*} || ${__T:Mmips*}
-__DEFAULT_YES_OPTIONS+=FDT
-.else
-__DEFAULT_NO_OPTIONS+=FDT
-.endif
-.undef __T
 
 #
 # MK_* options which default to "yes".

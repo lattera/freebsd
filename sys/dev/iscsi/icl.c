@@ -68,6 +68,14 @@ TUNABLE_INT("kern.icl.partial_receive_len", &partial_receive_len);
 SYSCTL_INT(_kern_icl, OID_AUTO, partial_receive_len, CTLFLAG_RW,
     &partial_receive_len, 1 * 1024, "Minimum read size for partially received "
     "data segment");
+static int sendspace = 1048576;
+TUNABLE_INT("kern.icl.sendspace", &sendspace);
+SYSCTL_INT(_kern_icl, OID_AUTO, sendspace, CTLFLAG_RW,
+    &sendspace, 1048576, "Default send socket buffer size");
+static int recvspace = 1048576;
+TUNABLE_INT("kern.icl.recvspace", &recvspace);
+SYSCTL_INT(_kern_icl, OID_AUTO, recvspace, CTLFLAG_RW,
+    &recvspace, 1048576, "Default receive socket buffer size");
 
 static uma_zone_t icl_conn_zone;
 static uma_zone_t icl_pdu_zone;
@@ -88,9 +96,10 @@ static volatile u_int	icl_ncons;
 		}							\
 	} while (0)
 
-#define ICL_CONN_LOCK(X)		mtx_lock(&X->ic_lock)
-#define ICL_CONN_UNLOCK(X)		mtx_unlock(&X->ic_lock)
-#define ICL_CONN_LOCK_ASSERT(X)		mtx_assert(&X->ic_lock, MA_OWNED)
+#define ICL_CONN_LOCK(X)		mtx_lock(X->ic_lock)
+#define ICL_CONN_UNLOCK(X)		mtx_unlock(X->ic_lock)
+#define ICL_CONN_LOCK_ASSERT(X)		mtx_assert(X->ic_lock, MA_OWNED)
+#define ICL_CONN_LOCK_ASSERT_NOT(X)	mtx_assert(X->ic_lock, MA_NOTOWNED)
 
 static void
 icl_conn_fail(struct icl_conn *ic)
@@ -896,7 +905,7 @@ icl_send_thread(void *arg)
 			break;
 		}
 		icl_conn_send_pdus(ic);
-		cv_wait(&ic->ic_send_cv, &ic->ic_lock);
+		cv_wait(&ic->ic_send_cv, ic->ic_lock);
 	}
 
 	ic->ic_send_running = false;
@@ -961,20 +970,19 @@ icl_pdu_queue(struct icl_pdu *ip)
 
 	ic = ip->ip_conn;
 
-	ICL_CONN_LOCK(ic);
+	ICL_CONN_LOCK_ASSERT(ic);
+
 	if (ic->ic_disconnecting || ic->ic_socket == NULL) {
 		ICL_DEBUG("icl_pdu_queue on closed connection");
-		ICL_CONN_UNLOCK(ic);
 		icl_pdu_free(ip);
 		return;
 	}
 	TAILQ_INSERT_TAIL(&ic->ic_to_send, ip, ip_next);
-	ICL_CONN_UNLOCK(ic);
 	cv_signal(&ic->ic_send_cv);
 }
 
 struct icl_conn *
-icl_conn_new(void)
+icl_conn_new(const char *name, struct mtx *lock)
 {
 	struct icl_conn *ic;
 
@@ -983,13 +991,14 @@ icl_conn_new(void)
 	ic = uma_zalloc(icl_conn_zone, M_WAITOK | M_ZERO);
 
 	TAILQ_INIT(&ic->ic_to_send);
-	mtx_init(&ic->ic_lock, "icl_lock", NULL, MTX_DEF);
+	ic->ic_lock = lock;
 	cv_init(&ic->ic_send_cv, "icl_tx");
 	cv_init(&ic->ic_receive_cv, "icl_rx");
 #ifdef DIAGNOSTIC
 	refcount_init(&ic->ic_outstanding_pdus, 0);
 #endif
 	ic->ic_max_data_segment_length = ICL_MAX_DATA_SEGMENT_LENGTH;
+	ic->ic_name = name;
 
 	return (ic);
 }
@@ -998,7 +1007,6 @@ void
 icl_conn_free(struct icl_conn *ic)
 {
 
-	mtx_destroy(&ic->ic_lock);
 	cv_destroy(&ic->ic_send_cv);
 	cv_destroy(&ic->ic_receive_cv);
 	uma_zfree(icl_conn_zone, ic);
@@ -1008,7 +1016,7 @@ icl_conn_free(struct icl_conn *ic)
 static int
 icl_conn_start(struct icl_conn *ic)
 {
-	size_t bufsize;
+	size_t minspace;
 	struct sockopt opt;
 	int error, one = 1;
 
@@ -1029,18 +1037,28 @@ icl_conn_start(struct icl_conn *ic)
 	ICL_CONN_UNLOCK(ic);
 
 	/*
-	 * Use max available sockbuf size for sending.  Do it manually
-	 * instead of sbreserve(9) to work around resource limits.
+	 * For sendspace, this is required because the current code cannot
+	 * send a PDU in pieces; thus, the minimum buffer size is equal
+	 * to the maximum PDU size.  "+4" is to account for possible padding.
 	 *
-	 * XXX: This kind of sucks.  On one hand, we don't currently support
-	 *	sending a part of data segment; we always do it in one piece,
-	 *	so we have to make sure it can fit in the socket buffer.
-	 *	Once I've implemented partial send, we'll get rid of this
-	 *	and use autoscaling.
+	 * What we should actually do here is to use autoscaling, but set
+	 * some minimal buffer size to "minspace".  I don't know a way to do
+	 * that, though.
 	 */
-        bufsize = (sizeof(struct iscsi_bhs) +
-            ic->ic_max_data_segment_length) * 8;
-	error = soreserve(ic->ic_socket, bufsize, bufsize);
+	minspace = sizeof(struct iscsi_bhs) + ic->ic_max_data_segment_length +
+	    ISCSI_HEADER_DIGEST_SIZE + ISCSI_DATA_DIGEST_SIZE + 4;
+	if (sendspace < minspace) {
+		ICL_WARN("kern.icl.sendspace too low; must be at least %jd",
+		    minspace);
+		sendspace = minspace;
+	}
+	if (recvspace < minspace) {
+		ICL_WARN("kern.icl.recvspace too low; must be at least %jd",
+		    minspace);
+		recvspace = minspace;
+	}
+
+	error = soreserve(ic->ic_socket, sendspace, recvspace);
 	if (error != 0) {
 		ICL_WARN("soreserve failed with error %d", error);
 		icl_conn_close(ic);
@@ -1066,14 +1084,16 @@ icl_conn_start(struct icl_conn *ic)
 	/*
 	 * Start threads.
 	 */
-	error = kthread_add(icl_send_thread, ic, NULL, NULL, 0, 0, "icltx");
+	error = kthread_add(icl_send_thread, ic, NULL, NULL, 0, 0, "%stx",
+	    ic->ic_name);
 	if (error != 0) {
 		ICL_WARN("kthread_add(9) failed with error %d", error);
 		icl_conn_close(ic);
 		return (error);
 	}
 
-	error = kthread_add(icl_receive_thread, ic, NULL, NULL, 0, 0, "iclrx");
+	error = kthread_add(icl_receive_thread, ic, NULL, NULL, 0, 0, "%srx",
+	    ic->ic_name);
 	if (error != 0) {
 		ICL_WARN("kthread_add(9) failed with error %d", error);
 		icl_conn_close(ic);
@@ -1101,6 +1121,8 @@ icl_conn_handoff(struct icl_conn *ic, int fd)
 	struct socket *so;
 	cap_rights_t rights;
 	int error;
+
+	ICL_CONN_LOCK_ASSERT_NOT(ic);
 
 	/*
 	 * Steal the socket from userland.
@@ -1141,6 +1163,7 @@ icl_conn_handoff(struct icl_conn *ic, int fd)
 void
 icl_conn_shutdown(struct icl_conn *ic)
 {
+	ICL_CONN_LOCK_ASSERT_NOT(ic);
 
 	ICL_CONN_LOCK(ic);
 	if (ic->ic_socket == NULL) {
@@ -1156,6 +1179,8 @@ void
 icl_conn_close(struct icl_conn *ic)
 {
 	struct icl_pdu *pdu;
+
+	ICL_CONN_LOCK_ASSERT_NOT(ic);
 
 	ICL_CONN_LOCK(ic);
 	if (ic->ic_socket == NULL) {
@@ -1200,10 +1225,7 @@ icl_conn_close(struct icl_conn *ic)
 
 	KASSERT(TAILQ_EMPTY(&ic->ic_to_send),
 	    ("destroying session with non-empty send queue"));
-	/*
-	 * XXX
-	 */
-#if 0
+#ifdef DIAGNOSTIC
 	KASSERT(ic->ic_outstanding_pdus == 0,
 	    ("destroying session with %d outstanding PDUs",
 	     ic->ic_outstanding_pdus));
@@ -1214,6 +1236,7 @@ icl_conn_close(struct icl_conn *ic)
 bool
 icl_conn_connected(struct icl_conn *ic)
 {
+	ICL_CONN_LOCK_ASSERT_NOT(ic);
 
 	ICL_CONN_LOCK(ic);
 	if (ic->ic_socket == NULL) {
@@ -1233,6 +1256,8 @@ int
 icl_conn_handoff_sock(struct icl_conn *ic, struct socket *so)
 {
 	int error;
+
+	ICL_CONN_LOCK_ASSERT_NOT(ic);
 
 	if (so->so_type != SOCK_STREAM)
 		return (EINVAL);

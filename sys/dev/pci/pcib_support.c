@@ -1,6 +1,6 @@
-/*-
- * Copyright (c) 1990, 1993
- *	The Regents of the University of California.  All rights reserved.
+/*
+ * Copyright (c) 2014 Sandvine Inc.  All rights reserved.
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,14 +10,11 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -25,40 +22,47 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)stddef.h	8.1 (Berkeley) 6/2/93
- *
- * $FreeBSD$
  */
 
-#ifndef _STDDEF_H_
-#define _STDDEF_H_
-
 #include <sys/cdefs.h>
-#include <sys/_null.h>
-#include <sys/_types.h>
+__FBSDID("$FreeBSD$");
 
-typedef	__ptrdiff_t	ptrdiff_t;
+/*
+ * Support functions for the PCI:PCI bridge driver.  This has to be in a
+ * separate file because kernel configurations end up referencing the functions
+ * here even when pci support is compiled out of the kernel.
+ */
 
-#if __BSD_VISIBLE
-#ifndef _RUNE_T_DECLARED
-typedef	__rune_t	rune_t;
-#define	_RUNE_T_DECLARED
-#endif
-#endif
+#include <sys/param.h>
+#include <sys/bus.h>
+#include <sys/kernel.h>
+#include <sys/malloc.h>
+#include <sys/module.h>
+#include <sys/rman.h>
+#include <sys/sysctl.h>
+#include <sys/systm.h>
 
-#ifndef _SIZE_T_DECLARED
-typedef	__size_t	size_t;
-#define	_SIZE_T_DECLARED
-#endif
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcib_private.h>
 
-#ifndef	__cplusplus
-#ifndef _WCHAR_T_DECLARED
-typedef	___wchar_t	wchar_t;
-#define	_WCHAR_T_DECLARED
-#endif
-#endif
+#include "pcib_if.h"
 
-#define	offsetof(type, member)	__offsetof(type, member)
+int
+pcib_maxfuncs(device_t dev)
+{
+	return (PCI_FUNCMAX);
+}
 
-#endif /* _STDDEF_H_ */
+uint16_t
+pcib_get_rid(device_t pcib, device_t dev)
+{
+	uint8_t bus, slot, func;
+
+	bus = pci_get_bus(dev);
+	slot = pci_get_slot(dev);
+	func = pci_get_function(dev);
+
+	return (PCI_RID(bus, slot, func));
+}
+
