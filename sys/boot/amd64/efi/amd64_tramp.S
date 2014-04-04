@@ -1,7 +1,9 @@
 /*-
- * Copyright (c) 2014 David T Chisnall
+ * Copyright (c) 2013 The FreeBSD Foundation
  * All rights reserved.
  *
+ * This software was developed by Benno Rice under sponsorship from
+ * the FreeBSD Foundation.
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -14,7 +16,7 @@
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -26,38 +28,37 @@
  * $FreeBSD$
  */
 
-#ifdef __BLOCKS__
-/**
- * Declares a block variable.  This macro is defined in the trivial way for
- * compilers that support blocks and exposing the ABI in the source for other
- * compilers.
+#include <machine/asmacros.h>
+
+	.text
+	.globl	amd64_tramp
+
+/*
+ * void amd64_tramp(uint64_t stack, void *copy_finish, uint64_t kernend,
+ *		    uint64_t modulep, uint64_t pagetable, uint64_t entry)
  */
-#define	DECLARE_BLOCK(retTy, name, argTys, ...)\
-	retTy(^name)(argTys, ## __VA_ARGS__)
-/**
- * Calls a block variable.  This macro is defined in the trivial way for
- * compilers that support blocks and exposing the ABI in the source for other
- * compilers.
- */
-#define CALL_BLOCK(name, ...) name(__VA_ARGS__)
-#else // !__BLOCKS__
-#define	DECLARE_BLOCK(retTy, name, argTys, ...)\
-	struct {\
-		void *isa;\
-		int flags;\
-		int reserved;\
-		retTy (*invoke)(void *, ...);\
-	} *name
-#define CALL_BLOCK(name, ...) (name)->invoke(name, __VA_ARGS__)
-#endif // __BLOCKS__
-/**
- * Returns the pointer to the block-invoke function.  This is used for passing
- * blocks to functions that want a function pointer and a data pointer.
- */
-#define GET_BLOCK_FUNCTION(x) \
-	(((struct {\
-		void *isa;\
-		int flags;\
-		int reserved;\
-		void (*invoke)(void *, ...);\
-	}*)(void*)x)->invoke)
+amd64_tramp:
+	cli			/* Make sure we don't get interrupted. */
+	movq	%rdi,%rsp	/* Switch to our temporary stack. */
+
+	movq	%rdx,%r12	/* Stash the kernel values for later. */
+	movq	%rcx,%r13
+	movq	%r8,%r14
+	movq	%r9,%r15
+
+	callq	*%rsi		/* Call copy_finish so we're all ready to go. */
+
+	pushq	%r12		/* Push kernend. */
+	salq	$32,%r13	/* Shift modulep and push it. */
+	pushq	%r13
+	pushq	%r15		/* Push the entry address. */
+	movq	%r14,%cr3	/* Switch page tables. */
+	ret			/* "Return" to kernel entry. */
+
+	ALIGN_TEXT
+amd64_tramp_end:
+
+	.data
+	.globl	amd64_tramp_size
+amd64_tramp_size:
+	.long	amd64_tramp_end-amd64_tramp
