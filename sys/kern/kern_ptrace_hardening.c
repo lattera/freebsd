@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/stat.h>
+#include <sys/ptrace.h>
 #include <sys/proc.h>
 #include <sys/sysctl.h>
 #include <sys/sbuf.h>
@@ -56,17 +57,31 @@ __FBSDID("$FreeBSD$");
 
 #include <security/mac_bsdextended/mac_bsdextended.h>
 
+#define PTRACE_ALLFLAGS		(PT_TRACE_ME|PT_READ_I|PT_READ_D|PT_WRITE_I|	\
+							PT_WRITE_D|PT_CONTINUE|PT_KILL|PT_STEP| 		\
+							PT_ATTACH|PT_DETACH|PT_IO|PT_LWPINFO|			\
+							PT_GETNUMLWPS|PT_GETLWPLIST|PT_CLEARSTEP|		\
+							PT_SETSTEP|PT_SUSPEND|PT_RESUME|				\
+							PT_TO_SCE|PT_TO_SCX|PT_SYSCALL|PT_FOLLOW_FORK|	\
+							PT_GETREGS|PT_SETREGS|PT_GETFPREGS|PT_SETFPREGS|\
+							PT_GETDBREGS|PT_SETDBREGS|PT_VM_TIMESTAMP|		\
+							PT_VM_ENTRY|PT_FIRSTMACH)
+
 static void ptrace_hardening_sysinit(void);
 static void ptrace_hardening_log(const char *, const char *, ...);
 
 int ptrace_hardening_status = PTRACE_HARDENING_ENABLED;
+int ptrace_hardening_flags = -1;
 int ptrace_hardening_log_status = 0;
 
 #ifdef PTRACE_HARDENING_GRP
 gid_t ptrace_hardening_allowed_gid = 0;
 #endif
 
+FEATURE(ptrace_hardening, "Ptrace call restrictions.");
+
 TUNABLE_INT("hardening.ptrace.status", &ptrace_hardening_status);
+TUNABLE_INT("hardening.ptrace.flags", &ptrace_hardening_flags);
 TUNABLE_INT("hardening.ptrace.log", &ptrace_hardening_log_status);
 
 #ifdef PTRACE_HARDENING_GRP
@@ -74,11 +89,12 @@ TUNABLE_INT("hardening.ptrace.allowed_gid", &ptrace_hardening_allowed_gid);
 #endif
 
 static int sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS);
+static int sysctl_ptrace_hardening_flags(SYSCTL_HANDLER_ARGS);
+static int sysctl_ptrace_hardening_log(SYSCTL_HANDLER_ARGS);
 
 #ifdef PTRACE_HARDENING_GRP
 static int sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS);
 #endif
-static int sysctl_ptrace_hardening_log(SYSCTL_HANDLER_ARGS);
 
 SYSCTL_NODE(_hardening, OID_AUTO, ptrace, CTLFLAG_RD, 0,
 	"PTrace settings.");
@@ -90,17 +106,22 @@ SYSCTL_PROC(_hardening_ptrace, OID_AUTO, status,
 	"0 - disabled, "
 	"1 - enabled");
 
+SYSCTL_PROC(_hardening_ptrace, OID_AUTO, flags,
+	CTLTYPE_INT|CTLFLAG_RWTUN|CTLFLAG_PRISON|CTLFLAG_SECURE,
+	NULL, 0, sysctl_ptrace_hardening_flags, "I",
+	"Request flags");
+
+SYSCTL_PROC(_hardening_ptrace, OID_AUTO, log,
+	CTLTYPE_INT|CTLFLAG_RWTUN|CTLFLAG_PRISON|CTLFLAG_SECURE,
+	NULL, 0, sysctl_ptrace_hardening_log, "I",
+	"Logging");
+
 #ifdef PTRACE_HARDENING_GRP
 SYSCTL_PROC(_hardening_ptrace, OID_AUTO, allowed_gid,
 	CTLTYPE_ULONG|CTLFLAG_RWTUN|CTLFLAG_PRISON|CTLFLAG_SECURE,
 	NULL, 0, sysctl_ptrace_hardening_gid, "LU",
 	"Allowed gid");
 #endif
-
-SYSCTL_PROC(_hardening_ptrace, OID_AUTO, log,
-	CTLTYPE_INT|CTLFLAG_RWTUN|CTLFLAG_PRISON|CTLFLAG_SECURE,
-	NULL, 0, sysctl_ptrace_hardening_log, "I",
-	"Logging");
 
 int
 sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS)
@@ -119,6 +140,28 @@ sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS)
 		return (EINVAL);
 	}
 
+	return (0);
+}
+
+int
+sysctl_ptrace_hardening_flags(SYSCTL_HANDLER_ARGS)
+{
+	int err, val = ptrace_hardening_flags;
+	err = sysctl_handle_int(oidp, &val, sizeof(int), req);
+	if (err || (req->newptr == NULL))
+		return (err);
+
+	if (val == -1) {
+		ptrace_hardening_flags = val;
+		return (0);
+	}
+	if ((val | PTRACE_ALLFLAGS) != PTRACE_ALLFLAGS)
+		return (EINVAL);
+
+	if (ptrace_hardening_flags == -1)
+		ptrace_hardening_flags = 0;
+
+	ptrace_hardening_flags |= val;
 	return (0);
 }
 
@@ -162,31 +205,41 @@ sysctl_ptrace_hardening_log(SYSCTL_HANDLER_ARGS)
 }
 
 int
-ptrace_hardening(struct thread *td, u_int ptrace_hardening_flag)
+ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag)
 {
+	uid_t uid;
+	gid_t gid;
+	pid_t pid;
+
 	if (!ptrace_hardening_status)
 		return (0);
 
-	if (ptrace_hardening_flag & 
+	if (p->p_ptrace_hardening & 
 		PTRACE_HARDENING_MODE_PUBLIC)
 		return (0);
 
-	uid_t uid = td->td_ucred->cr_ruid;
-	gid_t gid = td->td_ucred->cr_rgid;
+	uid = td->td_ucred->cr_ruid;
+	gid = td->td_ucred->cr_rgid;
+	pid = p->p_pid;
+
+	if (ptrace_hardening_flags > -1 && uid &&
+		!(ptrace_hardening_flags & ptrace_flag))
+		goto fail;
+		
 #ifdef PTRACE_HARDENING_GRP
 	if (uid && (ptrace_hardening_allowed_gid &&
-		gid != ptrace_hardening_allowed_gid)) {
+		gid != ptrace_hardening_allowed_gid))
 #else
-	if (uid) {
+	if (uid)
 #endif
-
-		ptrace_hardening_log(__func__, 
-			"forbidden ptrace call attempt "
-			"from %ld:%ld user", uid, gid);
-		return (EPERM);
-	}
+		goto fail;
 
 	return (0);
+
+fail:
+	ptrace_hardening_log(__func__, "forbidden ptrace call attempt "
+			"from %ld:%ld, pid %ld", uid, gid, pid);
+	return (EPERM);
 }
 
 void
@@ -211,13 +264,16 @@ ptrace_hardening_mode(struct image_params *imgp, uint32_t mode)
 static void
 ptrace_hardening_sysinit(void)
 {
-	printf("[PTRACE HARDENING] status : %d\n", ptrace_hardening_status);
+	printf("[PTRACE HARDENING] status : %s\n", 
+		ptrace_hardening_status ? "enabled" : "disabled");
 
+	printf("[PTRACE HARDENING] flags : %d\n", ptrace_hardening_flags);
+	printf("[PTRACE HARDENING] log : %s\n", 
+		ptrace_hardening_log_status ? "enabled" : "disabled");
 #ifdef PTRACE_HARDENING_GRP
 	printf("[PTRACE HARDENING] allowed gid : %d\n", 
 			ptrace_hardening_allowed_gid);
 #endif
-	printf("[PTRACE HARDENING] log : %d\n", ptrace_hardening_log_status);
 }
 SYSINIT(ptrace, SI_SUB_PTRACE_HARDENING, SI_ORDER_FIRST, ptrace_hardening_sysinit, NULL);
 
