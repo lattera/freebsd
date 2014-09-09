@@ -35,14 +35,19 @@
 #ifdef _KERNEL
 
 extern int ptrace_hardening_status;
-extern int ptrace_hardening_flags;
+extern int ptrace_hardening_flag_status;
+extern int ptrace_hardening_log_status;
 
 #ifdef PTRACE_HARDENING_GRP
 extern gid_t ptrace_hardening_allowed_gid;
 #endif
 
-#define PTRACE_HARDENING_DISABLED	0
-#define PTRACE_HARDENING_ENABLED	1
+#define PTRACE_HARDENING_DISABLED			0
+#define PTRACE_HARDENING_ENABLED			1
+#define PTRACE_HARDENING_REQFLAG_DISABLED	0
+#define PTRACE_HARDENING_REQFLAG_ENABLED	1
+#define PTRACE_HARDENING_LOG_DISABLED		0
+#define PTRACE_HARDENING_LOG_ENABLED		1
 
 #define PTRACE_HARDENING_MODE_ROOTONLY	0x00
 #define PTRACE_HARDENING_MODE_PUBLIC	0x01
