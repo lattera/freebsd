@@ -132,7 +132,7 @@ do_fstat(int argc, char **argv)
 				usage();
 			}
 			what = KERN_PROC_PID;
-			arg = strtonum(optarg, 1, 99999, &errstr);
+			arg = strtonum(optarg, 0, 99999, &errstr);
 			if (errstr) {
 				warnx("-p requires a valid process id (%s)", errstr);
 				usage();

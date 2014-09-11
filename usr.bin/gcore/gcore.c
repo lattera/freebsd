@@ -109,7 +109,7 @@ main(int argc, char *argv[])
 	/* XXX we should check that the pid argument is really a number */
 	switch (argc) {
 	case 1:
-		pid = strtonum(argv[0], 1, 99999, &errstr);
+		pid = strtonum(argv[0], 0, 99999, &errstr);
 		if (errstr)
 			errx(1, "pid argument invalid (%s)", errstr);
 		name[0] = CTL_KERN;

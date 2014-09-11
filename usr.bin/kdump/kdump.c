@@ -285,7 +285,7 @@ main(int argc, char *argv[])
 			fancy = 0;
 			break;
 		case 'p':
-			pid = strtonum(optarg, 1, 99999, &errstr);
+			pid = strtonum(optarg, 0, 99999, &errstr);
 			if (errstr)
 				errx(1, "invalid pid %s", errstr);
 			break;
