@@ -111,6 +111,7 @@ main(int argc, char **argv)
 	char buf[1024];
 	struct statfs *mntbuf;
 	struct nfscl_dumpmntopts dumpmntopts;
+	const char *errstr = NULL;
 
 	interval = 0;
 	memf = nlistf = NULL;
@@ -147,7 +148,10 @@ main(int argc, char **argv)
 			widemode = 1;
 			break;
 		case 'w':
-			interval = atoi(optarg);
+			interval = strtonum(optarg, 0, 100, &errstr);
+			if (errstr)
+				errx(1, "invalid interval %s: %s",
+						optarg, errstr);
 			break;
 		case 'c':
 			clientOnly = 1;
@@ -182,7 +186,10 @@ main(int argc, char **argv)
 #define	BACKWARD_COMPATIBILITY
 #ifdef	BACKWARD_COMPATIBILITY
 	if (*argv) {
-		interval = atoi(*argv);
+		interval = strtonum(*argv, 0, 1000, &errstr);
+		if (errstr)
+			errx(1, "invalid interval %s: %s", *argv,
+				errstr);
 		if (*++argv) {
 			nlistf = *argv;
 			if (*++argv)

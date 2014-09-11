@@ -300,7 +300,8 @@ parse(const char *string, int lineno)
  				} else {
 					intval = (int)strtol(newval, &endptr,
 					    0);
-					if (endptr == newval || *endptr != '\0') {
+					if (errno == ERANGE || endptr == newval || 
+						*endptr != '\0') {
 						warnx("invalid integer '%s'%s",
 						    (char *)newval, line);
 						return (1);
@@ -311,7 +312,8 @@ parse(const char *string, int lineno)
 				break;
 			case CTLTYPE_UINT:
 				uintval = (int) strtoul(newval, &endptr, 0);
-				if (endptr == newval || *endptr != '\0') {
+				if (errno == ERANGE || endptr == newval || 
+					*endptr != '\0') {
 					warnx("invalid unsigned integer '%s'%s",
 					    (char *)newval, line);
 					return (1);
@@ -321,7 +323,8 @@ parse(const char *string, int lineno)
 				break;
 			case CTLTYPE_LONG:
 				longval = strtol(newval, &endptr, 0);
-				if (endptr == newval || *endptr != '\0') {
+				if (errno == ERANGE || endptr == newval || 
+					*endptr != '\0') {
 					warnx("invalid long integer '%s'%s",
 					    (char *)newval, line);
 					return (1);
@@ -331,7 +334,8 @@ parse(const char *string, int lineno)
 				break;
 			case CTLTYPE_ULONG:
 				ulongval = strtoul(newval, &endptr, 0);
-				if (endptr == newval || *endptr != '\0') {
+				if (errno == ERANGE || endptr == newval || 
+					*endptr != '\0') {
 					warnx("invalid unsigned long integer"
 					    " '%s'%s", (char *)newval, line);
 					return (1);
@@ -343,7 +347,8 @@ parse(const char *string, int lineno)
 				break;
 			case CTLTYPE_S64:
 				i64val = strtoimax(newval, &endptr, 0);
-				if (endptr == newval || *endptr != '\0') {
+				if (errno == ERANGE || endptr == newval || 
+					*endptr != '\0') {
 					warnx("invalid int64_t '%s'%s",
 					    (char *)newval, line);
 					return (1);
@@ -353,7 +358,8 @@ parse(const char *string, int lineno)
 				break;
 			case CTLTYPE_U64:
 				u64val = strtoumax(newval, &endptr, 0);
-				if (endptr == newval || *endptr != '\0') {
+				if (errno == ERANGE || endptr == newval || 
+					*endptr != '\0') {
 					warnx("invalid uint64_t '%s'%s",
 					    (char *)newval, line);
 					return (1);
@@ -579,14 +585,16 @@ set_IK(const char *str, int *val)
 	p = &str[len - 1];
 	if (*p == 'C' || *p == 'F') {
 		temp = strtof(str, &endptr);
-		if (endptr == str || endptr != p)
+		if (errno == ERANGE || endptr == str || 
+			endptr != p)
 			return (0);
 		if (*p == 'F')
 			temp = (temp - 32) * 5 / 9;
 		kelv = temp * 10 + 2732;
 	} else {
 		kelv = (int)strtol(str, &endptr, 10);
-		if (endptr == str || *endptr != '\0')
+		if (errno == ERANGE || endptr == str || 
+			*endptr != '\0')
 			return (0);
 	}
 	*val = kelv;

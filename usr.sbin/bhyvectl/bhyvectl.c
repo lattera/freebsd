@@ -449,6 +449,7 @@ int
 main(int argc, char *argv[])
 {
 	char *vmname;
+	const char *errstr = NULL;
 	int error, ch, vcpu, ptenum;
 	vm_paddr_t gpa, gpa_pmap;
 	size_t len;
@@ -645,11 +646,18 @@ main(int argc, char *argv[])
 			vmname = optarg;
 			break;
 		case VCPU:
-			vcpu = atoi(optarg);
+			vcpu = strtonum(optarg, 0, INT_MAX, &errstr);
+			if (errstr)
+				vcpu = 0;
 			break;
 		case SET_MEM:
-			memsize = atoi(optarg) * MB;
-			memsize = roundup(memsize, 2 * MB);
+			memsize = strtoul(optarg, NULL, 0);
+			if (errno == ERANGE) {
+				error = 1;
+			} else {
+				memsize *= MB;
+				memsize = roundup(memsize, 2 * MB);
+			}
 			break;
 		case SET_EFER:
 			efer = strtoul(optarg, NULL, 0);
