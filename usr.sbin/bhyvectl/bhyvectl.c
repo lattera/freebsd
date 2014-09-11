@@ -652,10 +652,12 @@ main(int argc, char *argv[])
 			break;
 		case SET_MEM:
 			memsize = strtoul(optarg, NULL, 0);
-			if (errno == ERANGE)
-				memsize = 0;
-			memsize *= MB;
-			memsize = roundup(memsize, 2 * MB);
+			if (errno == ERANGE) {
+				error = 1;
+			} else {
+				memsize *= MB;
+				memsize = roundup(memsize, 2 * MB);
+			}
 			break;
 		case SET_EFER:
 			efer = strtoul(optarg, NULL, 0);
