@@ -59,8 +59,7 @@ static const int col3 = C3;
 static const int col4 = C4;
 static const int col5 = C5;
 
-SLIST_HEAD(, if_stat)		curlist;
-SLIST_HEAD(, if_stat_disp)	displist;
+static SLIST_HEAD(, if_stat)		curlist;
 
 struct if_stat {
 	SLIST_ENTRY(if_stat)	 link;
@@ -170,6 +169,31 @@ static	 u_int getifnum(void);
 WINDOW *
 openifstat(void)
 {
+	struct if_stat *p = NULL;
+	u_int n = 0, i = 0;
+
+	n = getifnum();		/* NOTE: can return < 0 */
+
+	SLIST_INIT(&curlist);
+	for (i = 0; i < n; i++) {
+		p = (struct if_stat *)calloc(1, sizeof(struct if_stat));
+		if (p == NULL)
+			IFSTAT_ERR(1, "out of memory");
+		SLIST_INSERT_HEAD(&curlist, p, link);
+		p->if_row = i+1;
+		getifmibdata(p->if_row, &p->if_mib);
+		right_align_string(p);
+
+		/*
+		 * Initially, we only display interfaces that have
+		 * received some traffic
+		 */
+		if (p->if_mib.ifmd_data.ifi_ibytes != 0)
+			p->display = 1;
+	}
+
+	sort_interface_list();
+
 	return (subwin(stdscr, LINES-3-1, 0, MAINWIN_ROW, 0));
 }
 
