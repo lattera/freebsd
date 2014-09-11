@@ -1018,6 +1018,7 @@ cpio_options(int argc, char **argv)
 	char *str;
 	FSUB tmp;
 	FILE *fp;
+	const char *errstr = NULL;
 
 	kflag = 1;
 	pids = 1;
@@ -1143,7 +1144,11 @@ cpio_options(int argc, char **argv)
 				/*
 				 * set block size in bytes
 				 */
-				wrblksz = atoi(optarg);
+				wrblksz = strtonum(optarg, 0, INT_MAX, &errstr);
+				if (errstr) {
+					paxwarn(1, "Invalid block size %s", errstr);
+					cpio_usage();
+				}
 				break;
 			case 'E':
 				/*
