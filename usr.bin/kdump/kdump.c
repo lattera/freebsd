@@ -54,6 +54,7 @@ extern int errno;
 #include <sys/uio.h>
 #include <sys/ktrace.h>
 #include <sys/ioctl.h>
+#include <sys/sysctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/sysent.h>
@@ -250,7 +251,8 @@ cappwdgrp_setup(cap_channel_t **cappwdp, cap_channel_t **capgrpp)
 int
 main(int argc, char *argv[])
 {
-	int ch, ktrlen, size;
+	int ch, ktrlen, size, pid_max;
+	size_t pid_max_len;
 	void *m;
 	const char *errstr = NULL;
 	int trpoints = ALL_POINTS;
@@ -261,6 +263,10 @@ main(int argc, char *argv[])
 	setlocale(LC_CTYPE, "");
 
 	timestamp = TIMESTAMP_NONE;
+	pid_max_len = sizeof(pid_max);
+	if (sysctlbyname("kern.pid_max", &pid_max, &pid_max_len,
+				NULL, 0) < 0)
+		errx(1, "kern.pid_max failure");
 
 	while ((ch = getopt(argc,argv,"f:dElm:np:AHRrSsTt:")) != -1)
 		switch (ch) {
@@ -285,7 +291,7 @@ main(int argc, char *argv[])
 			fancy = 0;
 			break;
 		case 'p':
-			pid = strtonum(optarg, 0, 99999, &errstr);
+			pid = strtonum(optarg, 0, pid_max, &errstr);
 			if (errstr)
 				errx(1, "invalid pid %s", errstr);
 			break;

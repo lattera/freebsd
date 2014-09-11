@@ -101,8 +101,14 @@ do_fstat(int argc, char **argv)
 	struct passwd *passwd;
 	struct procstat *procstat;
 	int arg, ch, what;
-	int cnt, i;
+	int cnt, i, pid_max;
+	size_t pid_max_len;
 	const char *errstr = NULL;
+
+	pid_max_len = sizeof(pid_max);
+	if (sysctlbyname("kern.pid_max", &pid_max, &pid_max_len,
+			NULL, 0) < 0)
+		errx(1, "kern.pid_max failure");
 
 	arg = 0;
 	what = KERN_PROC_PROC;
@@ -132,7 +138,7 @@ do_fstat(int argc, char **argv)
 				usage();
 			}
 			what = KERN_PROC_PID;
-			arg = strtonum(optarg, 0, 99999, &errstr);
+			arg = strtonum(optarg, 0, pid_max, &errstr);
 			if (errstr) {
 				warnx("-p requires a valid process id (%s)", errstr);
 				usage();
