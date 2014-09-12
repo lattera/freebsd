@@ -215,7 +215,7 @@ charsperline(void)
 	if (ioctl(0, TIOCGWINSZ, &ws) != -1)
 		columns = ws.ws_col;
 	if (columns == 0 && (cp = getenv("COLUMNS")))
-		columns = strtonum(cp, 0, INT_MAX, &errsyt);
+		columns = strtonum(cp, 0, INT_MAX, &errstr);
 	if (errstr)
 		columns = 80;	/* last resort */
 	return (columns);
