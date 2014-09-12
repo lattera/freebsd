@@ -197,9 +197,9 @@ struct prison {
 	int		 pr_pax_aslr_compat_exec_len;	/* (p) Number of bits randomized with the execbase (compat32) */
 	int		 pr_pax_map32_enabled;		/* (p) MAP_32BIT enabled (amd64 only) */
 	int 	 pr_ptrace_hardening_status;	/* (p) Ptrace hardening enabled */
-	int 	 pr_ptrace_hardening_flag_status;	/* (p) Ptrace hardening flag enabled */
-	int		 pr_ptrace_request_flags_all;	/* (p) Ptrace hardening request set for all */
-	int		 pr_ptrace_request_flags[65]; /* (p) Ptrace requests types */
+	int      pr_ptrace_hardening_flag_status;	/* (p) Ptrace hardening flag enabled */
+	int 	 pr_ptrace_request_flags_all;	/* (p) Ptrace hardening request set for all */
+	int 	 pr_ptrace_request_flags[65]; /* (p) Ptrace requests types */
 	gid_t	 pr_ptrace_hardening_allowed_gid;	/* (p) Ptrace hardening per gid */
 };
 

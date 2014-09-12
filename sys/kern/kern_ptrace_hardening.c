@@ -75,8 +75,11 @@ int			\
 sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS)	\
 {			\
 	struct prison *pr = NULL;		\
+	int err, val;                   \
+    \
 	pr = ptrace_get_prison(req->td->td_proc);		\
-	int err, val = (pr != NULL) ? pr->pr_ptrace_request_flags[PTFLAG] :	\
+	\
+	val = (pr != NULL) ? pr->pr_ptrace_request_flags[PTFLAG] :	\
 				ptrace_request_flags[PTFLAG];		\
 	err = sysctl_handle_int(oidp, &val, sizeof(int), req);		\
 	if (err || (req->newptr == NULL))	\
@@ -103,7 +106,7 @@ sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS)	\
 
 static void ptrace_hardening_sysinit(void);
 static void ptrace_hardening_log(const char *, const char *, ...);
-static struct prison * ptrace_get_prison(struct proc *);
+static struct prison *ptrace_get_prison(struct proc *);
 
 int ptrace_hardening_status = PTRACE_HARDENING_ENABLED;
 int ptrace_hardening_flag_status = PTRACE_HARDENING_REQFLAG_ENABLED;
@@ -203,8 +206,11 @@ int
 sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS)
 {
 	struct prison *pr = NULL;
+	int err, val;
+
 	pr = ptrace_get_prison(req->td->td_proc);
-	int err, val = (pr != NULL) ? pr->pr_ptrace_hardening_status : 
+
+	val = (pr != NULL) ? pr->pr_ptrace_hardening_status : 
 				ptrace_hardening_status;
 	err = sysctl_handle_int(oidp, &val, sizeof(int), req);
 	if (err || (req->newptr == NULL))
@@ -233,8 +239,11 @@ int
 sysctl_ptrace_hardening_flag(SYSCTL_HANDLER_ARGS)
 {
 	struct prison *pr = NULL;
+	int err, val;
+
 	pr = ptrace_get_prison(req->td->td_proc);
-	int err, val = (pr != NULL) ? pr->pr_ptrace_hardening_flag_status :
+	
+	val = (pr != NULL) ? pr->pr_ptrace_hardening_flag_status :
 				ptrace_hardening_flag_status;
 	err = sysctl_handle_int(oidp, &val, sizeof(int), req);
 	if (err || (req->newptr == NULL))
@@ -263,10 +272,13 @@ int
 sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 {
 	struct prison *pr = NULL;
-	pr = ptrace_get_prison(req->td->td_proc);
-	int err, val = (pr != NULL) ? pr->pr_ptrace_request_flags_all :
-				ptrace_request_flags_all;
 	size_t i = 0;
+	int err, val;
+
+	pr = ptrace_get_prison(req->td->td_proc);
+
+	val = (pr != NULL) ? pr->pr_ptrace_request_flags_all :
+				ptrace_request_flags_all;
 	err = sysctl_handle_int(oidp, &val, sizeof(int), req);
 	if (err || (req->newptr == NULL))
 		return (err);
@@ -301,10 +313,13 @@ int
 sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS)
 {
 	struct prison *pr = NULL;
-	pr = ptrace_get_prison(req->td->td_proc);
+	long val;
 	int err;
-	long val = (pr != NULL) ? pr->pr_ptrace_hardening_allowed_gid :
-					ptrace_hardening_allowed_gid;
+
+	pr = ptrace_get_prison(req->td->td_proc);
+
+	val = (pr != NULL) ? pr->pr_ptrace_hardening_allowed_gid :
+			ptrace_hardening_allowed_gid;
 	err = sysctl_handle_long(oidp, &val, sizeof(long), req);
 	if (err || (req->newptr == NULL))
 		return (err);

@@ -77,7 +77,7 @@ options 	PAX_ASLR		# Address Space Layout Randomization
 #options 	PAX_HARDENING		# Various hardening options
 options 	PAX_SYSCTLS		# sysctls for run-time options
 options		PTRACE_HARDENING # Ptrace calls restrictions
-option		PTRACE_HARDENING_GRP	# Ptrace allowance per gid
+options		PTRACE_HARDENING_GRP	# Ptrace allowance per gid
 
 # Debugging support.  Always need this:
 options 	KDB			# Enable kernel debugger support.
