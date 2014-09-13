@@ -90,11 +90,11 @@ sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS)	\
 	case 0:				\
 	case 1:				\
 		if ((pr == NULL) || (pr == &prison0))		\
-			ptrace_request_flags[PTFLAG] = (char)val;	\
+			ptrace_request_flags[PTFLAG] = val;		\
 		\
 		if (pr != NULL) {				\
 			prison_lock(pr);			\
-			pr->pr_ptrace_request_flags[PTFLAG] = (char)val;	\
+			pr->pr_ptrace_request_flags[PTFLAG] = val;	\
 			prison_unlock(pr);			\
 		}								\
 		break;			\
@@ -291,7 +291,7 @@ sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 			ptrace_request_flags_all = val;
 			for (; i <= PT_FIRSTMACH; i++)
 				ptrace_request_flags[i] = 
-					(char)ptrace_request_flags_all;		
+					ptrace_request_flags_all;		
 		}
 
 		if (pr != NULL) {
@@ -299,7 +299,7 @@ sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 			pr->pr_ptrace_request_flags_all = val;
 			for (; i <= PT_FIRSTMACH; i++)
 				pr->pr_ptrace_request_flags[i] = 
-					(char)ptrace_request_flags_all;		
+					ptrace_request_flags_all;		
 			prison_unlock(pr);
 		}
 		break;
