@@ -199,7 +199,7 @@ struct prison {
 	int 	 pr_ptrace_hardening_status;	/* (p) Ptrace hardening enabled */
 	int      pr_ptrace_hardening_flag_status;	/* (p) Ptrace hardening flag enabled */
 	int 	 pr_ptrace_request_flags_all;	/* (p) Ptrace hardening request set for all */
-	int 	 pr_ptrace_request_flags[65]; /* (p) Ptrace requests types */
+	char 	 pr_ptrace_request_flags[65]; /* (p) Ptrace requests types */
 	gid_t	 pr_ptrace_hardening_allowed_gid;	/* (p) Ptrace hardening per gid */
 };
 
