@@ -72,6 +72,7 @@ parselist(char *list, cpuset_t *mask)
 	int lastnum;
 	int curnum;
 	char *l;
+	const char *errstr = NULL;
 
 	if (strcasecmp(list, "all") == 0) {
 		if (cpuset_getaffinity(CPU_LEVEL_ROOT, CPU_WHICH_PID, -1,
@@ -83,10 +84,10 @@ parselist(char *list, cpuset_t *mask)
 	curnum = lastnum = 0;
 	for (l = list; *l != '\0';) {
 		if (isdigit(*l)) {
-			curnum = atoi(l);
-			if (curnum > CPU_SETSIZE)
+			curnum = strtonum(l, 0, CPU_SETSIZE, &errstr);
+			if (errstr)
 				errx(EXIT_FAILURE,
-				    "Only %d cpus supported", CPU_SETSIZE);
+				    "Invalid cpu %d (%s)", curnum, errstr);
 			while (isdigit(*l))
 				l++;
 			switch (state) {
@@ -201,6 +202,7 @@ main(int argc, char *argv[])
 	lwpid_t tid;
 	pid_t pid;
 	int ch;
+	const char *errstr = NULL;
 
 	CPU_ZERO(&mask);
 	level = CPU_LEVEL_WHICH;
@@ -226,7 +228,9 @@ main(int argc, char *argv[])
 		case 'j':
 			jflag = 1;
 			which = CPU_WHICH_JAIL;
-			id = atoi(optarg);
+			id = strtonum(optarg, 0, INT_MAX, &errstr);
+			if (errstr)
+				err(EXIT_FAILURE, "jail");
 			break;
 		case 'l':
 			lflag = 1;
@@ -235,7 +239,10 @@ main(int argc, char *argv[])
 		case 'p':
 			pflag = 1;
 			which = CPU_WHICH_PID;
-			id = pid = atoi(optarg);
+			id = pid = strtonum(optarg, -1, INT_MAX, 
+								&errstr);
+			if (errstr)
+				err(EXIT_FAILURE, "pid");
 			break;
 		case 'r':
 			if (cflag)
@@ -246,17 +253,25 @@ main(int argc, char *argv[])
 		case 's':
 			sflag = 1;
 			which = CPU_WHICH_CPUSET;
-			id = setid = atoi(optarg);
+			id = setid = strtonum(optarg, 0, INT_MAX, 
+								&errstr);
+			if (errstr)
+				err(EXIT_FAILURE, "setid");
 			break;
 		case 't':
 			tflag = 1;
 			which = CPU_WHICH_TID;
-			id = tid = atoi(optarg);
+			id = tid = strtonum(optarg, -1, INT_MAX,
+								&errstr);
+			if (errstr)
+				err(EXIT_FAILURE, "tid");
 			break;
 		case 'x':
 			xflag = 1;
 			which = CPU_WHICH_IRQ;
-			id = atoi(optarg);
+			id = strtonum(optarg, 0, INT_MAX, &errstr);
+			if (errstr)
+				err(EXIT_FAILURE, "irq");
 			break;
 		default:
 			usage();

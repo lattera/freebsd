@@ -305,6 +305,9 @@ pfind(pid_t pid)
 {
 	struct proc *p;
 
+	if (pid > PID_MAX)
+		return (NULL);
+
 	sx_slock(&allproc_lock);
 	p = pfind_locked(pid);
 	sx_sunlock(&allproc_lock);
@@ -1078,6 +1081,9 @@ struct proc *
 zpfind(pid_t pid)
 {
 	struct proc *p;
+
+	if (pid > PID_MAX)
+		return (NULL);
 
 	sx_slock(&allproc_lock);
 	p = zpfind_locked(pid);
