@@ -179,7 +179,7 @@ main(int argc, char *argv[])
 	KINFO_STR *ks;
 	struct varent *vent;
 	struct winsize ws;
-	const char *nlistf, *memf, *fmtstr, *str;
+	const char *nlistf, *memf, *fmtstr, *str, *errstr = NULL;
 	char *cols;
 	int all, ch, elem, flag, _fmt, i, lineno, linelen, left;
 	int descendancy, nentries, nkept, nselectors;
@@ -189,9 +189,11 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	time(&now);			/* Used by routines in print.c. */
 
-	if ((cols = getenv("COLUMNS")) != NULL && *cols != '\0')
-		termwidth = atoi(cols);
-	else if ((ioctl(STDOUT_FILENO, TIOCGWINSZ, (char *)&ws) == -1 &&
+	if ((cols = getenv("COLUMNS")) != NULL && *cols != '\0') {
+		termwidth = strtonum(cols, 0, INT_MAX, &errstr);
+		if (errstr)
+			termwidth = 79;
+	} else if ((ioctl(STDOUT_FILENO, TIOCGWINSZ, (char *)&ws) == -1 &&
 	     ioctl(STDERR_FILENO, TIOCGWINSZ, (char *)&ws) == -1 &&
 	     ioctl(STDIN_FILENO,  TIOCGWINSZ, (char *)&ws) == -1) ||
 	     ws.ws_col == 0)
