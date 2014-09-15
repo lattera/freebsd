@@ -1377,9 +1377,11 @@ dev/fatm/if_fatm.c		optional fatm pci
 dev/fb/fbd.c			optional fbd | vt
 dev/fb/fb_if.m			standard
 dev/fb/splash.c			optional sc splash
-dev/fdt/fdt_clock.c		optional fdt
-dev/fdt/fdt_clock_if.m		optional fdt
+dev/fdt/fdt_clock.c		optional fdt fdt_clock
+dev/fdt/fdt_clock_if.m		optional fdt fdt_clock
 dev/fdt/fdt_common.c		optional fdt
+dev/fdt/fdt_pinctrl.c		optional fdt fdt_pinctrl
+dev/fdt/fdt_pinctrl_if.m	optional fdt fdt_pinctrl
 dev/fdt/fdt_slicer.c		optional fdt cfi | fdt nand
 dev/fdt/fdt_static_dtb.S	optional fdt fdt_dtb_static \
 	dependency	"$S/boot/fdt/dts/${MACHINE}/${FDT_DTS_FILE}"
@@ -2188,6 +2190,7 @@ dev/smbus/smbconf.c		optional smbus
 dev/smbus/smbus.c		optional smbus
 dev/smbus/smbus_if.m		optional smbus
 dev/smc/if_smc.c		optional smc
+dev/smc/if_smc_fdt.c		optional smc fdt
 dev/sn/if_sn.c			optional sn
 dev/sn/if_sn_isa.c		optional sn isa
 dev/sn/if_sn_pccard.c		optional sn pccard
@@ -2967,9 +2970,10 @@ kern/kern_mtxpool.c		standard
 kern/kern_mutex.c		standard
 kern/kern_ntptime.c		standard
 kern/kern_osd.c			standard
-kern/kern_pax.c			optional pax_aslr | pax_hardening
+kern/kern_pax.c			optional pax_aslr | pax_segvguard | pax_hardening
 kern/kern_pax_aslr.c		optional pax_aslr
-kern/kern_pax_log.c		optional pax_aslr | pax_hardening
+kern/kern_pax_log.c		optional pax_aslr | pax_segvguard | pax_hardening
+kern/kern_pax_segvguard.c	optional pax_segvguard
 kern/kern_ptrace_hardening.c	optional ptrace_hardening | ptrace_hardening_grp
 kern/kern_physio.c		standard
 kern/kern_pmc.c			standard

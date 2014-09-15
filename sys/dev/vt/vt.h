@@ -87,12 +87,6 @@ static int vt_##_name = _default;					\
 SYSCTL_INT(_kern_vt, OID_AUTO, _name, CTLFLAG_RWTUN, &vt_##_name, _default,\
 		_descr);
 
-/* Allow to disable some special keys by users. */
-#define	VT_DEBUG_KEY_ENABLED	(1 << 0)
-#define	VT_REBOOT_KEY_ENABLED	(1 << 1)
-#define	VT_HALT_KEY_ENABLED	(1 << 2)
-#define	VT_POWEROFF_KEY_ENABLED	(1 << 3)
-
 struct vt_driver;
 
 void vt_allocate(struct vt_driver *, void *);
@@ -119,11 +113,17 @@ typedef unsigned int 	vt_axis_t;
 struct vt_mouse_cursor;
 #endif
 
+struct vt_pastebuf {
+	term_char_t		*vpb_buf;	/* Copy-paste buffer. */
+	unsigned int		 vpb_bufsz;	/* Buffer size. */
+	unsigned int		 vpb_len;	/* Length of a last selection. */
+};
+
 struct vt_device {
 	struct vt_window	*vd_windows[VT_MAXWINDOWS]; /* (c) Windows. */
 	struct vt_window	*vd_curwindow;	/* (d) Current window. */
 	struct vt_window	*vd_savedwindow;/* (?) Saved for suspend. */
-	struct vt_window	*vd_markedwin;	/* (?) Copy/paste buf owner. */
+	struct vt_pastebuf	 vd_pastebuf;	/* (?) Copy/paste buf. */
 	const struct vt_driver	*vd_driver;	/* (c) Graphics driver. */
 	void			*vd_softc;	/* (u) Driver data. */
 #ifndef SC_NO_CUTPASTE
@@ -156,6 +156,10 @@ struct vt_device {
 	unsigned int		 vd_kbstate;	/* (?) Device unit. */
 	unsigned int		 vd_unit;	/* (c) Device unit. */
 };
+
+#define	VD_PASTEBUF(vd)	((vd)->vd_pastebuf.vpb_buf)
+#define	VD_PASTEBUFSZ(vd)	((vd)->vd_pastebuf.vpb_bufsz)
+#define	VD_PASTEBUFLEN(vd)	((vd)->vd_pastebuf.vpb_len)
 
 /*
  * Per-window terminal screen buffer.
