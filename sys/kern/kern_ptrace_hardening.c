@@ -290,9 +290,8 @@ sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 	switch (val) {
 	case 0:
 	case 1:
-		if ((pr == NULL) || (pr == &prison0)) {
+		if ((pr == NULL) || (pr == &prison0))
 			ptrace_request_flags_all = val;
-		}
 
 		if (pr != NULL) {
 			prison_lock(pr);
@@ -301,7 +300,7 @@ sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 		}
 
 		SLIST_FOREACH(oid, oidlist, oid_link) {
-			buflen = 22 + strlen(oid->oid_name);
+			buflen = 23 + strlen(oid->oid_name);
 			char buf[buflen + 1];
 			snprintf(buf, buflen, "hardening.ptrace.flag.%s",
 				oid->oid_name);	
