@@ -227,7 +227,7 @@ sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS)
 			prison_lock(pr);
 			pr->pr_ptrace_hardening_status = val;
 			prison_unlock(pr);
-		}ptrace_request_flags_all = val;
+		}
 		break;
 	default:
 		return (EINVAL);
