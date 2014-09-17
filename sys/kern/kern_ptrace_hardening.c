@@ -273,10 +273,13 @@ int
 sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 {
 	struct prison *pr = NULL;
-	size_t i = 0;
+	struct sysctl_oid_list *oidlist;
+	struct sysctl_oid *oid;
+	size_t buflen;
 	int err, val;
 
 	pr = ptrace_get_prison(req->td->td_proc);
+	oidlist = &sysctl___hardening_ptrace_flag.oid_children;
 
 	val = (pr != NULL) ? pr->pr_ptrace_request_flags_all :
 	    ptrace_request_flags_all;
@@ -287,20 +290,24 @@ sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 	switch (val) {
 	case 0:
 	case 1:
-		if ((pr == NULL) || (pr == &prison0)) {
+		if ((pr == NULL) || (pr == &prison0))
 			ptrace_request_flags_all = val;
-			for (; i <= PT_FIRSTMACH; i++)
-				ptrace_request_flags[i] =
-					ptrace_request_flags_all;
-		}
 
 		if (pr != NULL) {
 			prison_lock(pr);
 			pr->pr_ptrace_request_flags_all = val;
-			for (; i <= PT_FIRSTMACH; i++)
-				pr->pr_ptrace_request_flags[i] =
-					ptrace_request_flags_all;
 			prison_unlock(pr);
+		}
+
+		SLIST_FOREACH(oid, oidlist, oid_link) {
+			buflen = 23 + strlen(oid->oid_name);
+			char buf[buflen + 1];
+			snprintf(buf, buflen, "hardening.ptrace.flag.%s",
+				oid->oid_name);	
+			buf[buflen] = '\0';
+
+			kernel_sysctlbyname(req->td, buf, NULL, 
+				0, &val, sizeof(val), NULL, 0);
 		}
 		break;
 	default:
