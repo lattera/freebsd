@@ -83,6 +83,7 @@ void	kmod_icmpstat_inc(int statnum);
 #define	ICMPCTL_MASKREPL	1	/* allow replies to netmask requests */
 #define	ICMPCTL_STATS		2	/* statistics (read-only) */
 #define ICMPCTL_ICMPLIM		3
+#define ICMPCTL_TSTAMPREL	4
 
 #ifdef _KERNEL
 SYSCTL_DECL(_net_inet_icmp);
