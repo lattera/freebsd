@@ -149,6 +149,11 @@ SYSCTL_VNET_INT(_net_inet_icmp, OID_AUTO, bmcastecho, CTLFLAG_RW,
 	&VNET_NAME(icmpbmcastecho), 0,
 	"");
 
+static VNET_DEFINE(int, icmptstamprepl) = 1;
+#define V_icmptstamprepl		VNET(icmptstamprepl)
+SYSCTL_VNET_INT(_net_inet_icmp, OID_AUTO, tstamprepl, CTLFLAG_RW,
+	&VNET_NAME(icmptstamprepl), 0,
+	"Respond to ICMP Timestamp requests");
 
 #ifdef ICMPPRINTFS
 int	icmpprintfs = 0;
@@ -545,6 +550,9 @@ icmp_input(struct mbuf **mp, int *offp, int proto)
 			goto reflect;
 
 	case ICMP_TSTAMP:
+		if (V_icmptstamprepl == 0)
+			break;
+
 		if (!V_icmpbmcastecho
 		    && (m->m_flags & (M_MCAST | M_BCAST)) != 0) {
 			ICMPSTAT_INC(icps_bmcasttstamp);
