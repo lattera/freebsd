@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/imgact.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/malloc.h>
 #include <sys/stat.h>
 #include <sys/ptrace.h>
 #include <sys/proc.h>
@@ -57,6 +58,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/stdarg.h>
 
 #include <security/mac_bsdextended/mac_bsdextended.h>
+
+static MALLOC_DEFINE(HARDENING_PTRACE, "ptrace hardening",
+	"Ptrace Hardening allocations");
 
 static char ptrace_request_flags[PT_FIRSTMACH + 1] = { 0 };
 static int ptrace_request_flags_all = 0;
@@ -275,11 +279,12 @@ sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 	struct prison *pr = NULL;
 	struct sysctl_oid_list *oidlist;
 	struct sysctl_oid *oid;
-	size_t buflen;
+	size_t buflen, sysctlpreflen;
 	int err, val;
 
 	pr = ptrace_get_prison(req->td->td_proc);
 	oidlist = &sysctl___hardening_ptrace_flag.oid_children;
+	sysctlpreflen = sizeof("hardening.ptrace.flag.");
 
 	val = (pr != NULL) ? pr->pr_ptrace_request_flags_all :
 	    ptrace_request_flags_all;
@@ -300,14 +305,16 @@ sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 		}
 
 		SLIST_FOREACH(oid, oidlist, oid_link) {
-			buflen = 23 + strlen(oid->oid_name);
-			char buf[buflen + 1];
+			buflen = sysctlpreflen + strlen(oid->oid_name);
+			char *buf = malloc(sizeof(char) * (buflen + 1), 
+				HARDENING_PTRACE, M_WAITOK);
 			snprintf(buf, buflen, "hardening.ptrace.flag.%s",
 				oid->oid_name);	
 			buf[buflen] = '\0';
 
 			kernel_sysctlbyname(req->td, buf, NULL, 
 				0, &val, sizeof(val), NULL, 0);
+			free(buf, HARDENING_PTRACE);
 		}
 		break;
 	default:
