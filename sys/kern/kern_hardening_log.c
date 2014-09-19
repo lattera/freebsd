@@ -35,7 +35,7 @@
 #include <sys/types.h>
 #include <sys/kernel.h>
 #include <sys/pax.h>
-#include <sys/proc.h>
+#include <sys/ptrace_hardening.h>
 #include <sys/sbuf.h>
 #include <sys/jail.h>
 #include <machine/stdarg.h>
@@ -183,3 +183,4 @@ sysctl_hardening_log_ulog(SYSCTL_HANDLER_ARGS)
 #endif
 
 __HARDENING_LOG_TEMPLATE(PAX, ASLR, pax, aslr)
+__HARDENING_LOG_TEMPLATE(PTRACE, HARDENING, ptrace, hardening)
