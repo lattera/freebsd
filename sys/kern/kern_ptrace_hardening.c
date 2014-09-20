@@ -392,7 +392,7 @@ ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag)
 
 fail:
 	ptrace_log_hardening(td->td_proc, __func__, "forbidden ptrace call attempt "
-	    "from %ld:%ld, pid %ld", uid, gid, pid);
+	    "from %ld:%ld, pid %ld\n", uid, gid, pid);
 
 	return (EPERM);
 }
@@ -419,6 +419,12 @@ ptrace_hardening_mode(struct image_params *imgp, uint32_t mode)
 static void
 ptrace_hardening_sysinit(void)
 {
+	if (ptrace_hardening_status < 0 || ptrace_hardening_status > 1)
+		ptrace_hardening_status = PTRACE_HARDENING_ENABLED;
+
+	if (ptrace_hardening_flag_status < 0 || ptrace_hardening_flag_status > 1)
+		ptrace_hardening_flag_status = PTRACE_HARDENING_REQFLAG_ENABLED;
+
 	printf("[PTRACE HARDENING] status : %s\n",
 	    ptrace_hardening_status ? "enabled" : "disabled");
 	printf("[PTRACE HARDENING] flags : %s\n",
@@ -428,6 +434,7 @@ ptrace_hardening_sysinit(void)
 	    ptrace_hardening_allowed_gid);
 #endif
 }
+SYSINIT(ptrace, SI_SUB_PTRACE_HARDENING, SI_ORDER_FIRST, ptrace_hardening_sysinit, NULL);
 
 struct prison *
 ptrace_get_prison(struct proc *p)
@@ -437,4 +444,3 @@ ptrace_get_prison(struct proc *p)
 
 	return (p->p_ucred->cr_prison);
 }
-SYSINIT(ptrace, SI_SUB_PTRACE_HARDENING, SI_ORDER_FIRST, ptrace_hardening_sysinit, NULL);
