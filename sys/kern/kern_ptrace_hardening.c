@@ -444,3 +444,28 @@ ptrace_get_prison(struct proc *p)
 
 	return (p->p_ucred->cr_prison);
 }
+
+void
+ptrace_hardening_init_prison(struct prison *pr)
+{
+	if (pr == NULL)
+		return;
+
+	if (pr->pr_ptrace_hardening_set)
+		return;
+
+	mtx_lock(&(pr->pr_mtx));
+
+	pr->pr_ptrace_hardening_status = ptrace_hardening_status;
+
+#ifdef PTRACE_HARDENING_GRP
+	pr->pr_ptrace_hardening_allowed_gid = ptrace_hardening_allowed_gid;
+#endif
+
+	pr->pr_ptrace_request_flag_status = ptrace_request_flag_status;
+	pr->pr_ptrace_request_flags_all = ptrace_request_flags_all;
+	memcpy(pr->pr_ptrace_request_flags, ptrace_request_flags,
+		sizeof(pr->pr_ptrace_request_flags));
+
+	mtx_unlock(&(pr->pr_mtx));
+}
