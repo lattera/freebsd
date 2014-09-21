@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_pax.h"
+#include "opt_ptrace_hardening.h"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -44,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/osd.h>
 #include <sys/pax.h>
+#include <sys/ptrace_hardening.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/taskqueue.h>
@@ -121,6 +123,11 @@ MTX_SYSINIT(prison0, &prison0.pr_mtx, "jail mutex", MTX_DEF);
 
 #if defined(PAX_ASLR) || defined(PAX_HARDENING)
 SYSINIT(pax, SI_SUB_PAX, SI_ORDER_MIDDLE, pax_init_prison, (void *) &prison0);
+#endif
+
+#ifdef PTRACE_HARDENING
+SYSINIT(ptrace, SI_SUB_PTRACE_HARDENING, SI_ORDER_MIDDLE,
+	ptrace_hardening_init_prison, (void *) &prison0);
 #endif
 
 /* allprison, allprison_racct and lastprid are protected by allprison_lock. */
@@ -1315,6 +1322,10 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 
 #if defined(PAX_ASLR) || defined(PAX_HARDENING)
 		pax_init_prison(pr);
+#endif
+
+#ifdef PTRACE_HARDENING_PRISON
+		ptrace_hardening_init_prison(pr);
 #endif
 
 		mtx_lock(&pr->pr_mtx);

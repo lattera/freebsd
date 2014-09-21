@@ -53,11 +53,13 @@ extern gid_t ptrace_hardening_allowed_gid;
 
 int ptrace_hardening(struct thread *, struct proc *, int);
 void ptrace_hardening_mode(struct image_params *, uint32_t);
+void ptrace_hardening_init_prison(struct prison *);
 
 extern int hardening_log_log;
 extern int hardening_log_ulog;
 
-void ptrace_log_hardening(struct proc *, const char *func, const char *fmt, ...);
+void ptrace_log_hardening(struct proc *, const char *func,
+	const char *fmt, ...);
 void ptrace_ulog_hardening(const char *func, const char *fmt, ...);
 #endif /* _KERNEL */
 

@@ -2995,4 +2995,9 @@ options         IMAGACT_BINMISC
 
 # Address Space Layout Randomization (ASLR)
 options		PAX_ASLR
+options		PAX_HARDENING
 options		PAX_SYSCTLS
+# Ptrace Restriction calls
+options		PTRACE_HARDENING
+options		PTRACE_HARDENING_GRP
+options		PTRACE_HARDENING_SYSCTLS
