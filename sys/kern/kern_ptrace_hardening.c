@@ -59,11 +59,39 @@ __FBSDID("$FreeBSD$");
 
 #include <security/mac_bsdextended/mac_bsdextended.h>
 
+FEATURE(ptrace_hardening, "Ptrace call restrictions.");
+
 static MALLOC_DEFINE(HARDENING_PTRACE, "ptrace hardening",
 	"Ptrace Hardening allocations");
 
+int ptrace_hardening_status = PTRACE_HARDENING_ENABLED;
+int ptrace_hardening_flag_status = PTRACE_HARDENING_REQFLAG_ENABLED;
+
+#ifdef PTRACE_HARDENING_GRP
+gid_t ptrace_hardening_allowed_gid = 0;
+#endif
+
 static char ptrace_request_flags[PT_FIRSTMACH + 1] = { 0 };
 static int ptrace_request_flags_all = 0;
+
+
+static void ptrace_hardening_sysinit(void);
+static struct prison *ptrace_get_prison(struct proc *);
+
+TUNABLE_INT("hardening.ptrace.status", &ptrace_hardening_status);
+TUNABLE_INT("hardening.ptrace.flag_status", &ptrace_hardening_flag_status);
+
+#ifdef PTRACE_HARDENING_GRP
+TUNABLE_INT("hardening.ptrace.allowed_gid", &ptrace_hardening_allowed_gid);
+#endif
+
+static int sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS);
+static int sysctl_ptrace_hardening_flag(SYSCTL_HANDLER_ARGS);
+static int sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS);
+
+#ifdef PTRACE_HARDENING_GRP
+static int sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS);
+#endif
 
 #define PTRACE_REQUEST_FLAG(PTFLAG, name)				\
 TUNABLE_STR("hardening.ptrace.flag."#name, 				\
@@ -108,33 +136,6 @@ sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS)		\
 									\
 	return (0);							\
 }
-
-static void ptrace_hardening_sysinit(void);
-static struct prison *ptrace_get_prison(struct proc *);
-
-int ptrace_hardening_status = PTRACE_HARDENING_ENABLED;
-int ptrace_hardening_flag_status = PTRACE_HARDENING_REQFLAG_ENABLED;
-
-#ifdef PTRACE_HARDENING_GRP
-gid_t ptrace_hardening_allowed_gid = 0;
-#endif
-
-FEATURE(ptrace_hardening, "Ptrace call restrictions.");
-
-TUNABLE_INT("hardening.ptrace.status", &ptrace_hardening_status);
-TUNABLE_INT("hardening.ptrace.flag_status", &ptrace_hardening_flag_status);
-
-#ifdef PTRACE_HARDENING_GRP
-TUNABLE_INT("hardening.ptrace.allowed_gid", &ptrace_hardening_allowed_gid);
-#endif
-
-static int sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS);
-static int sysctl_ptrace_hardening_flag(SYSCTL_HANDLER_ARGS);
-static int sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS);
-
-#ifdef PTRACE_HARDENING_GRP
-static int sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS);
-#endif
 
 SYSCTL_NODE(_hardening, OID_AUTO, ptrace, CTLFLAG_RD, 0,
     "PTrace settings.");
