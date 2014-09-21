@@ -73,9 +73,11 @@ gid_t ptrace_hardening_allowed_gid = 0;
 
 static char ptrace_request_flags[PT_FIRSTMACH + 1] = { 0 };
 static int ptrace_request_flags_all = 0;
+static struct mtx ptrace_request_flags_mtx;
 
 
 static void ptrace_hardening_sysinit(void);
+static void ptrace_hardening_sysuninit(void);
 static struct prison *ptrace_get_prison(struct proc *);
 
 TUNABLE_INT("hardening.ptrace.status", &ptrace_hardening_status);
@@ -85,58 +87,68 @@ TUNABLE_INT("hardening.ptrace.flag_status", &ptrace_hardening_flag_status);
 TUNABLE_INT("hardening.ptrace.allowed_gid", &ptrace_hardening_allowed_gid);
 #endif
 
+#ifdef PTRACE_HARDENING_SYSCTLS
 static int sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS);
 static int sysctl_ptrace_hardening_flag(SYSCTL_HANDLER_ARGS);
 static int sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS);
 
 #ifdef PTRACE_HARDENING_GRP
 static int sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS);
-#endif
+#endif	/* PTRACE_HARDENING_GTP */
+#endif	/* PTRACE_HARDENING_SYSCTLS */
+
+#ifdef PTRACE_HARDENING_SYSCTLS
+#define PTRACE_REQUEST_FLAG_SYSCTL(PTFLAG, name)						\
+static int sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS);	\
+																		\
+SYSCTL_PROC(_hardening_ptrace_flag, OID_AUTO, name,						\
+    CTLTYPE_INT|CTLFLAG_RWTUN|CTLFLAG_PRISON|CTLFLAG_SECURE,			\
+    NULL, 0, sysctl_ptrace_hardening_##name##_flag, "I",				\
+    "Request "#name" flag");											\
+																		\
+int																		\
+sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS)				\
+{																		\
+	struct prison *pr = NULL;											\
+	int err, val;                   									\
+																		\
+	pr = ptrace_get_prison(req->td->td_proc);							\
+																		\
+	val = (pr != NULL) ? pr->pr_ptrace_request_flags[PTFLAG] :			\
+	    ptrace_request_flags[PTFLAG];									\
+	err = sysctl_handle_int(oidp, &val, sizeof(int), req);				\
+	if (err || (req->newptr == NULL))									\
+		return (err);													\
+																		\
+	switch (val) {														\
+	case 0:																\
+	case 1:																\
+		if ((pr == NULL) || (pr == &prison0))							\
+			ptrace_request_flags[PTFLAG] = val;							\
+																		\
+		if (pr != NULL) {												\
+			prison_lock(pr);											\
+			pr->pr_ptrace_request_flags[PTFLAG] = val;					\
+			prison_unlock(pr);											\
+		}																\
+		break;															\
+	default:															\
+		return (EINVAL);												\
+	}																	\
+																		\
+	return (0);															\
+}
+#else
+#define PTRACE_REQUEST_FLAG_SYSCTL(PTFLAG, name)
+#endif	/* PTRACE_HARDENING_SYSCTLS */
 
 #define PTRACE_REQUEST_FLAG(PTFLAG, name)				\
 TUNABLE_STR("hardening.ptrace.flag."#name, 				\
     &ptrace_request_flags[PTFLAG], 1);					\
-									\
-static int sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS);	\
-									\
-SYSCTL_PROC(_hardening_ptrace_flag, OID_AUTO, name,			\
-    CTLTYPE_INT|CTLFLAG_RWTUN|CTLFLAG_PRISON|CTLFLAG_SECURE,		\
-    NULL, 0, sysctl_ptrace_hardening_##name##_flag, "I",		\
-    "Request "#name" flag");						\
-									\
-int									\
-sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS)		\
-{									\
-	struct prison *pr = NULL;					\
-	int err, val;                   				\
-									\
-	pr = ptrace_get_prison(req->td->td_proc);			\
-									\
-	val = (pr != NULL) ? pr->pr_ptrace_request_flags[PTFLAG] :	\
-	    ptrace_request_flags[PTFLAG];				\
-	err = sysctl_handle_int(oidp, &val, sizeof(int), req);		\
-	if (err || (req->newptr == NULL))				\
-		return (err);						\
-									\
-	switch (val) {							\
-	case 0:								\
-	case 1:								\
-		if ((pr == NULL) || (pr == &prison0))			\
-			ptrace_request_flags[PTFLAG] = val;		\
-									\
-		if (pr != NULL) {					\
-			prison_lock(pr);				\
-			pr->pr_ptrace_request_flags[PTFLAG] = val;	\
-			prison_unlock(pr);				\
-		}							\
-		break;							\
-	default:							\
-		return (EINVAL);					\
-	}								\
-									\
-	return (0);							\
-}
+														\
+PTRACE_REQUEST_FLAG_SYSCTL(PTFLAG, name)
 
+#ifdef PTRACE_HARDENING_SYSCTLS
 SYSCTL_NODE(_hardening, OID_AUTO, ptrace, CTLFLAG_RD, 0,
     "PTrace settings.");
 
@@ -165,7 +177,8 @@ SYSCTL_PROC(_hardening_ptrace, OID_AUTO, allowed_gid,
     CTLTYPE_ULONG|CTLFLAG_RWTUN|CTLFLAG_PRISON|CTLFLAG_SECURE,
     NULL, 0, sysctl_ptrace_hardening_gid, "LU",
     "Allowed gid");
-#endif
+#endif	/* PTRACE_HARDENING_GRP */
+#endif	/* PTRACE_HARDENING_SYSCTLS */
 
 PTRACE_REQUEST_FLAG(PT_TRACE_ME, trace_me)
 PTRACE_REQUEST_FLAG(PT_READ_I, read_i)
@@ -199,6 +212,7 @@ PTRACE_REQUEST_FLAG(PT_VM_TIMESTAMP, vm_timestamp)
 PTRACE_REQUEST_FLAG(PT_VM_ENTRY, vm_entry)
 PTRACE_REQUEST_FLAG(PT_FIRSTMACH, firstmach)
 
+#ifdef PTRACE_HARDENING_SYSCTLS
 int
 sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS)
 {
@@ -296,6 +310,8 @@ sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 			prison_unlock(pr);
 		}
 
+		mtx_lock(&ptrace_request_flags_mtx);
+
 		SLIST_FOREACH(oid, oidlist, oid_link) {
 			buflen = sysctlpreflen + strlen(oid->oid_name);
 			char *buf = malloc(sizeof(char) * (buflen + 1), 
@@ -308,6 +324,8 @@ sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 				0, &val, sizeof(val), NULL, 0);
 			free(buf, HARDENING_PTRACE);
 		}
+
+		mtx_unlock(&ptrace_request_flags_mtx);
 		break;
 	default:
 		return (EINVAL);
@@ -346,7 +364,8 @@ sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS)
 
 	return (0);
 }
-#endif
+#endif	/* PTRACE_HARDENING_GRP */
+#endif	/* PTRACE_HARDENING_SYSCTLS */
 
 int
 ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag)
@@ -387,7 +406,7 @@ ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag)
 #else
 	if (uid != 0)
 		goto fail;
-#endif
+#endif	/* PTRACE_HARDENING_GRP */
 
 	return (0);
 
@@ -420,22 +439,42 @@ ptrace_hardening_mode(struct image_params *imgp, uint32_t mode)
 static void
 ptrace_hardening_sysinit(void)
 {
+	int mtx_flag;
+
 	if (ptrace_hardening_status < 0 || ptrace_hardening_status > 1)
 		ptrace_hardening_status = PTRACE_HARDENING_ENABLED;
 
 	if (ptrace_hardening_flag_status < 0 || ptrace_hardening_flag_status > 1)
 		ptrace_hardening_flag_status = PTRACE_HARDENING_REQFLAG_ENABLED;
 
+	mtx_flag = MTX_DEF;
+
+#ifndef PTRACE_HARDENING_DEBUG
+	mtx_flag |= MTX_NOWITNESS;
+#endif
+
 	printf("[PTRACE HARDENING] status : %s\n",
 	    ptrace_hardening_status ? "enabled" : "disabled");
 	printf("[PTRACE HARDENING] flags : %s\n",
 	    ptrace_hardening_flag_status ? "enabled" : "disabled");
+
 #ifdef PTRACE_HARDENING_GRP
 	printf("[PTRACE HARDENING] allowed gid : %d\n",
 	    ptrace_hardening_allowed_gid);
 #endif
+
+	mtx_init(&ptrace_request_flags_mtx, "Ptrace request flags mutex",
+		NULL, mtx_flag);
 }
 SYSINIT(ptrace, SI_SUB_PTRACE_HARDENING, SI_ORDER_FIRST, ptrace_hardening_sysinit, NULL);
+
+static void
+ptrace_hardening_sysuninit(void)
+{
+	mtx_destroy(&ptrace_request_flags_mtx);
+}
+SYSUNINIT(ptrace, SI_SUB_PTRACE_HARDENING, SI_ORDER_FIRST,
+	ptrace_hardening_sysuninit, NULL);
 
 struct prison *
 ptrace_get_prison(struct proc *p)
@@ -463,7 +502,7 @@ ptrace_hardening_init_prison(struct prison *pr)
 	pr->pr_ptrace_hardening_allowed_gid = ptrace_hardening_allowed_gid;
 #endif
 
-	pr->pr_ptrace_request_flag_status = ptrace_request_flag_status;
+	pr->pr_ptrace_hardening_flag_status = ptrace_hardening_flag_status;
 	pr->pr_ptrace_request_flags_all = ptrace_request_flags_all;
 	memcpy(pr->pr_ptrace_request_flags, ptrace_request_flags,
 		sizeof(pr->pr_ptrace_request_flags));

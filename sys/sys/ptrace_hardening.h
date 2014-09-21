@@ -58,7 +58,8 @@ void ptrace_hardening_init_prison(struct prison *);
 extern int hardening_log_log;
 extern int hardening_log_ulog;
 
-void ptrace_log_hardening(struct proc *, const char *func, const char *fmt, ...);
+void ptrace_log_hardening(struct proc *, const char *func,
+	const char *fmt, ...);
 void ptrace_ulog_hardening(const char *func, const char *fmt, ...);
 #endif /* _KERNEL */
 
