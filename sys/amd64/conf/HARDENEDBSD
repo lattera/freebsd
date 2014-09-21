@@ -75,6 +75,7 @@ options 	INCLUDE_CONFIG_FILE	# Include this file in kernel
 # HardenedBSD hardening options
 options 	PAX_ASLR		# Address Space Layout Randomization
 options 	PAX_HARDENING		# Various hardening options
+options 	PAX_SEGVGUARD		# SegvGuard to track/block failing process
 options 	PAX_SYSCTLS		# sysctls for run-time options
 options 	PTRACE_HARDENING	# Ptrace calls restrictions
 options 	PTRACE_HARDENING_GRP	# Ptrace allowance per gid
