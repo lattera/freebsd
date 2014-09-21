@@ -142,10 +142,10 @@ sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS)				\
 #define PTRACE_REQUEST_FLAG_SYSCTL(PTFLAG, name)
 #endif	/* PTRACE_HARDENING_SYSCTLS */
 
-#define PTRACE_REQUEST_FLAG(PTFLAG, name)				\
-TUNABLE_STR("hardening.ptrace.flag."#name, 				\
-    &ptrace_request_flags[PTFLAG], 1);					\
-														\
+#define PTRACE_REQUEST_FLAG(PTFLAG, name)								\
+TUNABLE_STR("hardening.ptrace.flag."#name, 								\
+    &ptrace_request_flags[PTFLAG], 1);									\
+																		\
 PTRACE_REQUEST_FLAG_SYSCTL(PTFLAG, name)
 
 #ifdef PTRACE_HARDENING_SYSCTLS
