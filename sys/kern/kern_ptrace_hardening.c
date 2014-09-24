@@ -397,10 +397,10 @@ ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag)
 		goto fail;
 
 #ifdef PTRACE_HARDENING_GRP
-	if (uid && pr == NULL && (ptrace_hardening_allowed_gid &&
+	if (uid != 0 && pr == NULL && (ptrace_hardening_allowed_gid &&
 	    gid != ptrace_hardening_allowed_gid))
 		goto fail;
-	if (uid && pr != NULL && (pr->pr_ptrace_hardening_allowed_gid &&
+	if (uid != 0 && pr != NULL && (pr->pr_ptrace_hardening_allowed_gid &&
 	    gid != pr->pr_ptrace_hardening_allowed_gid))
 		goto fail;
 #else
@@ -440,12 +440,17 @@ static void
 ptrace_hardening_sysinit(void)
 {
 	int mtx_flag;
+	size_t i;
 
 	if (ptrace_hardening_status < 0 || ptrace_hardening_status > 1)
 		ptrace_hardening_status = PTRACE_HARDENING_ENABLED;
 
 	if (ptrace_hardening_flag_status < 0 || ptrace_hardening_flag_status > 1)
 		ptrace_hardening_flag_status = PTRACE_HARDENING_REQFLAG_ENABLED;
+
+	for (i = 0; i < sizeof(ptrace_request_flags); i++)
+		if (ptrace_request_flags[i] < 0 || ptrace_request_flags[i] > 1)
+			ptrace_request_flags[i] = 0;
 
 	mtx_flag = MTX_DEF;
 
@@ -494,7 +499,7 @@ ptrace_hardening_init_prison(struct prison *pr)
 	if (pr->pr_ptrace_hardening_set)
 		return;
 
-	mtx_lock(&(pr->pr_mtx));
+	prison_lock(pr);
 
 	pr->pr_ptrace_hardening_status = ptrace_hardening_status;
 
@@ -507,5 +512,7 @@ ptrace_hardening_init_prison(struct prison *pr)
 	memcpy(pr->pr_ptrace_request_flags, ptrace_request_flags,
 		sizeof(pr->pr_ptrace_request_flags));
 
-	mtx_unlock(&(pr->pr_mtx));
+	pr->pr_ptrace_hardening_set = 1;
+
+	prison_unlock(pr);
 }
