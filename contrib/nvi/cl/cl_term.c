@@ -454,12 +454,12 @@ noterm:	if (row == 0)
 	 */
 	if ((p = getenv("LINES")) != NULL) {
 		row = strtol(p, &rowptr, 10);
-		if (errno == ERANGE || *rowptr != '\0')
+		if (errno != 0 || *rowptr != '\0')
 			row = 24;
 	}
 	if ((p = getenv("COLUMNS")) != NULL) {
 		col = strtol(p, &colptr, 10);
-		if (errno == ERANGE || *colptr != '\0')
+		if (errno != 0 || *colptr != '\0')
 			col = 80;
 	}
 	if (rowp != NULL)
