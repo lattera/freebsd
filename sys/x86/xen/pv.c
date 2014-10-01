@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2004 Christian Limpach.
  * Copyright (c) 2004-2006,2008 Kip Macy
+ * Copyright (c) 2008 The NetBSD Foundation, Inc.
  * Copyright (c) 2013 Roger Pau Monné <roger.pau@citrix.com>
  * All rights reserved.
  *
@@ -59,11 +60,13 @@ __FBSDID("$FreeBSD$");
 #include <x86/init.h>
 #include <machine/pc/bios.h>
 #include <machine/smp.h>
+#include <machine/intr_machdep.h>
 
 #include <xen/xen-os.h>
 #include <xen/hypervisor.h>
 #include <xen/xenstore/xenstorevar.h>
 #include <xen/xen_pv.h>
+#include <xen/xen_msi.h>
 
 #include <xen/interface/vcpu.h>
 
@@ -116,6 +119,7 @@ struct init_ops xen_init_ops = {
 #ifdef SMP
 	.start_all_aps			= xen_pv_start_all_aps,
 #endif
+	.msi_init =			xen_msi_init,
 };
 
 static struct bios_smap xen_smap[MAX_E820_ENTRIES];

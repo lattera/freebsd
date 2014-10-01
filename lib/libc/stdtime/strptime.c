@@ -72,7 +72,7 @@ static char * _strptime(const char *, const char *, struct tm *, int *, locale_t
  * Calculate the week day of the first day of a year. Valid for
  * the Gregorian calendar, which began Sept 14, 1752 in the UK
  * and its colonies. Ref:
- * http://en.wikipedia.org/wiki/Calculating_the_day_of_the_week/
+ * http://en.wikipedia.org/wiki/Determination_of_the_day_of_the_week
  */
 
 static int
@@ -89,6 +89,7 @@ _strptime(const char *buf, const char *fmt, struct tm *tm, int *GMTp,
 	char	c;
 	const char *ptr;
 	int	day_offset = -1, wday_offset;
+	int week_offset;
 	int	i, len;
 	int flags;
 	int Ealternative, Oalternative;
@@ -132,6 +133,7 @@ label:
 			buf = _strptime(buf, tptr->date_fmt, tm, GMTp, locale);
 			if (buf == NULL)
 				return (NULL);
+			flags |= FLAG_WDAY | FLAG_MONTH | FLAG_MDAY | FLAG_YEAR;
 			break;
 
 		case 'C':
@@ -158,12 +160,14 @@ label:
 			buf = _strptime(buf, tptr->c_fmt, tm, GMTp, locale);
 			if (buf == NULL)
 				return (NULL);
+			flags |= FLAG_WDAY | FLAG_MONTH | FLAG_MDAY | FLAG_YEAR;
 			break;
 
 		case 'D':
 			buf = _strptime(buf, "%m/%d/%y", tm, GMTp, locale);
 			if (buf == NULL)
 				return (NULL);
+			flags |= FLAG_MONTH | FLAG_MDAY | FLAG_YEAR;
 			break;
 
 		case 'E':
@@ -182,6 +186,7 @@ label:
 			buf = _strptime(buf, "%Y-%m-%d", tm, GMTp, locale);
 			if (buf == NULL)
 				return (NULL);
+			flags |= FLAG_MONTH | FLAG_MDAY | FLAG_YEAR;
 			break;
 
 		case 'R':
@@ -212,6 +217,7 @@ label:
 			buf = _strptime(buf, tptr->x_fmt, tm, GMTp, locale);
 			if (buf == NULL)
 				return (NULL);
+			flags |= FLAG_MONTH | FLAG_MDAY | FLAG_YEAR;
 			break;
 
 		case 'j':
@@ -336,33 +342,9 @@ label:
 			if (i == asizeof(tptr->weekday))
 				return (NULL);
 
-			tm->tm_wday = i;
-			if (day_offset >= 0 && (i - day_offset) != 0) {
-				tm->tm_yday += i - day_offset;
-				i = 0;
-				while (tm->tm_yday >=
-					start_of_month[isleap(tm->tm_year +
-							TM_YEAR_BASE)][i])
-					i++;
-				if (i > 12)
-				{
-					i = 1;
-					tm->tm_yday -=
-						start_of_month[isleap(tm->tm_year +
-								TM_YEAR_BASE)]
-						[12];
-					tm->tm_year++;
-				}
-				tm->tm_mon = i - 1;
-				tm->tm_mday = tm->tm_yday -
-					start_of_month[isleap(tm->tm_year +
-							TM_YEAR_BASE)]
-					[i - 1] + 1;
-			}
 			buf += len;
-			flags |= FLAG_YEAR | FLAG_MONTH | FLAG_YDAY |
-				 FLAG_MDAY | FLAG_WDAY;
-
+			tm->tm_wday = i;
+			flags |= FLAG_WDAY;
 			break;
 
 		case 'U':
@@ -372,8 +354,6 @@ label:
 			 * information present in the tm structure at this
 			 * point to calculate a real value, so just check the
 			 * range for now.
-			 * We expect that the year has already been
-			 * parsed.
 			 */
 			if (!isdigit_l((unsigned char)*buf, locale))
 				return (NULL);
@@ -388,44 +368,13 @@ label:
 			if (i > 53)
 				return (NULL);
 
-			/* Week numbers are l-origin. So that we can always
-			 * return the date of a Sunday (or Monday), treat week
-			 * 0 as week 1.
-			 */
-
-			if (i == 0)
-				i = 1;
-
 			if (c == 'U')
 				day_offset = TM_SUNDAY;
 			else
 				day_offset = TM_MONDAY;
 
-			/* Set the date to the first Sunday (or Monday)
-			 * of the specified week of the year.
-			 */
 
-			tm->tm_yday = (7 - first_wday_of(tm->tm_year +
-				TM_YEAR_BASE) + day_offset) % 7 + (i - 1) * 7;
-			i = 0;
-			while (tm->tm_yday >=
-				start_of_month[isleap(tm->tm_year + TM_YEAR_BASE)][i])
-				i++;
-			if (i > 12)
-			{
-				i = 1;
-				tm->tm_yday -=
-					start_of_month[isleap(tm->tm_year +
-							TM_YEAR_BASE)][12];
-				tm->tm_year++;
-			}
-			tm->tm_mon = i - 1;
-			tm->tm_mday = tm->tm_yday -
-				start_of_month[isleap(tm->tm_year + TM_YEAR_BASE)]
-				[i - 1] + 1;
-			tm->tm_wday = day_offset;
-			flags |= FLAG_YEAR | FLAG_MONTH | FLAG_YDAY |
-				 FLAG_MDAY | FLAG_WDAY;
+			week_offset = i;
 
 			break;
 
@@ -438,7 +387,7 @@ label:
 				return (NULL);
 
 			tm->tm_wday = i;
-			flags != FLAG_WDAY;
+			flags |= FLAG_WDAY;
 
 			break;
 
@@ -650,18 +599,60 @@ label:
 		}
 	}
 
-	if (flags & (FLAG_YEAR | FLAG_MONTH)) {
-		if (!tm->tm_yday && (flags & FLAG_MDAY))
-			tm->tm_yday = start_of_month[isleap(tm->tm_year
-				+ TM_YEAR_BASE)][tm->tm_mon] + (tm->tm_mday - 1);
-		if (!tm->tm_wday) {
+	if (!(flags & FLAG_YDAY) && (flags & FLAG_YEAR)) {
+		if ((flags & (FLAG_MONTH | FLAG_MDAY)) ==
+		    (FLAG_MONTH | FLAG_MDAY)) {
+			tm->tm_yday = start_of_month[isleap(tm->tm_year +
+			    TM_YEAR_BASE)][tm->tm_mon] + (tm->tm_mday - 1);
+			flags |= FLAG_YDAY;
+		} else if (day_offset != -1) {
+			/* Set the date to the first Sunday (or Monday)
+			 * of the specified week of the year.
+			 */
+			if (!(flags & FLAG_WDAY)) {
+				tm->tm_wday = day_offset;
+				flags |= FLAG_WDAY;
+			}
+			tm->tm_yday = (7 -
+			    first_wday_of(tm->tm_year + TM_YEAR_BASE) +
+			    day_offset) % 7 + (week_offset - 1) * 7 +
+			    tm->tm_wday - day_offset;
+			flags |= FLAG_YDAY;
+		}
+	}
+
+	if ((flags & (FLAG_YEAR | FLAG_YDAY)) == (FLAG_YEAR | FLAG_YDAY)) {
+		if (!(flags & FLAG_MONTH)) {
+			i = 0;
+			while (tm->tm_yday >=
+			    start_of_month[isleap(tm->tm_year +
+			    TM_YEAR_BASE)][i])
+				i++;
+			if (i > 12) {
+				i = 1;
+				tm->tm_yday -=
+				    start_of_month[isleap(tm->tm_year +
+				    TM_YEAR_BASE)][12];
+				tm->tm_year++;
+			}
+			tm->tm_mon = i - 1;
+			flags |= FLAG_MONTH;
+		}
+		if (!(flags & FLAG_MDAY)) {
+			tm->tm_mday = tm->tm_yday -
+			    start_of_month[isleap(tm->tm_year + TM_YEAR_BASE)]
+			    [tm->tm_mon] + 1;
+			flags |= FLAG_MDAY;
+		}
+		if (!(flags & FLAG_WDAY)) {
 			i = 0;
 			wday_offset = first_wday_of(tm->tm_year);
-			while (i++ <= tm->tm_yday)
+			while (i++ <= tm->tm_yday) {
 				if (wday_offset++ >= 6)
 					wday_offset = 0;
-
+			}
 			tm->tm_wday = wday_offset;
+			flags |= FLAG_WDAY;
 		}
 	}
 
@@ -685,6 +676,7 @@ strptime_l(const char * __restrict buf, const char * __restrict fmt,
 
 	return (ret);
 }
+
 char *
 strptime(const char * __restrict buf, const char * __restrict fmt,
     struct tm * __restrict tm)
