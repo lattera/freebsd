@@ -551,10 +551,6 @@ icmp_input(struct mbuf **mp, int *offp, int proto)
 	case ICMP_TSTAMP:
 		if (V_icmptstamprepl == 0)
 			break;
-<<<<<<< HEAD
-
-=======
->>>>>>> hardened/current/master
 		if (!V_icmpbmcastecho
 		    && (m->m_flags & (M_MCAST | M_BCAST)) != 0) {
 			ICMPSTAT_INC(icps_bmcasttstamp);
