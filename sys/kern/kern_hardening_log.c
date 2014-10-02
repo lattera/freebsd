@@ -205,5 +205,4 @@ sysctl_hardening_log_ulog(SYSCTL_HANDLER_ARGS)
 
 __HARDENING_LOG_TEMPLATE(PAX, ASLR, pax, aslr)
 __HARDENING_LOG_TEMPLATE(PAX, SEGVGUARD, pax, segvguard)
-
 __HARDENING_LOG_TEMPLATE(PTRACE, HARDENING, ptrace, hardening)
