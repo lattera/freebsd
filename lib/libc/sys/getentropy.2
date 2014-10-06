@@ -1,0 +1,63 @@
+.\"	$OpenBSD: getentropy.2,v 1.6 2014/07/18 18:20:17 deraadt Exp $
+.\"
+.\" Copyright (c) 2014 Theo de Raadt
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate: July 18 2014 $
+.Dt GETENTROPY 2
+.Os
+.Sh NAME
+.Nm getentropy
+.Nd get entropy
+.Sh SYNOPSIS
+.Fd #include <unistd.h>
+.Ft int
+.Fn getentropy "void *buf" "size_t buflen"
+.Sh DESCRIPTION
+.Nm
+fills a buffer with high-quality entropy, which can be used
+as input for process-context pseudorandom generators like
+.Xr arc4random 3 .
+.Pp
+The maximum buffer size permitted is 256 bytes.
+Even if
+.Va buflen
+exceeds this.
+.Pp
+.Nm
+is not intended for regular code; please use the
+.Xr arc4random 3
+family of functions instead.
+.Sh RETURN VALUES
+Upon successful completion, a value of 0 is returned.
+Otherwise, a value of \-1 is returned and
+.Va errno
+is set to indicate the error.
+.Sh ERRORS
+.Fn getentropy
+will succeed unless:
+.Bl -tag -width Er
+.It Bq Er EFAULT
+The
+.Fa buf
+parameter points to an
+invalid address.
+.El
+.Sh SEE ALSO
+.Xr arc4random 3
+.Sh HISTORY
+The
+.Nm
+function appeared in
+.Ox 5.6 .
