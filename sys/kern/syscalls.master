@@ -980,5 +980,6 @@
 543	AUE_NULL	NOSTD	{ int aio_mlock(struct aiocb *aiocbp); }
 544	AUE_NULL	STD	{ int procctl(idtype_t idtype, id_t id, \
 				    int com, void *data); }
+545	AUE_NULL	STD	{ int getentropy(void *ptr, size_t len); }
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/compat/freebsd32/syscalls.master
