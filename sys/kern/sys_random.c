@@ -54,7 +54,7 @@ sys_getentropy(struct thread *td, struct getentropy_args *uap)
 	if ((error = copyout(buf, uap->ptr, len)) != 0)	
 		return (error);
 
-	memset(buf, 0, sizeof(buf));
+	explicit_bzero(buf, sizeof(buf));
 
 	return (0);
 }
