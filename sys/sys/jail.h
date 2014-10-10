@@ -202,7 +202,6 @@ struct prison {
 	int              pr_pax_segvguard_maxcrashes;   /* (p) Maximum number of crashes before suspending application */
 	int		 pr_pax_map32_enabled;		/* (p) MAP_32BIT enabled (amd64 only) */
 	int		 pr_pax_proc_harden;		/* (p) Harden procfs */
-	void		*pr_secfw_mac;			/* (p) secfw metadata */
 	int		 pr_ptrace_hardening_set;		/* (p) Ptrace flags set */
 	int		 pr_ptrace_hardening_status;	/* (p) Ptrace hardening enabled */
 	int		 pr_ptrace_hardening_flag_status;	/* (p) Ptrace hardening flag enabled */
