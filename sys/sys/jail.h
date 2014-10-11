@@ -208,6 +208,7 @@ struct prison {
 	char		 pr_ptrace_request_flags[65];	/* (p) Ptrace requests types */
 	gid_t		 pr_ptrace_hardening_allowed_gid;	/* (p) Ptrace hardening per gid */
 	int		 pr_pax_procfs_harden;		/* (p) Harden procfs */
+	int		 pr_pax_mprotect_exec;		/* (p) Disallow setting exec bit on non-exec mappings */
 };
 
 struct prison_racct {
