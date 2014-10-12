@@ -234,6 +234,11 @@ pax_init_prison(struct prison *pr)
 	pr->pr_hardening.hr_pax_mprotect_exec = pax_mprotect_exec_global;
 #endif
 
+#ifdef PAX_HARDENING
+	pr->pr_hardening.hr_pax_procfs_harden = pax_procfs_harden_global;
+	pr->pr_hardening.hr_pax_mprotect_exec = pax_mprotect_exec_global;
+#endif
+
 	pr->pr_pax_set = 1;
 
 	prison_unlock(pr);
