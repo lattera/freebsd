@@ -41,8 +41,14 @@ PROG=	dhclient
 SCRIPTS=dhclient-script
 MAN=	dhclient.8 dhclient.conf.5 dhclient.leases.5 dhcp-options.5 \
 	dhclient-script.8
+
+.if ${MK_PIE} !="no"
+DPADD=	${LIBUTIL_PIC}
+LDADD=	-lutil_pic
+.else
 DPADD=	${LIBUTIL}
 LDADD=	-lutil
+.endif
 
 WARNS?=	2
 
@@ -50,4 +56,4 @@ WARNS?=	2
 SUBDIR+=    tests
 .endif
 
-.include <bsd.prog.mk>
+.include <bsd.prog.pie.mk>

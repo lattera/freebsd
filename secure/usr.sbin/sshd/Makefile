@@ -25,9 +25,15 @@ SRCS+=	gss-genr.c
 MAN=	sshd.8 sshd_config.5
 CFLAGS+=-I${SSHDIR} -include ssh_namespace.h
 
+.if ${MK_PIE} != "no"
+DPADD=	${LIBSSH_PIC} ${LIBUTIL_PIC} ${LIBWRAP_PIC} ${LIBPAM_PIC}
+LDADD=	${LDSSH} -lutil_pic -lwrap_pic ${MINUSLPAM_PIC}
+USEPRIVATELIB= ssh_pic
+.else
 DPADD=	${LIBSSH} ${LIBUTIL} ${LIBWRAP} ${LIBPAM}
 LDADD=	${LDSSH} -lutil -lwrap ${MINUSLPAM}
 USEPRIVATELIB= ssh
+.endif
 
 .if ${MK_LDNS} != "no"
 CFLAGS+=	-DHAVE_LDNS=1
@@ -42,6 +48,22 @@ DPADD+=  ${LIBBSM}
 LDADD+=  -lbsm
 .endif
 
+.if ${MK_PIE} != "no"
+.if ${MK_KERBEROS_SUPPORT} != "no"
+CFLAGS+= -include krb5_config.h
+DPADD+=	 ${LIBGSSAPI_KRB5_PIC} ${LIBGSSAPI_PIC} ${LIBKRB5_PIC} ${LIBHX509_PIC} ${LIBASN1_PIC} \
+	${LIBCOM_ERR_PIC} ${LIBROKEN_PIC} ${LIBWIND_PIC} ${LIBHEIMBASE_PIC} ${LIBHEIMIPCC_PIC}
+LDADD+=	 -lgssapi_krb5_pic -lgssapi_pic -lkrb5_pic -lhx509_pic -lasn1_pic \
+	-lcom_err_pic -lroken_pic -lwind_pic -lheimbase_pic ${LDHEIMIPCC}
+.endif
+
+.if ${MK_OPENSSH_NONE_CIPHER} != "no"
+CFLAGS+= -DNONE_CIPHER_ENABLED
+.endif
+
+DPADD+= ${LIBCRYPT_PIC} ${LIBCRYPTO_PIC} ${LIBZ_PIC}
+LDADD+= -lcrypt_pic -lcrypto_pic -lz_pic
+.else
 .if ${MK_KERBEROS_SUPPORT} != "no"
 CFLAGS+= -include krb5_config.h
 DPADD+=	 ${LIBGSSAPI_KRB5} ${LIBGSSAPI} ${LIBKRB5} ${LIBHX509} ${LIBASN1} \
@@ -54,9 +76,8 @@ LDADD+=	 -lgssapi_krb5 -lgssapi -lkrb5 -lhx509 -lasn1 \
 CFLAGS+= -DNONE_CIPHER_ENABLED
 .endif
 
-DPADD+= ${LIBCRYPT} ${LIBCRYPTO} ${LIBZ}
-LDADD+= -lcrypt -lcrypto -lz
-
+DPADD+= ${LIBCRYPT_PIC} ${LIBCRYPTO_PIC} ${LIBZ_PIC}
+.endif
 # Fix the order of NEEDED entries for libthr and libc. The libthr
 # needs to interpose libc symbols, leaving the libthr loading as
 # dependency of krb causes reversed order and broken interposing. Put
@@ -71,7 +92,7 @@ LDADD+= -lpthread
 CFLAGS+= -DXAUTH_PATH=\"${LOCALBASE}/bin/xauth\"
 .endif
 
-.include <bsd.prog.mk>
+.include <bsd.prog.pie.mk>
 
 .PATH:	${SSHDIR}
 

@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	gssapi_ntlm
 LDFLAGS= -Wl,-Bsymbolic -Wl,--no-undefined
 LDADD=	-lcrypto -lgssapi -lkrb5 -lhx509 -lheimntlm -lroken

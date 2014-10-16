@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	asn1
 LDFLAGS=	-Wl,--no-undefined
 INCS=	asn1_err.h asn1-common.h heim_asn1.h der.h der-protos.h der-private.h

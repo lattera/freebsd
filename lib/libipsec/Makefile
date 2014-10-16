@@ -31,6 +31,7 @@ SHLIBDIR?= /lib
 
 .include <src.opts.mk>
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	ipsec
 SHLIB_MAJOR= 4
 CFLAGS+=-I. -I${.CURDIR}

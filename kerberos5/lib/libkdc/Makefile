@@ -1,5 +1,6 @@
 #$FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	kdc
 LDFLAGS=	-Wl,--no-undefined
 VERSION_MAP= ${KRB5DIR}/kdc/version-script.map

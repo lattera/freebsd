@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	vers
 INTERNALLIB=
 SRCS=	print_version.c roken.h

@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=		gssapi
 SHLIB_MAJOR=	10
 VERSION_DEF=	${.CURDIR}/../libc/Versions.def
