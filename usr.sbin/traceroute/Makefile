@@ -3,6 +3,8 @@
 TRACEROUTE_DISTDIR?= ${.CURDIR}/../../contrib/traceroute
 .PATH: ${TRACEROUTE_DISTDIR}
 
+.include <src.opts.mk>
+
 PROG=	traceroute
 MAN=	traceroute.8
 SRCS=	as.c version.c traceroute.c ifaddrlist.c findsaddr-udp.c
@@ -25,8 +27,13 @@ CFLAGS+= -DIPSEC
 # CFLAGS+= -DSANE_PRECISION
 
 .if !defined(TRACEROUTE_NO_IPSEC)
+.if ${MK_PIE} != "no"
+DPADD=	${LIBIPSEC_PIC}
+LDADD=	-lipsec_pic
+.else
 DPADD=	${LIBIPSEC}
 LDADD=	-lipsec
+.endif
 .endif
 
 CFLAGS+= -I${TRACEROUTE_DISTDIR}
@@ -39,4 +46,4 @@ version.c: ${TRACEROUTE_DISTDIR}/VERSION
 	    sed -e 's/.*/char version[] = "&";/' \
 	    > ${.TARGET}
 
-.include <bsd.prog.mk>
+.include <bsd.prog.pie.mk>

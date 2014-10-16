@@ -13,6 +13,8 @@
 #	DEBUG			use local directory to find ddate and dumpdates
 #	TDEBUG			trace out the process forking
 
+.include <src.opts.mk>
+
 PROG=	dump
 LINKS=	${BINDIR}/dump ${BINDIR}/rdump
 CFLAGS+=-DRDUMP
@@ -21,4 +23,4 @@ MAN=	dump.8
 MLINKS=	dump.8 rdump.8
 WARNS?=	2
 
-.include <bsd.prog.mk>
+.include <bsd.prog.pie.mk>

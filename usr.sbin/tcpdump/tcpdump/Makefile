@@ -1,9 +1,9 @@
 # $FreeBSD$
 
-.include <src.opts.mk>
-
 TCPDUMP_DISTDIR?= ${.CURDIR}/../../../contrib/tcpdump
 .PATH: ${TCPDUMP_DISTDIR}
+
+.include <src.opts.mk>
 
 PROG=	tcpdump
 
@@ -160,6 +160,21 @@ CFLAGS+=	-DINET6
 CFLAGS+=	-DLBL_ALIGN
 .endif
 
+.if ${MK_PIE} != "no"
+DPADD=	${LIBL_PIC} ${LIBPCAP_PIC}
+LDADD=	-ll_pic -lpcap_pic
+.if ${MK_CASPER} != "no"
+DPADD+=	${LIBCAPSICUM_PIC} ${LIBNV_PIC}
+LDADD+=	-lcapsicum_pic -lnv_pic
+CFLAGS+=-DHAVE_LIBCAPSICUM
+.endif
+.if ${MK_OPENSSL} != "no"
+DPADD+= ${LIBCRYPTO_PIC}
+LDADD+= -lcrypto_pic
+CFLAGS+= -I${DESTDIR}/usr/include/openssl
+CFLAGS+= -DHAVE_LIBCRYPTO -DHAVE_OPENSSL_EVP_H
+.endif
+.else
 DPADD=	${LIBL} ${LIBPCAP}
 LDADD=	-ll -lpcap
 .if ${MK_CASPER} != "no"
@@ -171,7 +186,7 @@ CFLAGS+=-DHAVE_LIBCAPSICUM
 DPADD+= ${LIBCRYPTO}
 LDADD+= -lcrypto
 CFLAGS+= -I${DESTDIR}/usr/include/openssl
-CFLAGS+= -DHAVE_LIBCRYPTO -DHAVE_OPENSSL_EVP_H
+.endif
 .endif
 
 .if ${MK_PF} != "no"
@@ -185,4 +200,4 @@ version.c: ${TCPDUMP_DISTDIR}/VERSION
 	    sed 's/.*/char version[] = "&";/' ${TCPDUMP_DISTDIR}/VERSION \
 		> version.c
 
-.include <bsd.prog.mk>
+.include <bsd.prog.pie.mk>

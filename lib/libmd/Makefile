@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	md
 SHLIB_MAJOR= 6
 SHLIBDIR?= /lib

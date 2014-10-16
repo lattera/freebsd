@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	gssapi_spnego
 LDFLAGS= -Wl,-Bsymbolic -Wl,--no-undefined
 LDADD=	-lgssapi -lheimbase -lasn1 -lroken

@@ -1,6 +1,7 @@
 # Makefile for libpcap
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 SHLIBDIR?= /lib
 
 .include <src.opts.mk>

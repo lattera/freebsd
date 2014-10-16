@@ -6,6 +6,7 @@ SHLIBDIR?=	/lib
 
 .include <src.opts.mk>
 
+INSTALL_PIC_ARCHIVE=yes
 SHLIB_MAJOR=	5
 LIB=		crypt
 

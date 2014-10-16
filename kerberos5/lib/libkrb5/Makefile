@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	krb5
 LDFLAGS=	-Wl,--no-undefined
 VERSION_MAP= ${KRB5DIR}/lib/krb5/version-script.map

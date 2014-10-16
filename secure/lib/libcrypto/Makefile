@@ -5,6 +5,7 @@ SUBDIR=		engines
 
 .include <bsd.own.mk>
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=		crypto
 SHLIB_MAJOR=	7
 ALLOW_SHARED_TEXTREL=

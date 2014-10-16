@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	capsicum
 
 SHLIB_MAJOR=	0

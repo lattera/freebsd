@@ -47,6 +47,7 @@ CTFFLAGS+= -g
 STRIP?=	-s
 .endif
 
+
 .if defined(NO_SHARED) && (${NO_SHARED} != "no" && ${NO_SHARED} != "NO")
 LDFLAGS+= -static
 .endif
