@@ -6,6 +6,7 @@ PROG=	casperd
 
 SRCS=	casperd.c zygote.c
 
+WANTS_PIE=yes
 .if ${MK_PIE} != "no"
 DPADD=	${LIBCASPER_PIC} ${LIBCAPSICUM_PIC} ${LIBNV_PIC} ${LIBPJDLOG_PIC} ${LIBUTIL_PIC}
 LDADD=	-lcasper_pic -lcapsicum_pic -lnv_pic -lpjdlog_pic -lutil_pic
@@ -22,4 +23,4 @@ CFLAGS+=-I${.CURDIR}/../../lib/libcasper
 CFLAGS+=-I${.CURDIR}/../../lib/libnv
 CFLAGS+=-I${.CURDIR}/../../lib/libpjdlog
 
-.include <bsd.prog.pie.mk>
+.include <bsd.prog.mk>

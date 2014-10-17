@@ -6,10 +6,11 @@
 PROG=	rcp
 SRCS=	rcp.c util.c
 CFLAGS+=-DBINDIR=${BINDIR}
+WANTS_PIE=yes
 
 
 BINOWN=	root
 BINMODE=4555
 PRECIOUSPROG=
 
-.include <bsd.prog.pie.mk>
+.include <bsd.prog.mk>

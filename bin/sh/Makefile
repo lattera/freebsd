@@ -18,6 +18,7 @@ SRCS= ${SHSRCS} ${GENSRCS} ${GENHDRS}
 # utilities of the same name are handled with the associated manpage,
 # builtin.1 in share/man/man1/.
 
+WANTS_PIE=yes
 .if ${MK_PIE} != "no"
 DPADD= ${LIBEDIT_PIC} ${LIBTERMCAPW_PIC}
 LDADD= -ledit_pic -ltermcapw_pic
@@ -70,4 +71,4 @@ token.h: mktokens
 SUBDIR+=    tests
 .endif
 
-.include <bsd.prog.pie.mk>
+.include <bsd.prog.mk>

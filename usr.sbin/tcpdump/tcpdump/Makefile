@@ -160,6 +160,7 @@ CFLAGS+=	-DINET6
 CFLAGS+=	-DLBL_ALIGN
 .endif
 
+WANTS_PIE=yes
 .if ${MK_PIE} != "no"
 DPADD=	${LIBL_PIC} ${LIBPCAP_PIC}
 LDADD=	-ll_pic -lpcap_pic
@@ -200,4 +201,4 @@ version.c: ${TCPDUMP_DISTDIR}/VERSION
 	    sed 's/.*/char version[] = "&";/' ${TCPDUMP_DISTDIR}/VERSION \
 		> version.c
 
-.include <bsd.prog.pie.mk>
+.include <bsd.prog.mk>
