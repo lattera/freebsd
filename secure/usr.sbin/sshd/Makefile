@@ -48,6 +48,7 @@ DPADD+=  ${LIBBSM}
 LDADD+=  -lbsm
 .endif
 
+WANTS_PIE=yes
 .if ${MK_PIE} != "no"
 .if ${MK_KERBEROS_SUPPORT} != "no"
 CFLAGS+= -include krb5_config.h
@@ -92,7 +93,7 @@ LDADD+= -lpthread
 CFLAGS+= -DXAUTH_PATH=\"${LOCALBASE}/bin/xauth\"
 .endif
 
-.include <bsd.prog.pie.mk>
+.include <bsd.prog.mk>
 
 .PATH:	${SSHDIR}
 

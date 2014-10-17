@@ -6,4 +6,6 @@
 PROG=	chroot
 MAN=	chroot.8
 
-.include <bsd.prog.pie.mk>
+WANTS_PIE=yes
+
+.include <bsd.prog.mk>

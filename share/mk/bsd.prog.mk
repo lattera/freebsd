@@ -56,6 +56,23 @@ LDFLAGS+= -static
 LDFLAGS+= -L${_SHLIBDIRPREFIX}${LIBPRIVATEDIR} -rpath ${LIBPRIVATEDIR}
 .endif
 
+.if ${MACHINE_CPUARCH} == "sparc64"
+PIEFLAG=-fPIE
+.else
+PIEFLAG=-fpie
+.endif
+
+.if ${MK_PIE} != "no"
+.if defined(WANTS_PIE) && ${WANTS_PIE} != "no" && ${WANTS_PIE} != "NO" 
+.if !defined(PROG_CXX)
+CFLAGS+=${PIEFLAG}
+.else
+CXXFLAGS+=${PIEFLAG}
+.endif
+LDFLAGS+=-pie
+.endif
+.endif
+
 .if ${MK_DEBUG_FILES} != "no"
 PROG_FULL=${PROG}.full
 # Use ${DEBUGDIR} for base system debug files, else .debug subdirectory

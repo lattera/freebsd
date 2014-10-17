@@ -29,6 +29,7 @@ CFLAGS+= -I${.CURDIR} -I${TRACEROUTE_DISTDIR} -I.
 
 WARNS?=	3
 
+WANTS_PIE=yes
 .if ${MK_PIE} != "no"
 DPADD=	${LIBIPSEC_PIC}
 LDADD=	-lipsec_pic
@@ -37,4 +38,4 @@ DPADD=	${LIBIPSEC}
 LDADD=	-lipsec
 .endif
 
-.include <bsd.prog.pie.mk>
+.include <bsd.prog.mk>

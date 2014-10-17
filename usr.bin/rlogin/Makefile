@@ -8,5 +8,6 @@ PROG=	rlogin
 BINOWN=	root
 BINMODE=4555
 PRECIOUSPROG=
+WANTS_PIE=yes
 
-.include <bsd.prog.pie.mk>
+.include <bsd.prog.mk>

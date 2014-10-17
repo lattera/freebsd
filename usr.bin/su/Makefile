@@ -7,6 +7,7 @@ PROG=	su
 
 WARNS?=	5
 
+WANTS_PIE=yes
 .if ${MK_PIE} != "no"
 DPADD=	${LIBUTIL_PIC} ${LIBPAM_PIC}
 LDADD=	-lutil_pic ${MINUSLPAM_PIC}
@@ -30,4 +31,4 @@ BINOWN=	root
 BINMODE=4555
 PRECIOUSPROG=
 
-.include <bsd.prog.pie.mk>
+.include <bsd.prog.mk>
