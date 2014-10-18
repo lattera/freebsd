@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=		sbuf
 SHLIBDIR?= 	/lib
 SRCS=		subr_sbuf.c 

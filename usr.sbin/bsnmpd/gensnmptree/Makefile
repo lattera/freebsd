@@ -2,6 +2,8 @@
 #
 # Author: Harti Brandt <harti@freebsd.org>
 
+.include <src.opts.mk>
+
 CONTRIB=${.CURDIR}/../../../contrib/bsnmp
 .PATH: ${CONTRIB}/gensnmptree
 
@@ -9,6 +11,8 @@ PROG=	gensnmptree
 CFLAGS+= -I${CONTRIB}/lib
 CFLAGS+= -DQUADFMT='"llu"' -DQUADXFMT='"llx"' -DHAVE_STDINT_H
 CFLAGS+= -DHAVE_INTTYPES_H
+
+WANTS_PIE=yes
 
 WARNS?=	5
 
