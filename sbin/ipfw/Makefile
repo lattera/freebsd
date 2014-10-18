@@ -11,8 +11,16 @@ SRCS+=	altq.c
 CFLAGS+=-DPF
 .endif
 
+WANTS_PIE=yes
+
+.if ${MK_PIE} != "no"
+DPADD=	${LIBUTIL_PIC}
+LDADD=	-lutil_pic
+.else
 DPADD=	${LIBUTIL}
 LDADD=	-lutil
+.endif
+
 MAN=	ipfw.8
 
 .include <bsd.prog.mk>

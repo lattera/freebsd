@@ -11,3 +11,4 @@ LIBBSNMPTOOLSDIR=      ${.OBJDIR}/../libbsnmptools
 LIBBSNMPTOOLSDIR=      ${.CURDIR}/../libbsnmptools
 .endif
 LIBBSNMPTOOLS=         ${LIBBSNMPTOOLSDIR}/libbsnmptools.a
+LIBBSNMPTOOLS_PIC=         ${LIBBSNMPTOOLSDIR}/libbsnmptools_pic.a
