@@ -12,8 +12,6 @@ CFLAGS+= -I${CONTRIB}/lib
 CFLAGS+= -DQUADFMT='"llu"' -DQUADXFMT='"llx"' -DHAVE_STDINT_H
 CFLAGS+= -DHAVE_INTTYPES_H
 
-WANTS_PIE=yes
-
 WARNS?=	5
 
 .include <bsd.prog.mk>
