@@ -7,7 +7,6 @@
 CONTRIB= ${.CURDIR}/../../../contrib/bsnmp/lib
 .PATH: ${CONTRIB}
 
-INSTALL_PIC_ARCHIVE=yes
 LIB=	bsnmp
 SHLIB_MAJOR=	6
 
