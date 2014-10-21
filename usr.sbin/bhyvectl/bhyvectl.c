@@ -314,12 +314,6 @@ dump_vm_run_exitcode(struct vm_exit *vmexit, int vcpu)
 		printf("\tinst_type\t\t%d\n", vmexit->u.vmx.inst_type);
 		printf("\tinst_error\t\t%d\n", vmexit->u.vmx.inst_error);
 		break;
-	case VM_EXITCODE_SVM:
-		printf("\treason\t\tSVM\n");
-		printf("\texit_reason\t\t%#lx\n", vmexit->u.svm.exitcode);
-		printf("\texitinfo1\t\t%#lx\n", vmexit->u.svm.exitinfo1);
-		printf("\texitinfo2\t\t%#lx\n", vmexit->u.svm.exitinfo2);
-		break;
 	default:
 		printf("*** unknown vm run exitcode %d\n", vmexit->exitcode);
 		break;
