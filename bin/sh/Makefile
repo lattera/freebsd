@@ -18,8 +18,14 @@ SRCS= ${SHSRCS} ${GENSRCS} ${GENHDRS}
 # utilities of the same name are handled with the associated manpage,
 # builtin.1 in share/man/man1/.
 
+WANTS_PIE=yes
+.if ${MK_PIE} != "no"
+DPADD= ${LIBEDIT_PIC} ${LIBTERMCAPW_PIC}
+LDADD= -ledit_pic -ltermcapw_pic
+.else
 DPADD= ${LIBEDIT} ${LIBTERMCAPW}
 LDADD= -ledit -ltermcapw
+.endif
 
 CFLAGS+=-DSHELL -I. -I${.CURDIR}
 # for debug:

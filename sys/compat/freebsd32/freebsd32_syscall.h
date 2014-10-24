@@ -452,4 +452,5 @@
 #define	FREEBSD32_SYS_freebsd32_aio_mlock	543
 #define	FREEBSD32_SYS_freebsd32_procctl	544
 #define	FREEBSD32_SYS_freebsd32_procctl	544
-#define	FREEBSD32_SYS_MAXSYSCALL	545
+#define	FREEBSD32_SYS_getentropy	545
+#define	FREEBSD32_SYS_MAXSYSCALL	546

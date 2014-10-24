@@ -3,6 +3,8 @@
 TRACEROUTE_DISTDIR?= ${.CURDIR}/../../contrib/traceroute
 .PATH: ${TRACEROUTE_DISTDIR}
 
+.include <src.opts.mk>
+
 PROG=	traceroute
 MAN=	traceroute.8
 SRCS=	as.c version.c traceroute.c ifaddrlist.c findsaddr-udp.c
@@ -24,9 +26,15 @@ CFLAGS+= -DIPSEC
 # reporting, ie: print a variable precision from 0.001ms through 1000ms
 # CFLAGS+= -DSANE_PRECISION
 
+WANTS_PIE=yes
 .if !defined(TRACEROUTE_NO_IPSEC)
+.if ${MK_PIE} != "no"
+DPADD=	${LIBIPSEC_PIC}
+LDADD=	-lipsec_pic
+.else
 DPADD=	${LIBIPSEC}
 LDADD=	-lipsec
+.endif
 .endif
 
 CFLAGS+= -I${TRACEROUTE_DISTDIR}

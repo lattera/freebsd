@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	heimntlm
 LDFLAGS=	-Wl,--no-undefined
 LDADD=	-lcrypto -lcom_err -lkrb5 -lroken

@@ -579,4 +579,5 @@ struct sysent sysent[] = {
 	{ AS(pipe2_args), (sy_call_t *)sys_pipe2, AUE_PIPE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 542 = pipe2 */
 	{ AS(aio_mlock_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 543 = aio_mlock */
 	{ AS(procctl_args), (sy_call_t *)sys_procctl, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 544 = procctl */
+	{ AS(getentropy_args), (sy_call_t *)sys_getentropy, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 545 = getentropy */
 };

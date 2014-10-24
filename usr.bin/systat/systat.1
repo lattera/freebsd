@@ -88,6 +88,7 @@ The
 flag expects
 .Ar display
 to be one of:
+.Ic altqs ,
 .Ic icmp ,
 .Ic icmp6 ,
 .Ic ifstat ,
@@ -500,6 +501,18 @@ then only the requested information will be displayed.
 Reset the port, host, and protocol matching mechanisms to the default
 (any protocol, port, or host).
 .El
+.It Ic altqs
+Display packet filter altq statistics. The ALTQ operates in
+conjunction with the packet filter (pf) on the interface's
+transmit path. Packet rate, data rate in bytes per interval,
+drop rate, and queue length is displayed in three separate
+sections in a convenient INTERFACE-by-ALTQLABEL matrix.
+.Pp
+To save space drops
+and queue length are combined in the third section.
+if packet drops are presemt, drops
+will be displayed, otherwise the packet queue length with a 'Q' suffix
+will be displayed.
 .It Ic ifstat
 Display the network traffic going through active interfaces on the
 system.

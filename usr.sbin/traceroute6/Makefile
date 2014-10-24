@@ -16,6 +16,8 @@
 TRACEROUTE_DISTDIR?= ${.CURDIR}/../../contrib/traceroute
 .PATH: ${TRACEROUTE_DISTDIR}
 
+.include <src.opts.mk>
+
 PROG=	traceroute6
 MAN=	traceroute6.8
 SRCS=	as.c traceroute6.c
@@ -27,7 +29,13 @@ CFLAGS+= -I${.CURDIR} -I${TRACEROUTE_DISTDIR} -I.
 
 WARNS?=	3
 
+WANTS_PIE=yes
+.if ${MK_PIE} != "no"
+DPADD=	${LIBIPSEC_PIC}
+LDADD=	-lipsec_pic
+.else
 DPADD=	${LIBIPSEC}
 LDADD=	-lipsec
+.endif
 
 .include <bsd.prog.mk>

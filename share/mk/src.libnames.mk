@@ -28,18 +28,22 @@ LIBEVENT?=	${LIBEVENTDIR}/libevent.a
 LIBHEIMIPCCDIR=	${ROOTOBJDIR}/kerberos5/lib/libheimipcc
 LDHEIMIPCC?=	${LIBHEIMIPCCDIR}/libheimipcc.so
 LIBHEIMIPCC?=	${LIBHEIMIPCCDIR}/libheimipcc.a
+LIBHEIMIPCC_PIC?=	${LIBHEIMIPCCDIR}/libheimipcc_pic.a
 
 LIBHEIMIPCSDIR=	${ROOTOBJDIR}/kerberos5/lib/libheimipcs
 LDHEIMIPCS?=	${LIBHEIMIPCSDIR}/libheimipcs.so
 LIBHEIMIPCS?=	${LIBHEIMIPCSDIR}/libheimipcs.a
+LIBHEIMIPCS_PIC?=	${LIBHEIMIPCSDIR}/libheimipcs_pic.a
 
 LIBLDNSDIR=	${ROOTOBJDIR}/lib/libldns
 LDLDNS?=	${LIBLDNSDIR}/libldns.so
 LIBLDNS?=	${LIBLDNSDIR}/libldns.a
+LIBLDNS_PIC?=	${LIBLDNSDIR}/libldns_pic.a
 
 LIBSSHDIR=	${ROOTOBJDIR}/secure/lib/libssh
 LDSSH?=		${LIBSSHDIR}/libssh.so
 LIBSSH?=	${LIBSSHDIR}/libssh.a
+LIBSSH_PIC?=	${LIBSSHDIR}/libssh_pic.a
 
 LIBUNBOUNDDIR=	${ROOTOBJDIR}/lib/libunbound
 LDUNBOUND?=	${LIBUNBOUNDDIR}/libunbound.so

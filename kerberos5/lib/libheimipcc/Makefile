@@ -1,5 +1,6 @@
 #$FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	heimipcc
 PRIVATELIB=
 LDADD=	-lheimbase -lroken -lpthread

@@ -3,13 +3,21 @@
 #
 # optional flags are: MEASURE TESTING DEBUG
 
+.include <src.opts.mk>
+
 PROG=	timed
 MAN=	timed.8
 SRCS=	acksend.c candidate.c correct.c master.c networkdelta.c readmsg.c \
 	slave.c timed.c byteorder.c measure.c cksum.c
 
+WANTS_PIE=yes
+.if ${MK_PIE} != "no"
+DPADD=	${LIBUTIL_PIC}
+LDADD=	-lutil_pic
+.else
 DPADD=	${LIBUTIL}
 LDADD=	-lutil
+.endif
 
 WARNS?=	1
 

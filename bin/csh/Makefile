@@ -40,8 +40,14 @@ MLINKS= csh.1 tcsh.1
 # utilities of the same name are handled with the associated manpage,
 # builtin.1 in share/man/man1/.
 
+WANTS_PIE=yes
+.if ${MK_PIE} != "no"
+DPADD=	${LIBTERMCAPW_PIC} ${LIBCRYPT_PIC}
+LDADD=	-ltermcapw_pic -lcrypt_pic
+.else
 DPADD=	${LIBTERMCAPW} ${LIBCRYPT}
 LDADD=	-ltermcapw -lcrypt
+.endif
 
 LINKS=	${BINDIR}/csh ${BINDIR}/tcsh
 

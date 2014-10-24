@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	hdb
 LDFLAGS=	-Wl,--no-undefined
 VERSION_MAP=	${KRB5DIR}/lib/hdb/version-script.map

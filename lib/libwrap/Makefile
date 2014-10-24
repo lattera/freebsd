@@ -4,6 +4,7 @@
 
 .include <src.opts.mk>
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	wrap
 SHLIB_MAJOR= 6
 INCS=	tcpd.h

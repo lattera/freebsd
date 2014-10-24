@@ -615,4 +615,5 @@ struct sysent freebsd32_sysent[] = {
 #else
 	{ AS(freebsd32_procctl_args), (sy_call_t *)freebsd32_procctl, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 544 = freebsd32_procctl */
 #endif
+	{ AS(getentropy_args), (sy_call_t *)sys_getentropy, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 545 = getentropy */
 };

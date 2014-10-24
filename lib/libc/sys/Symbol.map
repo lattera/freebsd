@@ -393,6 +393,7 @@ FBSD_1.3 {
 	ffclock_getcounter;
 	ffclock_getestimate;
 	ffclock_setestimate;
+	getentropy;
 	pipe2;
 	posix_fadvise;
 	procctl;
@@ -612,6 +613,8 @@ FBSDprivate_1.0 {
 	_getegid;
 	__sys_getegid;
 	_geteuid;
+	__sys_getentropy;
+	_getentropy;
 	__sys_geteuid;
 	_getfh;
 	__sys_getfh;

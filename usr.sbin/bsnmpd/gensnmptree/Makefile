@@ -2,6 +2,8 @@
 #
 # Author: Harti Brandt <harti@freebsd.org>
 
+.include <src.opts.mk>
+
 CONTRIB=${.CURDIR}/../../../contrib/bsnmp
 .PATH: ${CONTRIB}/gensnmptree
 

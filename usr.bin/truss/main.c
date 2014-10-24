@@ -170,8 +170,15 @@ main(int ac, char **av)
 	char *fname;
 	char *signame;
 	char **command;
+	const char *errstr = NULL;
+	size_t pid_max_len;
 	pid_t childpid;
-	int c, initial_open, status;
+	int c, initial_open, status, pid_max;
+
+	pid_max_len = sizeof(pid_max);
+	if (sysctlbyname("kern.pid_max", &pid_max, &pid_max_len,
+					NULL, 0) < 0)
+		errx(1, "sysctl kern.pid_max failed");
 
 	fname = NULL;
 	initial_open = 1;
@@ -189,8 +196,14 @@ main(int ac, char **av)
 	while ((c = getopt(ac, av, "p:o:facedDs:S")) != -1) {
 		switch (c) {
 		case 'p':	/* specified pid */
-			trussinfo->pid = atoi(optarg);
-			/* make sure i don't trace me */
+			trussinfo->pid = strtonum(optarg, 0, pid_max, &errstr);
+			/* make sure i have proper pid value */
+			if (errstr) {
+				fprintf(stderr, "invalid pid %s (%s).\n", 
+						optarg, errstr);
+				exit(2);
+			}
+			/* make sure i don't trace me either */
 			if (trussinfo->pid == getpid()) {
 				fprintf(stderr, "attempt to grab self.\n");
 				exit(2);
@@ -218,7 +231,10 @@ main(int ac, char **av)
 			fname = optarg;
 			break;
 		case 's':	/* Specified string size */
-			trussinfo->strsize = atoi(optarg);
+			trussinfo->strsize = strtonum(optarg, 0, INT_MAX, &errstr);
+			/* make sure i have proper size */
+			if (errstr)
+				trussinfo->strsize = 32;
 			break;
 		case 'S':	/* Don't trace signals */
 			trussinfo->flags |= NOSIGS;

@@ -1,5 +1,6 @@
 #$FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	heimbase
 LDFLAGS=	-Wl,--no-undefined
 LDADD=	-lpthread

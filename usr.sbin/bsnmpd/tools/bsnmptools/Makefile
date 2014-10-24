@@ -9,6 +9,7 @@ PROG=	bsnmpget
 
 DPADD+=	${LIBBSNMP} ${LIBBSNMPTOOLS}
 LDADD+=	-lbsnmp -lbsnmptools
+
 CFLAGS+=	-I${.CURDIR}/../libbsnmptools
 LDFLAGS+=	-L${LIBBSNMPTOOLSDIR}
 

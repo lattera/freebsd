@@ -10,6 +10,7 @@ KEYFILE?=	\"/etc/opiekeys\"
 
 .PATH: ${DIST_DIR}
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	opie
 SRCS=	atob8.c btoa8.c btoh.c challenge.c getsequence.c hash.c hashlen.c \
 	keycrunch.c lock.c lookup.c newseed.c parsechallenge.c passcheck.c \

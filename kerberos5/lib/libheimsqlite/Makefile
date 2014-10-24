@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	heimsqlite
 SRCS=	sqlite3.c
 DPADD=	${LIBPTHREAD}

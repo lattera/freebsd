@@ -4,6 +4,7 @@ SHLIBDIR?= /lib
 
 .include <src.opts.mk>
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	nv
 SHLIB_MAJOR= 0
 
