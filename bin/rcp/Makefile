@@ -6,7 +6,7 @@
 PROG=	rcp
 SRCS=	rcp.c util.c
 CFLAGS+=-DBINDIR=${BINDIR}
-WANTS_PIE=yes
+WANTS_PIE=	yes
 
 
 BINOWN=	root

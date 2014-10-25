@@ -7,7 +7,7 @@
 
 PROG=	bsnmpget
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
 
 .if ${MK_PIE} != "no"
 DPADD+=	${LIBBSNMP_PIC} ${LIBBSNMPTOOLS_PIC}

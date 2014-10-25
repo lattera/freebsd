@@ -11,7 +11,7 @@ SRCS+=	altq.c
 CFLAGS+=-DPF
 .endif
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
 
 .if ${MK_PIE} != "no"
 DPADD=	${LIBUTIL_PIC}

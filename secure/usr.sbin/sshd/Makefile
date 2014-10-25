@@ -25,6 +25,8 @@ SRCS+=	gss-genr.c
 MAN=	sshd.8 sshd_config.5
 CFLAGS+=-I${SSHDIR} -include ssh_namespace.h
 
+WANTS_PIE=	yes
+
 .if ${MK_PIE} != "no"
 DPADD=	${LIBSSH_PIC} ${LIBUTIL_PIC} ${LIBWRAP_PIC} ${LIBPAM_PIC}
 LDADD=	${LDSSH} -lutil_pic -lwrap_pic ${MINUSLPAM_PIC}
@@ -47,8 +49,6 @@ CFLAGS+= -DUSE_BSM_AUDIT -DHAVE_GETAUDIT_ADDR
 DPADD+=  ${LIBBSM}
 LDADD+=  -lbsm
 .endif
-
-WANTS_PIE=yes
 
 .if ${MK_PIE} != "no"
 .if ${MK_KERBEROS_SUPPORT} != "no"

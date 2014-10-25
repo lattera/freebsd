@@ -12,7 +12,7 @@ CFLAGS+=	-I${.CURDIR}/../../sys/dev/iscsi
 #CFLAGS+=	-DICL_KERNEL_PROXY
 MAN=		ctld.8 ctl.conf.5
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
 
 .if ${MK_PIE} != "no"
 DPADD=		${LIBBSDXML_PIC} ${LIBCAM_PIC} ${LIBCRYPTO_PIC} ${LIBL_PIC} ${LIBSBUF_PIC} ${LIBSSL_PIC} ${LIBUTIL_PIC}

@@ -9,7 +9,7 @@ SRCS=	gssd.c gssd.h gssd_svc.c gssd_xdr.c gssd_prot.c
 CFLAGS+= -I.
 WARNS?= 1
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
 
 .if ${MK_PIE} != "no"
 DPADD=	${LIBGSSAPI_PIC}

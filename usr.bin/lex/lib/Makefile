@@ -4,7 +4,7 @@
 
 .PATH:	${.CURDIR}/../../../contrib/flex
 
-INSTALL_PIC_ARCHIVE=yes
+INSTALL_PIC_ARCHIVE=	yes
 LIB=    ln
 SRCS=   libmain.c libyywrap.c
 

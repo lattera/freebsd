@@ -160,7 +160,8 @@ CFLAGS+=	-DINET6
 CFLAGS+=	-DLBL_ALIGN
 .endif
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
+
 .if ${MK_PIE} != "no"
 DPADD=	${LIBL_PIC} ${LIBPCAP_PIC}
 LDADD=	-ll_pic -lpcap_pic

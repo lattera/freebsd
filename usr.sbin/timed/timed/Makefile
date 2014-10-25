@@ -10,7 +10,8 @@ MAN=	timed.8
 SRCS=	acksend.c candidate.c correct.c master.c networkdelta.c readmsg.c \
 	slave.c timed.c byteorder.c measure.c cksum.c
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
+
 .if ${MK_PIE} != "no"
 DPADD=	${LIBUTIL_PIC}
 LDADD=	-lutil_pic

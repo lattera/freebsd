@@ -16,7 +16,8 @@ CFLAGS+= -DINET6
 
 WARNS?=	1
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
+
 .if ${MK_PIE} != "no"
 DPADD=	${LIBWRAP_PIC} ${LIBUTIL_PIC}
 LDADD=	-lwrap_pic -lutil_pic
