@@ -4,6 +4,7 @@
 
 .PATH: ${.CURDIR}
 
+INSTALL_PIC_ARCHIVE=yes
 LIB=	bsnmptools
 #INTERNALLIB=
 SRCS=	bsnmpimport.c bsnmpmap.c bsnmptools.c bsnmptc.c

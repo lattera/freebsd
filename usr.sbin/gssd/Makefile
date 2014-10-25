@@ -22,7 +22,9 @@ LDADD=	-lgssapi
 .if ${MK_KERBEROS_SUPPORT} != "no"
 .if ${MK_PIE} != "no"
 DPADD+=	${LIBKRB5_PIC} ${LIBHX509_PIC} ${LIBASN1_PIC} ${LIBROKEN_PIC} ${LIBCOM_ERR_PIC} ${LIBCRYPT_PIC} ${LIBCRYPTO_PIC}
-LDADD+=	-lkrb5_pic -lhx509_pic -lasn1_pic -lroken_pic -lcom_err_pic -lcrypt_pic -lcrypto_pic
+DPADD+= ${LIBWIND_PIC} ${LIBHEIMBASE_PIC} ${LIBHEIMIPCC}
+LDADD+=	-lkrb5_pic -lhx509_pic -lasn1_pic -lroken_pic -lcom_err_pic -lcrypt_pic -lcrypto_pic -lwind_pic -lheimbase_pic
+LDADD+= ${LDHEIMIPCC}
 .else
 DPADD+=	${LIBKRB5} ${LIBHX509} ${LIBASN1} ${LIBROKEN} ${LIBCOM_ERR} ${LIBCRYPT} ${LIBCRYPTO}
 LDADD+=	-lkrb5 -lhx509 -lasn1 -lroken -lcom_err -lcrypt -lcrypto
