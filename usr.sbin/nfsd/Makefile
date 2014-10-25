@@ -4,6 +4,6 @@
 PROG=	nfsd
 MAN=	nfsd.8 nfsv4.4 stablerestart.5
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
 
 .include <bsd.prog.mk>

@@ -7,7 +7,8 @@ PROG=	su
 
 WARNS?=	5
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
+
 .if ${MK_PIE} != "no"
 DPADD=	${LIBUTIL_PIC} ${LIBPAM_PIC}
 LDADD=	-lutil_pic ${MINUSLPAM_PIC}

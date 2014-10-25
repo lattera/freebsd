@@ -13,7 +13,7 @@ WARNS?= 2
 
 .PATH: ${MOUNT}
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
 
 .if ${MK_PIE} != "no"
 DPADD=	${LIBUTIL_PIC}

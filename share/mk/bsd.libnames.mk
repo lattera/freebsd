@@ -198,6 +198,7 @@ LIBTERMLIB?=	"don't use LIBTERMLIB, use LIBTERMCAP"
 LIBTINFO?=	"don't use LIBTINFO, use LIBNCURSES"
 LIBUFS?=	${DESTDIR}${LIBDIR}/libufs.a
 LIBUGIDFW?=	${DESTDIR}${LIBDIR}/libugidfw.a
+LIBUGIDFW_PIC?=	${DESTDIR}${LIBDIR}/libugidfw_pic.a
 LIBUMEM?=	${DESTDIR}${LIBDIR}/libumem.a
 LIBUSBHID?=	${DESTDIR}${LIBDIR}/libusbhid.a
 LIBUSB?=	${DESTDIR}${LIBDIR}/libusb.a

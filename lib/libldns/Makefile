@@ -5,7 +5,7 @@ LDNSDIR = ${.CURDIR}/../../contrib/ldns
 
 .PATH: ${LDNSDIR} ${LDNSDIR}/compat
 
-INSTALL_PIC_ARCHIVE=yes
+INSTALL_PIC_ARCHIVE=	yes
 LIB=	ldns
 PRIVATELIB= true
 

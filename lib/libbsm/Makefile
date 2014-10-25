@@ -5,7 +5,7 @@
 OPENBSMDIR=		${.CURDIR}/../../contrib/openbsm
 LIBBSMDIR=		${OPENBSMDIR}/libbsm
 
-INSTALL_PIC_ARCHIVE=yes
+INSTALL_PIC_ARCHIVE=	yes
 LIB=		bsm
 SHLIB_MAJOR=	3
 

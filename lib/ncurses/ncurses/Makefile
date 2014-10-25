@@ -11,7 +11,7 @@ MK_MAN=no
 
 .include "${.CURDIR}/../config.mk"
 
-INSTALL_PIC_ARCHIVE=yes
+INSTALL_PIC_ARCHIVE=	yes
 LIB=		ncurses${LIB_SUFFIX}
 SHLIB_MAJOR=	8
 

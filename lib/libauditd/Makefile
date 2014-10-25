@@ -2,7 +2,7 @@
 # $FreeBSD$
 #
 
-INSTALL_PIC_ARCHIVE=yes
+INSTALL_PIC_ARCHIVE=	yes
 OPENBSMDIR=		${.CURDIR}/../../contrib/openbsm
 LIBAUDITDDIR=		${OPENBSMDIR}/libauditd
 LIBBSMDIR=		${OPENBSMDIR}/libbsm
