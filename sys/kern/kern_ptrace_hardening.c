@@ -114,7 +114,8 @@ sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS)				\
 																		\
 	pr = ptrace_get_prison(req->td->td_proc);							\
 																		\
-	val = (pr != NULL) ? pr->pr_ptrace_request_flags[PTFLAG] :			\
+	val = (pr != NULL) ?												\
+		pr->pr_hardening.hr_ptrace_request_flags[PTFLAG] :				\
 	    ptrace_request_flags[PTFLAG];									\
 	err = sysctl_handle_int(oidp, &val, sizeof(int), req);				\
 	if (err || (req->newptr == NULL))									\
@@ -128,7 +129,7 @@ sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS)				\
 																		\
 		if (pr != NULL) {												\
 			prison_lock(pr);											\
-			pr->pr_ptrace_request_flags[PTFLAG] = val;					\
+			pr->pr_hardening.hr_ptrace_request_flags[PTFLAG] = val;	\
 			prison_unlock(pr);											\
 		}																\
 		break;															\
@@ -221,7 +222,7 @@ sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS)
 
 	pr = ptrace_get_prison(req->td->td_proc);
 
-	val = (pr != NULL) ? pr->pr_ptrace_hardening_status :
+	val = (pr != NULL) ? pr->pr_hardening.hr_ptrace_hardening_status :
 	    ptrace_hardening_status;
 	err = sysctl_handle_int(oidp, &val, sizeof(int), req);
 	if (err || (req->newptr == NULL))
@@ -235,7 +236,7 @@ sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS)
 
 		if (pr != NULL) {
 			prison_lock(pr);
-			pr->pr_ptrace_hardening_status = val;
+			pr->pr_hardening.hr_ptrace_hardening_status = val;
 			prison_unlock(pr);
 		}
 		break;
@@ -254,7 +255,7 @@ sysctl_ptrace_hardening_flag(SYSCTL_HANDLER_ARGS)
 
 	pr = ptrace_get_prison(req->td->td_proc);
 
-	val = (pr != NULL) ? pr->pr_ptrace_hardening_flag_status :
+	val = (pr != NULL) ? pr->pr_hardening.hr_ptrace_hardening_flag_status :
 	    ptrace_hardening_flag_status;
 	err = sysctl_handle_int(oidp, &val, sizeof(int), req);
 	if (err || (req->newptr == NULL))
@@ -268,7 +269,7 @@ sysctl_ptrace_hardening_flag(SYSCTL_HANDLER_ARGS)
 
 		if (pr != NULL) {
 			prison_lock(pr);
-			pr->pr_ptrace_hardening_flag_status = val;
+			pr->pr_hardening.hr_ptrace_hardening_flag_status = val;
 			prison_unlock(pr);
 		}
 		break;
@@ -292,7 +293,7 @@ sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 	oidlist = &sysctl___hardening_ptrace_flag.oid_children;
 	sysctlpreflen = sizeof("hardening.ptrace.flag.");
 
-	val = (pr != NULL) ? pr->pr_ptrace_request_flags_all :
+	val = (pr != NULL) ? pr->pr_hardening.hr_ptrace_request_flags_all :
 	    ptrace_request_flags_all;
 	err = sysctl_handle_int(oidp, &val, sizeof(int), req);
 	if (err || (req->newptr == NULL))
@@ -306,7 +307,7 @@ sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 
 		if (pr != NULL) {
 			prison_lock(pr);
-			pr->pr_ptrace_request_flags_all = val;
+			pr->pr_hardening.hr_ptrace_request_flags_all = val;
 			prison_unlock(pr);
 		}
 
@@ -344,7 +345,7 @@ sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS)
 
 	pr = ptrace_get_prison(req->td->td_proc);
 
-	val = (pr != NULL) ? pr->pr_ptrace_hardening_allowed_gid :
+	val = (pr != NULL) ? pr->pr_hardening.hr_ptrace_hardening_allowed_gid :
 	    ptrace_hardening_allowed_gid;
 	err = sysctl_handle_long(oidp, &val, sizeof(long), req);
 	if (err || (req->newptr == NULL))
@@ -358,7 +359,7 @@ sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS)
 
 	if (pr != NULL) {
 		prison_lock(pr);
-		pr->pr_ptrace_hardening_allowed_gid = val;
+		pr->pr_hardening.hr_ptrace_hardening_allowed_gid = val;
 		prison_unlock(pr);
 	}
 
@@ -379,7 +380,7 @@ ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag)
 
 	if (pr == NULL && !ptrace_hardening_status)
 		return (0);
-	if (pr != NULL && !pr->pr_ptrace_hardening_status)
+	if (pr != NULL && !pr->pr_hardening.hr_ptrace_hardening_status)
 		return (0);
 
 	if (p->p_ptrace_hardening & PTRACE_HARDENING_MODE_PUBLIC)
@@ -392,16 +393,17 @@ ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag)
 	if (pr == NULL && ptrace_hardening_flag_status &&
 	    !ptrace_request_flags[ptrace_flag])
 		goto fail;
-	if (pr != NULL && pr->pr_ptrace_hardening_flag_status &&
-	    !pr->pr_ptrace_request_flags[ptrace_flag])
+	if (pr != NULL && pr->pr_hardening.hr_ptrace_hardening_flag_status &&
+	    !pr->pr_hardening.hr_ptrace_request_flags[ptrace_flag])
 		goto fail;
 
 #ifdef PTRACE_HARDENING_GRP
 	if (uid != 0 && pr == NULL && (ptrace_hardening_allowed_gid &&
 	    gid != ptrace_hardening_allowed_gid))
 		goto fail;
-	if (uid != 0 && pr != NULL && (pr->pr_ptrace_hardening_allowed_gid &&
-	    gid != pr->pr_ptrace_hardening_allowed_gid))
+	if (uid != 0 && pr != NULL && 
+		(pr->pr_hardening.hr_ptrace_hardening_allowed_gid &&
+	    gid != pr->pr_hardening.hr_ptrace_hardening_allowed_gid))
 		goto fail;
 #else
 	if (uid != 0)
@@ -496,23 +498,26 @@ ptrace_hardening_init_prison(struct prison *pr)
 	if (pr == NULL)
 		return;
 
-	if (pr->pr_ptrace_hardening_set)
+	if (pr->pr_hardening.hr_ptrace_hardening_set)
 		return;
 
 	prison_lock(pr);
 
-	pr->pr_ptrace_hardening_status = ptrace_hardening_status;
+	pr->pr_hardening.hr_ptrace_hardening_status = ptrace_hardening_status;
 
 #ifdef PTRACE_HARDENING_GRP
-	pr->pr_ptrace_hardening_allowed_gid = ptrace_hardening_allowed_gid;
+	pr->pr_hardening.hr_ptrace_hardening_allowed_gid =
+		ptrace_hardening_allowed_gid;
 #endif
 
-	pr->pr_ptrace_hardening_flag_status = ptrace_hardening_flag_status;
-	pr->pr_ptrace_request_flags_all = ptrace_request_flags_all;
-	memcpy(pr->pr_ptrace_request_flags, ptrace_request_flags,
-		sizeof(pr->pr_ptrace_request_flags));
+	pr->pr_hardening.hr_ptrace_hardening_flag_status =
+		ptrace_hardening_flag_status;
+	pr->pr_hardening.hr_ptrace_request_flags_all =
+		ptrace_request_flags_all;
+	memcpy(pr->pr_hardening.hr_ptrace_request_flags, ptrace_request_flags,
+		sizeof(pr->pr_hardening.hr_ptrace_request_flags));
 
-	pr->pr_ptrace_hardening_set = 1;
+	pr->pr_hardening.hr_ptrace_hardening_set = 1;
 
 	prison_unlock(pr);
 }
