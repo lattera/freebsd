@@ -400,8 +400,8 @@ ctlfeasync(void *callback_arg, uint32_t code, struct cam_path *path, void *arg)
 		 * frontend structure itself.
 	 	 */
 		port->port_name = softc->port_name;
-		port->physical_port = cpi->unit_number;
-		port->virtual_port = cpi->bus_id;
+		port->physical_port = cpi->bus_id;
+		port->virtual_port = 0;
 		port->port_online = ctlfe_online;
 		port->port_offline = ctlfe_offline;
 		port->onoff_arg = softc;
@@ -1513,11 +1513,6 @@ ctlfedone(struct cam_periph *periph, union ccb *done_ccb)
 			case CAM_MESSAGE_RECV:
 				switch (inot->arg) {
 				case MSG_ABORT_TASK_SET:
-					/*
-					 * XXX KDM this isn't currently
-					 * supported by CTL.  It ends up
-					 * being a no-op.
-					 */
 					io->taskio.task_action =
 						CTL_TASK_ABORT_TASK_SET;
 					break;
@@ -1534,11 +1529,6 @@ ctlfedone(struct cam_periph *periph, union ccb *done_ccb)
 						CTL_TASK_LUN_RESET;
 					break;
 				case MSG_CLEAR_TASK_SET:
-					/*
-					 * XXX KDM this isn't currently
-					 * supported by CTL.  It ends up
-					 * being a no-op.
-					 */
 					io->taskio.task_action =
 						CTL_TASK_CLEAR_TASK_SET;
 					break;
