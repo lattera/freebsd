@@ -281,7 +281,7 @@ cpu_startup(dummy)
 	 * We do this by disabling a bit in the SMI_EN (SMI Control and
 	 * Enable register) of the Intel ICH LPC Interface Bridge.
 	 */
-	sysenv = getenv("smbios.system.product");
+	sysenv = kern_getenv("smbios.system.product");
 	if (sysenv != NULL) {
 		if (strncmp(sysenv, "MacBook1,1", 10) == 0 ||
 		    strncmp(sysenv, "MacBook3,1", 10) == 0 ||
@@ -314,7 +314,7 @@ cpu_startup(dummy)
 	 * Display physical memory if SMBIOS reports reasonable amount.
 	 */
 	memsize = 0;
-	sysenv = getenv("smbios.memory.enabled");
+	sysenv = kern_getenv("smbios.memory.enabled");
 	if (sysenv != NULL) {
 		memsize = (uintmax_t)strtoul(sysenv, (char **)NULL, 10) << 10;
 		freeenv(sysenv);
@@ -2463,10 +2463,10 @@ static void
 getmemsize(int first)
 {
 	int has_smap, off, physmap_idx, pa_indx, da_indx;
-	u_long physmem_tunable, memtest;
+	u_long memtest;
 	vm_paddr_t physmap[PHYSMAP_SIZE];
 	pt_entry_t *pte;
-	quad_t dcons_addr, dcons_size;
+	quad_t dcons_addr, dcons_size, physmem_tunable;
 #ifndef XEN
 	int hasbrokenint12, i, res;
 	u_int extmem;
@@ -2650,7 +2650,7 @@ physmap_done:
 	Maxmem = MAXMEM / 4;
 #endif
 
-	if (TUNABLE_ULONG_FETCH("hw.physmem", &physmem_tunable))
+	if (TUNABLE_QUAD_FETCH("hw.physmem", &physmem_tunable))
 		Maxmem = atop(physmem_tunable);
 
 	/*
