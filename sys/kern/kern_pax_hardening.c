@@ -189,7 +189,8 @@ sysctl_pax_mprotect_exec(SYSCTL_HANDLER_ARGS)
 
 	pr = pax_get_prison(req->td->td_proc);
 
-	val = (pr != NULL) ? pr->pr_hardening.hr_pax_mprotect_exec : pax_mprotect_exec_harden_global;
+	val = (pr != NULL) ? pr->pr_hardening.hr_pax_mprotect_exec :
+		pax_mprotect_exec_harden_global;
 	err = sysctl_handle_int(oidp, &val, sizeof(int), req);
 	if (err || (req->newptr == NULL))
 		return (err);
