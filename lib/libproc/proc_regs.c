@@ -44,6 +44,10 @@ proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
 {
 	struct reg regs;
 
+#ifdef	DTRACE_HARDENING_PTRACE
+	return (0);
+#endif
+
 	if (phdl->status == PS_DEAD || phdl->status == PS_UNDEAD ||
 	    phdl->status == PS_IDLE) {
 		errno = ENOENT;
@@ -87,6 +91,10 @@ int
 proc_regset(struct proc_handle *phdl, proc_reg_t reg, unsigned long regvalue)
 {
 	struct reg regs;
+
+#ifdef	DTRACE_HARDENING_PTRACE
+	return (0);
+#endif
 
 	if (phdl->status == PS_DEAD || phdl->status == PS_UNDEAD ||
 	    phdl->status == PS_IDLE) {
