@@ -939,6 +939,10 @@ PTRACE_HARDENING_DEBUG		opt_ptrace_hardening.h
 PTRACE_HARDENING_GRP		opt_ptrace_hardening.h
 PTRACE_HARDENING_SYSCTLS	opt_ptrace_hardening.h
 
+# Dtrace hardening options
+DTRACE_HARDENING			opt_dtrace_hardening.h
+DTRACE_HARDENING_PTRACE		opt_dtrace_hardening.h
+
 # Random number generator(s)
 RANDOM_YARROW	opt_random.h
 RANDOM_FORTUNA	opt_random.h

@@ -225,10 +225,13 @@ pax_init_prison(struct prison *pr)
 	pr->pr_hardening.hr_pax_segvguard_maxcrashes = pax_segvguard_maxcrashes;
 #endif
 
-#ifdef PAX_HARDENING
-#ifdef MAP_32BIT
+#ifdef	PAX_HARDENING
+#ifdef	MAP_32BIT
 	pr->pr_hardening.hr_pax_map32_enabled = pax_map32_enabled_global;
 #endif
+#endif
+
+#ifdef PAX_HARDENING
 	pr->pr_hardening.hr_pax_procfs_harden = pax_procfs_harden_global;
 	pr->pr_hardening.hr_pax_mprotect_exec = pax_mprotect_exec_harden_global;
 #endif

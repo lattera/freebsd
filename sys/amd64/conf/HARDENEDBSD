@@ -83,6 +83,7 @@ options 	PAX_SYSCTLS		# sysctls for run-time options
 options 	PTRACE_HARDENING	# Ptrace calls restrictions
 options 	PTRACE_HARDENING_GRP	# Ptrace allowance per gid
 options		PTRACE_HARDENING_SYSCTLS # sysctls for run-time options
+options		DTRACE_HARDENING_PTRACE
 
 # Debugging support.  Always need this:
 options 	KDB			# Enable kernel debugger support.

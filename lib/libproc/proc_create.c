@@ -76,6 +76,10 @@ proc_attach(pid_t pid, int flags, struct proc_handle **pphdl)
 	int error = 0;
 	int status;
 
+#ifdef	DTRACE_HARDENING_PTRACE
+	return (0);
+#endif
+
 	if (pid == 0 || pid == getpid())
 		return (EINVAL);
 
@@ -127,6 +131,10 @@ proc_create(const char *file, char * const *argv, proc_child_func *pcf,
 	int error = 0;
 	int status;
 	pid_t pid;
+
+#ifdef	DTRACE_HARDENING_PTRACE
+	return (0);
+#endif
 
 	/*
 	 * Allocate memory for the process handle, a structure containing
