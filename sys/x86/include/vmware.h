@@ -1,8 +1,7 @@
 /*-
- * Copyright (c) 2012 Olivier Houchard <cognet@FreeBSD.org>
- * Copyright (c) 2012 Baptiste Daroussin <bapt@FreeBSD.org>
+ * Copyright (c) 2011-2014 Jung-uk Kim <jkim@FreeBSD.org>
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -11,7 +10,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -27,43 +26,22 @@
  * $FreeBSD$
  */
 
-#ifndef ELF_TABLES_H_
-#define ELF_TABLES_H_
-struct _elf_corres {
-	int elf_nb;
-	const char *string;
-};
+#ifndef _X86_VMWARE_H_
+#define	_X86_VMWARE_H_
 
-static struct _elf_corres mach_corres[] = {
-	{ EM_386, "x86" },
-	{ EM_AMD64, "x86" },
-	{ EM_ARM, "arm" },
-	{ EM_MIPS, "mips" },
-	{ EM_PPC, "powerpc" },
-	{ EM_PPC64, "powerpc" },
-	{ EM_SPARCV9, "sparc64" },
-	{ -1, NULL },
-};
+#define	VMW_HVMAGIC		0x564d5868
+#define	VMW_HVPORT		0x5658
+#define	VMW_HVCMD_GETVERSION	10
+#define	VMW_HVCMD_GETHZ		45
 
-static struct _elf_corres wordsize_corres[] = {
-	{ ELFCLASS32, "32" },
-	{ ELFCLASS64, "64" },
-	{ -1, NULL},
-};
+static __inline void
+vmware_hvcall(u_int cmd, u_int *p)
+{
 
-static struct _elf_corres endian_corres[] = {
-	{ ELFDATA2MSB, "eb" },
-	{ ELFDATA2LSB, "el" },
-	{ -1, NULL}
-};
+	__asm __volatile("inl %w3, %0"
+	: "=a" (p[0]), "=b" (p[1]), "=c" (p[2]), "=d" (p[3])
+	: "0" (VMW_HVMAGIC), "1" (UINT_MAX), "2" (cmd), "3" (VMW_HVPORT)
+	: "memory");
+}
 
-#ifndef EF_MIPS_ABI
-#define EF_MIPS_ABI	0x0000f000
-#endif
-#define E_MIPS_ABI_O32	0x00001000
-#define E_MIPS_ABI_N32	0x00000020
-
-#define NT_VERSION	1
-#define NT_ARCH	2
-
-#endif /* ELF_TABLES_H_ */
+#endif /* !_X86_VMWARE_H_ */

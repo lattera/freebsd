@@ -2200,13 +2200,14 @@ ctl_copyout_args(int num_args, struct ctl_be_arg *args)
  * Escape characters that are illegal or not recommended in XML.
  */
 int
-ctl_sbuf_printf_esc(struct sbuf *sb, char *str)
+ctl_sbuf_printf_esc(struct sbuf *sb, char *str, int size)
 {
+	char *end = str + size;
 	int retval;
 
 	retval = 0;
 
-	for (; *str; str++) {
+	for (; *str && str < end; str++) {
 		switch (*str) {
 		case '&':
 			retval = sbuf_printf(sb, "&amp;");
@@ -3198,7 +3199,8 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 				break;
 
 			retval = ctl_sbuf_printf_esc(sb,
-						     lun->be_lun->serial_num);
+			    lun->be_lun->serial_num,
+			    sizeof(lun->be_lun->serial_num));
 
 			if (retval != 0)
 				break;
@@ -3213,7 +3215,9 @@ ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 			if (retval != 0)
 				break;
 
-			retval = ctl_sbuf_printf_esc(sb,lun->be_lun->device_id);
+			retval = ctl_sbuf_printf_esc(sb,
+			    lun->be_lun->device_id,
+			    sizeof(lun->be_lun->device_id));
 
 			if (retval != 0)
 				break;
@@ -4731,6 +4735,7 @@ ctl_free_lun(struct ctl_lun *lun)
 	ctl_tpc_lun_shutdown(lun);
 	mtx_destroy(&lun->lun_lock);
 	free(lun->lun_devid, M_CTL);
+	free(lun->write_buffer, M_CTL);
 	if (lun->flags & CTL_LUN_MALLOCED)
 		free(lun, M_CTL);
 
@@ -5336,8 +5341,7 @@ ctl_scsi_reserve(struct ctl_scsiio *ctsio)
 
 	mtx_lock(&lun->lun_lock);
 	if ((lun->flags & CTL_LUN_RESERVED) && (lun->res_idx != residx)) {
-		ctsio->scsi_status = SCSI_STATUS_RESERV_CONFLICT;
-		ctsio->io_hdr.status = CTL_SCSI_ERROR;
+		ctl_set_reservation_conflict(ctsio);
 		goto bailout;
 	}
 
@@ -5688,24 +5692,6 @@ ctl_read_buffer(struct ctl_scsiio *ctsio)
 	lun = (struct ctl_lun *)ctsio->io_hdr.ctl_private[CTL_PRIV_LUN].ptr;
 	cdb = (struct scsi_read_buffer *)ctsio->cdb;
 
-	if (lun->flags & CTL_LUN_PR_RESERVED) {
-		uint32_t residx;
-
-		/*
-		 * XXX KDM need a lock here.
-		 */
-		residx = ctl_get_resindex(&ctsio->io_hdr.nexus);
-		if ((lun->res_type == SPR_TYPE_EX_AC
-		  && residx != lun->pr_res_idx)
-		 || ((lun->res_type == SPR_TYPE_EX_AC_RO
-		   || lun->res_type == SPR_TYPE_EX_AC_AR)
-		  && lun->pr_keys[residx] == 0)) {
-			ctl_set_reservation_conflict(ctsio);
-			ctl_done((union ctl_io *)ctsio);
-			return (CTL_RETVAL_COMPLETE);
-	        }
-	}
-
 	if ((cdb->byte2 & RWB_MODE) != RWB_MODE_DATA &&
 	    (cdb->byte2 & RWB_MODE) != RWB_MODE_ECHO_DESCR &&
 	    (cdb->byte2 & RWB_MODE) != RWB_MODE_DESCR) {
@@ -5722,7 +5708,7 @@ ctl_read_buffer(struct ctl_scsiio *ctsio)
 	len = scsi_3btoul(cdb->length);
 	buffer_offset = scsi_3btoul(cdb->offset);
 
-	if (buffer_offset + len > sizeof(lun->write_buffer)) {
+	if (buffer_offset + len > CTL_WRITE_BUFFER_SIZE) {
 		ctl_set_invalid_field(ctsio,
 				      /*sks_valid*/ 1,
 				      /*command*/ 1,
@@ -5735,14 +5721,19 @@ ctl_read_buffer(struct ctl_scsiio *ctsio)
 
 	if ((cdb->byte2 & RWB_MODE) == RWB_MODE_DESCR) {
 		descr[0] = 0;
-		scsi_ulto3b(sizeof(lun->write_buffer), &descr[1]);
+		scsi_ulto3b(CTL_WRITE_BUFFER_SIZE, &descr[1]);
 		ctsio->kern_data_ptr = descr;
 		len = min(len, sizeof(descr));
 	} else if ((cdb->byte2 & RWB_MODE) == RWB_MODE_ECHO_DESCR) {
 		ctsio->kern_data_ptr = echo_descr;
 		len = min(len, sizeof(echo_descr));
-	} else
+	} else {
+		if (lun->write_buffer == NULL) {
+			lun->write_buffer = malloc(CTL_WRITE_BUFFER_SIZE,
+			    M_CTL, M_WAITOK);
+		}
 		ctsio->kern_data_ptr = lun->write_buffer + buffer_offset;
+	}
 	ctsio->kern_data_len = len;
 	ctsio->kern_total_len = len;
 	ctsio->kern_data_resid = 0;
@@ -5780,7 +5771,7 @@ ctl_write_buffer(struct ctl_scsiio *ctsio)
 	len = scsi_3btoul(cdb->length);
 	buffer_offset = scsi_3btoul(cdb->offset);
 
-	if (buffer_offset + len > sizeof(lun->write_buffer)) {
+	if (buffer_offset + len > CTL_WRITE_BUFFER_SIZE) {
 		ctl_set_invalid_field(ctsio,
 				      /*sks_valid*/ 1,
 				      /*command*/ 1,
@@ -5796,6 +5787,10 @@ ctl_write_buffer(struct ctl_scsiio *ctsio)
 	 * malloc it and tell the caller the data buffer is here.
 	 */
 	if ((ctsio->io_hdr.flags & CTL_FLAG_ALLOCATED) == 0) {
+		if (lun->write_buffer == NULL) {
+			lun->write_buffer = malloc(CTL_WRITE_BUFFER_SIZE,
+			    M_CTL, M_WAITOK);
+		}
 		ctsio->kern_data_ptr = lun->write_buffer + buffer_offset;
 		ctsio->kern_data_len = len;
 		ctsio->kern_total_len = len;
@@ -6628,24 +6623,6 @@ ctl_mode_sense(struct ctl_scsiio *ctsio)
 	else
 		control_dev = 0;
 
-	if (lun->flags & CTL_LUN_PR_RESERVED) {
-		uint32_t residx;
-
-		/*
-		 * XXX KDM need a lock here.
-		 */
-		residx = ctl_get_resindex(&ctsio->io_hdr.nexus);
-		if ((lun->res_type == SPR_TYPE_EX_AC
-		  && residx != lun->pr_res_idx)
-		 || ((lun->res_type == SPR_TYPE_EX_AC_RO
-		   || lun->res_type == SPR_TYPE_EX_AC_AR)
-		  && lun->pr_keys[residx] == 0)) {
-			ctl_set_reservation_conflict(ctsio);
-			ctl_done((union ctl_io *)ctsio);
-			return (CTL_RETVAL_COMPLETE);
-		}
-	}
-
 	switch (ctsio->cdb[0]) {
 	case MODE_SENSE_6: {
 		struct scsi_mode_sense_6 *cdb;
@@ -7182,23 +7159,6 @@ ctl_read_defect(struct ctl_scsiio *ctsio)
 	CTL_DEBUG_PRINT(("ctl_read_defect\n"));
 
 	lun = (struct ctl_lun *)ctsio->io_hdr.ctl_private[CTL_PRIV_LUN].ptr;
-	if (lun->flags & CTL_LUN_PR_RESERVED) {
-		uint32_t residx;
-
-		/*
-		 * XXX KDM need a lock here.
-		 */
-		residx = ctl_get_resindex(&ctsio->io_hdr.nexus);
-		if ((lun->res_type == SPR_TYPE_EX_AC
-		  && residx != lun->pr_res_idx)
-		 || ((lun->res_type == SPR_TYPE_EX_AC_RO
-		   || lun->res_type == SPR_TYPE_EX_AC_AR)
-		  && lun->pr_keys[residx] == 0)) {
-			ctl_set_reservation_conflict(ctsio);
-			ctl_done((union ctl_io *)ctsio);
-			return (CTL_RETVAL_COMPLETE);
-	        }
-	}
 
 	if (ctsio->cdb[0] == READ_DEFECT_DATA_10) {
 		ccb10 = (struct scsi_read_defect_data_10 *)&ctsio->cdb;
@@ -8892,24 +8852,6 @@ ctl_read_write(struct ctl_scsiio *ctsio)
 
 	isread = ctsio->cdb[0] == READ_6  || ctsio->cdb[0] == READ_10
 	      || ctsio->cdb[0] == READ_12 || ctsio->cdb[0] == READ_16;
-	if (lun->flags & CTL_LUN_PR_RESERVED && isread) {
-		uint32_t residx;
-
-		/*
-		 * XXX KDM need a lock here.
-		 */
-		residx = ctl_get_resindex(&ctsio->io_hdr.nexus);
-		if ((lun->res_type == SPR_TYPE_EX_AC
-		  && residx != lun->pr_res_idx)
-		 || ((lun->res_type == SPR_TYPE_EX_AC_RO
-		   || lun->res_type == SPR_TYPE_EX_AC_AR)
-		  && lun->pr_keys[residx] == 0)) {
-			ctl_set_reservation_conflict(ctsio);
-			ctl_done((union ctl_io *)ctsio);
-			return (CTL_RETVAL_COMPLETE);
-	        }
-	}
-
 	switch (ctsio->cdb[0]) {
 	case READ_6:
 	case WRITE_6: {
@@ -9399,17 +9341,18 @@ ctl_report_luns(struct ctl_scsiio *ctsio)
 			 * Flat addressing method.
 			 */
 			lun_data->luns[num_filled].lundata[0] =
-				RPL_LUNDATA_ATYP_FLAT |
-				(targ_lun_id & RPL_LUNDATA_FLAT_LUN_MASK);
-#ifdef OLDCTLHEADERS
-				(SRLD_ADDR_FLAT << SRLD_ADDR_SHIFT) |
-				(targ_lun_id & SRLD_BUS_LUN_MASK);
-#endif
+				RPL_LUNDATA_ATYP_FLAT | (targ_lun_id >> 8);
 			lun_data->luns[num_filled].lundata[1] =
-#ifdef OLDCTLHEADERS
-				targ_lun_id >> SRLD_BUS_LUN_BITS;
-#endif
-				targ_lun_id >> RPL_LUNDATA_FLAT_LUN_BITS;
+				(targ_lun_id & 0xff);
+			num_filled++;
+		} else if (targ_lun_id <= 0xffffff) {
+			/*
+			 * Extended flat addressing method.
+			 */
+			lun_data->luns[num_filled].lundata[0] =
+			    RPL_LUNDATA_ATYP_EXTLUN | 0x12;
+			scsi_ulto3b(targ_lun_id,
+			    &lun_data->luns[num_filled].lundata[1]);
 			num_filled++;
 		} else {
 			printf("ctl_report_luns: bogus LUN number %jd, "
@@ -11210,27 +11153,29 @@ ctl_scsiio_lun_check(struct ctl_softc *ctl_softc, struct ctl_lun *lun,
 	if ((lun->flags & CTL_LUN_RESERVED)
 	 && ((entry->flags & CTL_CMD_FLAG_ALLOW_ON_RESV) == 0)) {
 		if (lun->res_idx != residx) {
-			ctsio->scsi_status = SCSI_STATUS_RESERV_CONFLICT;
-			ctsio->io_hdr.status = CTL_SCSI_ERROR;
+			ctl_set_reservation_conflict(ctsio);
 			retval = 1;
 			goto bailout;
 		}
 	}
 
-	if ((lun->flags & CTL_LUN_PR_RESERVED)
-	 && ((entry->flags & CTL_CMD_FLAG_ALLOW_ON_PR_RESV) == 0)) {
+	if ((lun->flags & CTL_LUN_PR_RESERVED) == 0 ||
+	    (entry->flags & CTL_CMD_FLAG_ALLOW_ON_PR_RESV)) {
+		/* No reservation or command is allowed. */;
+	} else if ((entry->flags & CTL_CMD_FLAG_ALLOW_ON_PR_WRESV) &&
+	    (lun->res_type == SPR_TYPE_WR_EX ||
+	     lun->res_type == SPR_TYPE_WR_EX_RO ||
+	     lun->res_type == SPR_TYPE_WR_EX_AR)) {
+		/* The command is allowed for Write Exclusive resv. */;
+	} else {
 		/*
 		 * if we aren't registered or it's a res holder type
 		 * reservation and this isn't the res holder then set a
 		 * conflict.
-		 * NOTE: Commands which might be allowed on write exclusive
-		 * type reservations are checked in the particular command
-		 * for a conflict. Read and SSU are the only ones.
 		 */
 		if (lun->pr_keys[residx] == 0
 		 || (residx != lun->pr_res_idx && lun->res_type < 4)) {
-			ctsio->scsi_status = SCSI_STATUS_RESERV_CONFLICT;
-			ctsio->io_hdr.status = CTL_SCSI_ERROR;
+			ctl_set_reservation_conflict(ctsio);
 			retval = 1;
 			goto bailout;
 		}
