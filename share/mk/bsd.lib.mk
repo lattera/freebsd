@@ -43,6 +43,10 @@ CTFFLAGS+= -g
 STRIP?=	-s
 .endif
 
+.if ${MK_DTRACE_HARDENING} != "no"
+CFLAGS+= -DDTRACE_HARDENING
+.endif
+
 .if ${MK_DEBUG_FILES} != "no" && empty(DEBUG_FLAGS:M-g) && \
     empty(DEBUG_FLAGS:M-gdwarf*)
 SHARED_CFLAGS+= -g

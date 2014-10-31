@@ -53,6 +53,11 @@ proc_init(pid_t pid, int flags, int status, struct proc_handle *phdl)
 	phdl->flags = flags;
 	phdl->status = status;
 
+#ifdef	DTRACE_HARDENING_PTRACE
+	phdl->execname[0] = '\0';
+	return (0);
+#endif
+
 	mib[0] = CTL_KERN;
 	mib[1] = KERN_PROC;
 	mib[2] = KERN_PROC_PATHNAME;
@@ -75,10 +80,6 @@ proc_attach(pid_t pid, int flags, struct proc_handle **pphdl)
 	struct proc_handle *phdl;
 	int error = 0;
 	int status;
-
-#ifdef	DTRACE_HARDENING_PTRACE
-	return (0);
-#endif
 
 	if (pid == 0 || pid == getpid())
 		return (EINVAL);
@@ -131,10 +132,6 @@ proc_create(const char *file, char * const *argv, proc_child_func *pcf,
 	int error = 0;
 	int status;
 	pid_t pid;
-
-#ifdef	DTRACE_HARDENING_PTRACE
-	return (0);
-#endif
 
 	/*
 	 * Allocate memory for the process handle, a structure containing

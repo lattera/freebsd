@@ -36,6 +36,10 @@ CFLAGS+=	-I${.CURDIR}/../../cddl/contrib/opensolaris/lib/libctf/common \
 CFLAGS+=	-DNO_CTF
 .endif
 
+.if ${MK_DTRACE_HARDENING} != "no"
+CFLAGS+=	-DDTRACE_HARDENING_PTRACE
+.endif
+
 SHLIB_MAJOR=	3
 
 MAN=
