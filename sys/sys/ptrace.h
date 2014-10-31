@@ -37,8 +37,6 @@
 #include <sys/param.h>
 #include <machine/reg.h>
 
-#include "opt_dtrace_hardening.h"
-
 #define	PT_TRACE_ME	0	/* child declares it's being traced */
 #define	PT_READ_I	1	/* read word in child's I space */
 #define	PT_READ_D	2	/* read word in child's D space */
