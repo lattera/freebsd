@@ -3010,3 +3010,5 @@ options 	PAX_SYSCTLS	# Run-time settings for PAX and Hardening
 options 	PTRACE_HARDENING
 options 	PTRACE_HARDENING_GRP
 options		PTRACE_HARDENING_SYSCTLS
+options		DTRACE_HARDENING_PTRACE
+options		DTRACE_HARDENING

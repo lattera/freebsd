@@ -390,6 +390,12 @@ ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag)
 	gid = td->td_ucred->cr_rgid;
 	pid = p->p_pid;
 
+#ifndef	PTRACE_HARDENING_NOROOT
+	if (uid == 0)
+		return (0);
+#endif
+
+
 	if (pr == NULL && ptrace_hardening_flag_status &&
 	    !ptrace_request_flags[ptrace_flag])
 		goto fail;
@@ -398,15 +404,13 @@ ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag)
 		goto fail;
 
 #ifdef PTRACE_HARDENING_GRP
-	if (uid != 0 && pr == NULL && (ptrace_hardening_allowed_gid &&
+	if (pr == NULL && (ptrace_hardening_allowed_gid &&
 	    gid != ptrace_hardening_allowed_gid))
 		goto fail;
-	if (uid != 0 && pr != NULL && 
+
+	if (pr != NULL && 
 		(pr->pr_hardening.hr_ptrace_hardening_allowed_gid &&
 	    gid != pr->pr_hardening.hr_ptrace_hardening_allowed_gid))
-		goto fail;
-#else
-	if (uid != 0)
 		goto fail;
 #endif	/* PTRACE_HARDENING_GRP */
 

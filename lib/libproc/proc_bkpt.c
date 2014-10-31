@@ -150,10 +150,6 @@ proc_bkptdel(struct proc_handle *phdl, uintptr_t address,
 	unsigned long paddr, caddr;
 	int ret = 0, stopped;
 
-#ifdef	DTRACE_HARDENING_PTRACE
-	return (0);
-#endif
-
 	if (phdl->status == PS_DEAD || phdl->status == PS_UNDEAD ||
 	    phdl->status == PS_IDLE) {
 		errno = ENOENT;
@@ -210,10 +206,6 @@ proc_bkptexec(struct proc_handle *phdl, unsigned long saved)
 	unsigned long pc;
 	unsigned long samesaved;
 	int status;
-
-#ifdef	DTRACE_HARDENING_PTRACE
-	return (0);
-#endif
 
 	if (proc_regget(phdl, REG_PC, &pc) < 0) {
 		DPRINTFX("ERROR: couldn't get PC register");

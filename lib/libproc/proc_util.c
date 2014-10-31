@@ -141,6 +141,10 @@ pid_t
 proc_getpid(struct proc_handle *phdl)
 {
 
+#ifdef	DTRACE_HARDENING_PTRACE
+	return (-1);
+#endif
+
 	if (phdl == NULL)
 		return (-1);
 
