@@ -2,7 +2,7 @@
 
 .include <src.opts.mk>
 
-INSTALL_PIC_ARCHIVE=yes
+INSTALL_PIC_ARCHIVE=	yes
 LIB=	ssh
 PRIVATELIB=	true
 SHLIB_MAJOR=	5

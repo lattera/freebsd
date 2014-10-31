@@ -2,7 +2,7 @@
 
 .include <src.opts.mk>
 
-INSTALL_PIC_ARCHIVE=yes
+INSTALL_PIC_ARCHIVE=	yes
 
 SUBDIR= 
 .if ${MK_OPENSSL} != "no"

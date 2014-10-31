@@ -26,7 +26,8 @@ CFLAGS+= -DIPSEC
 # reporting, ie: print a variable precision from 0.001ms through 1000ms
 # CFLAGS+= -DSANE_PRECISION
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
+
 .if !defined(TRACEROUTE_NO_IPSEC)
 .if ${MK_PIE} != "no"
 DPADD=	${LIBIPSEC_PIC}

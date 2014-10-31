@@ -30,8 +30,15 @@ CFLAGS+= -I${CONTRIB}/lib -I${CONTRIB}/snmpd -I. -DUSE_LIBBEGEMOT
 CFLAGS+= -DUSE_TCPWRAPPERS -DQUADFMT='"llu"' -DQUADXFMT='"llx"'
 CFLAGS+= -DHAVE_STDINT_H -DHAVE_INTTYPES_H -DHAVE_ERR_H -DHAVE_STRLCPY
 
+WANTS_PIE=	yes
+
+.if ${MK_PIE} != "no"
+DPADD=	${LIBBEGEMOT_PIC} ${LIBBSNMP_PIC} ${LIBWRAP_PIC} ${LIBCRYPTO_PIC}
+LDADD=	-lbegemot_pic -lbsnmp_pic -lwrap_pic -lcrypto_pic
+.else
 DPADD=	${LIBBEGEMOT} ${LIBBSNMP} ${LIBWRAP}
 LDADD=	-lbegemot -lbsnmp -lwrap
+.endif
 
 LDFLAGS= -Wl,-export-dynamic
 

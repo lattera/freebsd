@@ -42,7 +42,7 @@ SCRIPTS=dhclient-script
 MAN=	dhclient.8 dhclient.conf.5 dhclient.leases.5 dhcp-options.5 \
 	dhclient-script.8
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
 .if ${MK_PIE} !="no"
 DPADD=	${LIBUTIL_PIC}
 LDADD=	-lutil_pic

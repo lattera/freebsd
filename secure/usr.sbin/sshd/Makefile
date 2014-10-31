@@ -25,6 +25,8 @@ SRCS+=	gss-genr.c
 MAN=	sshd.8 sshd_config.5
 CFLAGS+=-I${SSHDIR} -include ssh_namespace.h
 
+WANTS_PIE=	yes
+
 .if ${MK_PIE} != "no"
 DPADD=	${LIBSSH_PIC} ${LIBUTIL_PIC} ${LIBWRAP_PIC} ${LIBPAM_PIC}
 LDADD=	${LDSSH} -lutil_pic -lwrap_pic ${MINUSLPAM_PIC}
@@ -48,7 +50,6 @@ DPADD+=  ${LIBBSM}
 LDADD+=  -lbsm
 .endif
 
-WANTS_PIE=yes
 .if ${MK_PIE} != "no"
 .if ${MK_KERBEROS_SUPPORT} != "no"
 CFLAGS+= -include krb5_config.h
@@ -77,7 +78,8 @@ LDADD+=	 -lgssapi_krb5 -lgssapi -lkrb5 -lhx509 -lasn1 \
 CFLAGS+= -DNONE_CIPHER_ENABLED
 .endif
 
-DPADD+= ${LIBCRYPT_PIC} ${LIBCRYPTO_PIC} ${LIBZ_PIC}
+DPADD+= ${LIBCRYPT} ${LIBCRYPTO} ${LIBZ}
+LDADD+= -lcrypt -lcrypto -lz
 .endif
 # Fix the order of NEEDED entries for libthr and libc. The libthr
 # needs to interpose libc symbols, leaving the libthr loading as

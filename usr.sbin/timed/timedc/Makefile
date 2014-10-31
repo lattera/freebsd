@@ -11,7 +11,7 @@ SRCS=	cmds.c cmdtab.c timedc.c byteorder.c measure.c cksum.c
 BINOWN=	root
 BINMODE= 4555
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
 
 WARNS?=	1
 

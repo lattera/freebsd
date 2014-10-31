@@ -6,7 +6,7 @@
 PROG=	nfsstat
 CFLAGS+=-DNFS
 
-WANTS_PIE=yes
+WANTS_PIE=	yes
 
 .if ${MK_PIE} != "no"
 DPADD=  ${LIBKVM_PIC}

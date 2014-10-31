@@ -6,6 +6,6 @@
 PROG=	sysctl
 WARNS?=	3
 MAN=	sysctl.8
-WANTS_PIE=yes
+WANTS_PIE=	yes
 
 .include <bsd.prog.mk>
