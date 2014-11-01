@@ -35,7 +35,6 @@
 #if defined(_KERNEL) || defined(_WANT_PRISON)
 struct hardening_features {
 	int	 hr_pax_aslr_status;		/* (p) PaX ASLR enabled */
-	int	 hr_pax_aslr_debug;		/* (p) PaX ASLR debug */
 	int	 hr_pax_aslr_mmap_len;		/* (p) Number of bits randomized with mmap */
 	int	 hr_pax_aslr_stack_len;		/* (p) Number of bits randomized with stack */
 	int	 hr_pax_aslr_exec_len;		/* (p) Number of bits randomized with the execbase */
@@ -231,7 +230,6 @@ extern const char *pax_status_simple_str[];
 #endif /* PAX_ASLR_COMPAT_DELTA_EXEC_MAX_LEN */
 
 extern int pax_aslr_status;
-extern int pax_aslr_debug;
 
 extern int pax_aslr_mmap_len;
 extern int pax_aslr_stack_len;
@@ -287,21 +285,21 @@ extern int hardening_log_ulog;
  * generic pax functions
  */
 int pax_elf(struct image_params *, uint32_t);
-int pax_get_flags(struct proc *proc, uint32_t *flags);
-struct prison *pax_get_prison(struct proc *proc);
+void pax_get_flags(struct proc *p, uint32_t *flags);
+struct prison *pax_get_prison(struct proc *p);
 void pax_init_prison(struct prison *pr);
 
 /*
  * ASLR related functions
  */
-bool pax_aslr_active(struct proc *proc);
+bool pax_aslr_active(struct proc *p);
 void _pax_aslr_init(struct vmspace *vm, struct proc *p);
 void _pax_aslr_init32(struct vmspace *vm, struct proc *p);
 void pax_aslr_init(struct image_params *imgp);
 void pax_aslr_mmap(struct proc *p, vm_offset_t *addr, 
     vm_offset_t orig_addr, int flags);
 u_int pax_aslr_setup_flags(struct image_params *imgp, u_int mode);
-void pax_aslr_stack(struct thread *td, uintptr_t *addr);
+void pax_aslr_stack(struct proc *p, uintptr_t *addr);
 
 /*
  * Log related functions
