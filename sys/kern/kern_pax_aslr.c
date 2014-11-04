@@ -66,6 +66,152 @@ __FBSDID("$FreeBSD$");
 
 #include <security/mac_bsdextended/mac_bsdextended.h>
 
+#ifndef PAX_ASLR_DELTA
+#define	PAX_ASLR_DELTA(delta, lsb, len)	\
+	(((delta) & ((1UL << (len)) - 1)) << (lsb))
+#endif /* PAX_ASLR_DELTA */
+
+/*
+ * generic ASLR values
+ *
+ *  	MMAP	| 32 bit | 64 bit |
+ * 	+-------+--------+--------+
+ * 	| MIN	|  8 bit | 16 bit |
+ * 	+-------+--------+--------+
+ * 	| DEF	| 14 bit | 21 bit |
+ * 	+-------+--------+--------+
+ * 	| MAX   | 20 bit | 32 bit |
+ * 	+-------+--------+--------+
+ *
+ *  	STACK	| 32 bit | 64 bit |
+ * 	+-------+--------+--------+
+ * 	| MIN	|  6 bit | 12 bit |
+ * 	+-------+--------+--------+
+ * 	| DEF	|  6 bit | 16 bit |
+ * 	+-------+--------+--------+
+ * 	| MAX   | 10 bit | 21 bit |
+ * 	+-------+--------+--------+
+ *
+ *  	EXEC	| 32 bit | 64 bit |
+ * 	+-------+--------+--------+
+ * 	| MIN	|  6 bit | 12 bit |
+ * 	+-------+--------+--------+
+ * 	| DEF	| 14 bit | 21 bit |
+ * 	+-------+--------+--------+
+ * 	| MAX   | 20 bit | 21 bit |
+ * 	+-------+--------+--------+
+ *
+ */
+#ifndef PAX_ASLR_DELTA_MMAP_LSB
+#define PAX_ASLR_DELTA_MMAP_LSB		PAGE_SHIFT
+#endif /* PAX_ASLR_DELTA_MMAP_LSB */
+
+#ifndef PAX_ASLR_DELTA_MMAP_MIN_LEN
+#define PAX_ASLR_DELTA_MMAP_MIN_LEN	((sizeof(void *) * NBBY) / 4)
+#endif /* PAX_ASLR_DELTA_MMAP_MAX_LEN */
+
+#ifndef PAX_ASLR_DELTA_MMAP_MAX_LEN
+#ifdef __LP64__
+#define PAX_ASLR_DELTA_MMAP_MAX_LEN	((sizeof(void *) * NBBY) / 2)
+#else
+#define PAX_ASLR_DELTA_MMAP_MAX_LEN	20
+#endif /* __LP64__ */
+#endif /* PAX_ASLR_DELTA_MMAP_MAX_LEN */
+
+#ifndef PAX_ASLR_DELTA_STACK_LSB
+#define PAX_ASLR_DELTA_STACK_LSB	3
+#endif /* PAX_ASLR_DELTA_STACK_LSB */
+
+#ifndef PAX_ASLR_DELTA_STACK_MIN_LEN
+#define PAX_ASLR_DELTA_STACK_MIN_LEN	((sizeof(void *) * NBBY) / 5)
+#endif /* PAX_ASLR_DELTA_STACK_MAX_LEN */
+
+#ifndef PAX_ASLR_DELTA_STACK_MAX_LEN
+#define PAX_ASLR_DELTA_STACK_MAX_LEN	((sizeof(void *) * NBBY) / 3)
+#endif /* PAX_ASLR_DELTA_STACK_MAX_LEN */
+
+#ifndef PAX_ASLR_DELTA_EXEC_LSB
+#define PAX_ASLR_DELTA_EXEC_LSB		PAGE_SHIFT
+#endif /* PAX_ASLR_DELTA_EXEC_LSB */
+
+#ifndef PAX_ASLR_DELTA_EXEC_MIN_LEN
+#define PAX_ASLR_DELTA_EXEC_MIN_LEN	((sizeof(void *) * NBBY) / 5)
+#endif /* PAX_ASLR_DELTA_EXEC_MIN_LEN */
+
+#ifndef PAX_ASLR_DELTA_EXEC_MAX_LEN
+#ifdef __LP64__
+#define PAX_ASLR_DELTA_EXEC_MAX_LEN	((sizeof(void *) * NBBY) / 3)
+#else
+#define PAX_ASLR_DELTA_EXEC_MAX_LEN	20
+#endif /* __LP64__ */
+#endif /* PAX_ASLR_DELTA_EXEC_MAX_LEN */
+
+/*
+ * ASLR default values for native host
+ */
+#ifdef __LP64__
+#ifndef PAX_ASLR_DELTA_MMAP_DEF_LEN
+#define PAX_ASLR_DELTA_MMAP_DEF_LEN	21
+#endif /* PAX_ASLR_DELTA_MMAP_DEF_LEN */
+#ifndef PAX_ASLR_DELTA_STACK_DEF_LEN
+#define PAX_ASLR_DELTA_STACK_DEF_LEN	16
+#endif /* PAX_ASLR_DELTA_STACK_DEF_LEN */
+#ifndef PAX_ASLR_DELTA_EXEC_DEF_LEN
+#define PAX_ASLR_DELTA_EXEC_DEF_LEN	21
+#endif /* PAX_ASLR_DELTA_EXEC_DEF_LEN */
+#else
+#ifndef PAX_ASLR_DELTA_MMAP_DEF_LEN
+#define PAX_ASLR_DELTA_MMAP_DEF_LEN	14
+#endif /* PAX_ASLR_DELTA_MMAP_DEF_LEN */
+#ifndef PAX_ASLR_DELTA_STACK_DEF_LEN
+#define PAX_ASLR_DELTA_STACK_DEF_LEN	PAX_ASLR_DELTA_STACK_MIN_LEN
+#endif /* PAX_ASLR_DELTA_STACK_DEF_LEN */
+#ifndef PAX_ASLR_DELTA_EXEC_DEF_LEN
+#define PAX_ASLR_DELTA_EXEC_DEF_LEN	14
+#endif /* PAX_ASLR_DELTA_EXEC_DEF_LEN */
+#endif /* __LP64__ */
+
+/*
+ * ASLR values for COMPAT_FREEBSD32, COMPAT_LINUX and MAP_32BIT
+ */
+#if defined(COMPAT_LINUX) || defined(COMPAT_FREEBSD32) || defined(MAP_32BIT)
+#ifndef PAX_ASLR_COMPAT_DELTA_MMAP_LSB
+#define PAX_ASLR_COMPAT_DELTA_MMAP_LSB		PAGE_SHIFT
+#endif /* PAX_ASLR_COMPAT_DELTA_MMAP_LSB */
+
+#ifndef PAX_ASLR_COMPAT_DELTA_MMAP_MIN_LEN
+#define PAX_ASLR_COMPAT_DELTA_MMAP_MIN_LEN	((sizeof(int) * NBBY) / 4)
+#endif /* PAX_ASLR_COMPAT_DELTA_MMAP_MAX_LEN */
+
+#ifndef PAX_ASLR_COMPAT_DELTA_MMAP_MAX_LEN
+#define PAX_ASLR_COMPAT_DELTA_MMAP_MAX_LEN	((sizeof(int) * NBBY) / 2)
+#endif /* PAX_ASLR_COMPAT_DELTA_MMAP_MAX_LEN */
+
+#ifndef PAX_ASLR_COMPAT_DELTA_STACK_LSB
+#define PAX_ASLR_COMPAT_DELTA_STACK_LSB		3
+#endif /* PAX_ASLR_COMPAT_DELTA_STACK_LSB */
+
+#ifndef PAX_ASLR_COMPAT_DELTA_STACK_MIN_LEN
+#define PAX_ASLR_COMPAT_DELTA_STACK_MIN_LEN	((sizeof(int) * NBBY) / 5)
+#endif /* PAX_ASLR_COMPAT_DELTA_STACK_MAX_LEN */
+
+#ifndef PAX_ASLR_COMPAT_DELTA_STACK_MAX_LEN
+#define PAX_ASLR_COMPAT_DELTA_STACK_MAX_LEN	((sizeof(int) * NBBY) / 3)
+#endif /* PAX_ASLR_COMPAT_DELTA_STACK_MAX_LEN */
+
+#ifndef PAX_ASLR_COMPAT_DELTA_EXEC_LSB
+#define PAX_ASLR_COMPAT_DELTA_EXEC_LSB		PAGE_SHIFT
+#endif /* PAX_ASLR_COMPAT_DELTA_EXEC_LSB */
+
+#ifndef PAX_ASLR_COMPAT_DELTA_EXEC_MIN_LEN
+#define PAX_ASLR_COMPAT_DELTA_EXEC_MIN_LEN	((sizeof(int) * NBBY) / 5)
+#endif /* PAX_ASLR_COMPAT_DELTA_EXEC_MAX_LEN */
+
+#ifndef PAX_ASLR_COMPAT_DELTA_EXEC_MAX_LEN
+#define PAX_ASLR_COMPAT_DELTA_EXEC_MAX_LEN	((sizeof(int) * NBBY) / 3)
+#endif /* PAX_ASLR_COMPAT_DELTA_EXEC_MAX_LEN */
+#endif
+
 FEATURE(aslr, "Address Space Layout Randomization.");
 
 int pax_aslr_status = PAX_FEATURE_OPTOUT;
@@ -405,6 +551,7 @@ sysctl_pax_aslr_compat_exec(SYSCTL_HANDLER_ARGS)
 static void
 pax_aslr_sysinit(void)
 {
+
 	switch (pax_aslr_status) {
 	case PAX_FEATURE_DISABLED:
 	case PAX_FEATURE_OPTIN:
@@ -444,10 +591,12 @@ pax_aslr_active(struct proc *p)
 }
 
 void
-_pax_aslr_init(struct vmspace *vm, struct proc *p)
+pax_aslr_init_vmspace(struct proc *p)
 {
 	struct prison *pr;
+	struct vmspace *vm;
 
+	vm = p->p_vmspace;
 	KASSERT(vm != NULL, ("%s: vm is null", __func__));
 
 	pr = pax_get_prison(p);
@@ -476,6 +625,7 @@ _pax_aslr_init(struct vmspace *vm, struct proc *p)
 static void
 pax_compat_aslr_sysinit(void)
 {
+
 	switch (pax_aslr_compat_status) {
 	case PAX_FEATURE_DISABLED:
 	case PAX_FEATURE_OPTIN:
@@ -496,10 +646,12 @@ pax_compat_aslr_sysinit(void)
 SYSINIT(pax_compat_aslr, SI_SUB_PAX, SI_ORDER_SECOND, pax_compat_aslr_sysinit, NULL);
 
 void
-_pax_aslr_init32(struct vmspace *vm, struct proc *p)
+pax_aslr_init_vmspace32(struct proc *p)
 {
 	struct prison *pr;
+	struct vmspace *vm;
 
+	vm = p->p_vmspace;
 	KASSERT(vm != NULL, ("%s: vm is null", __func__));
 
 	pr = pax_get_prison(p);
@@ -528,7 +680,6 @@ _pax_aslr_init32(struct vmspace *vm, struct proc *p)
 void
 pax_aslr_init(struct image_params *imgp)
 {
-	struct vmspace *vm;
 	struct proc *p;
 
 	KASSERT(imgp != NULL, ("%s: imgp is null", __func__));
@@ -537,36 +688,34 @@ pax_aslr_init(struct image_params *imgp)
 	if (!pax_aslr_active(p))
 		return;
 
-	vm = p->p_vmspace;
-
 	if (imgp->sysent->sv_pax_aslr_init != NULL)
-		imgp->sysent->sv_pax_aslr_init(vm, p);
+		imgp->sysent->sv_pax_aslr_init(p);
 }
 
 void
 pax_aslr_mmap(struct proc *p, vm_offset_t *addr, vm_offset_t orig_addr, int flags)
 {
-	int len_32bit;
 
 	if (!pax_aslr_active(p))
 		return;
-
-#ifdef COMPAT_FREEBSD32
-	len_32bit = pax_aslr_compat_mmap_len;
-#else
-	len_32bit = PAX_ASLR_COMPAT_DELTA_MMAP_MIN_LEN;
-#endif
 
 	if (!(flags & MAP_FIXED) && ((orig_addr == 0) || !(flags & MAP_ANON))) {
 		CTR4(KTR_PAX, "%s: applying to %p orig_addr=%p flags=%x\n",
 		    __func__, (void *)*addr, (void *)orig_addr, flags);
 
 #ifdef MAP_32BIT
-		if (flags & MAP_32BIT)
+		if (flags & MAP_32BIT) {
+			int len_32bit;
+
+#ifdef COMPAT_FREEBSD32
+			len_32bit = pax_aslr_compat_mmap_len;
+#else
+			len_32bit = PAX_ASLR_COMPAT_DELTA_MMAP_MIN_LEN;
+#endif
 			*addr += PAX_ASLR_DELTA(arc4random(),
 			    PAX_ASLR_COMPAT_DELTA_MMAP_LSB,
 			    len_32bit);
-		else
+		 } else
 #endif /* MAP_32BIT */
 			*addr += p->p_vmspace->vm_aslr_delta_mmap;
 		CTR2(KTR_PAX, "%s: result %p\n", __func__, (void *)*addr);
@@ -587,6 +736,14 @@ pax_aslr_stack(struct proc *p, uintptr_t *addr)
 	*addr -= p->p_vmspace->vm_aslr_delta_stack;
 	CTR3(KTR_PAX, "%s: orig_addr=%p, new_addr=%p\n",
 	    __func__, (void *)orig_addr, (void *)*addr);
+}
+
+void
+pax_aslr_execbase(struct proc *p, u_long *et_dyn_addr)
+{
+
+	if (pax_aslr_active(p))
+		*et_dyn_addr += p->p_vmspace->vm_aslr_delta_exec;
 }
 
 u_int
