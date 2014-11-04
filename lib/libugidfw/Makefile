@@ -1,6 +1,5 @@
 # $FreeBSD$
 
-INSTALL_PIC_ARCHIVE=	yes
 LIB=		ugidfw
 SHLIB_MAJOR=	4
 SRCS=		ugidfw.c
