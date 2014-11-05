@@ -2,6 +2,7 @@
 
 .include <src.opts.mk>
 
+INSTALL_PIC_ARCHIVE=	yes
 LIB=		mp
 SHLIB_MAJOR=	7
 DPADD=		${LIBCRYPTO}
