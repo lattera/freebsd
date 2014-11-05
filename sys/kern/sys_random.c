@@ -46,12 +46,13 @@ int
 sys_getentropy(struct thread *td, struct getentropy_args *uap)
 {
 	char buf[256];
-	size_t len;
 	int error;
 
-	len = MIN(sizeof(buf), uap->len);
-	arc4rand(buf, len, 1);
-	if ((error = copyout(buf, uap->ptr, len)) != 0)	
+	if (uap->len > sizeof(buf))
+		return (EIO);
+
+	arc4rand(buf, uap->len, 1);
+	if ((error = copyout(buf, uap->ptr, uap->len)) != 0)	
 		return (error);
 
 	explicit_bzero(buf, sizeof(buf));
