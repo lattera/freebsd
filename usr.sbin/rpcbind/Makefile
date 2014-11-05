@@ -15,15 +15,7 @@ CFLAGS+= -DINET6
 .endif
 
 WARNS?=	1
-
-WANTS_PIE=	yes
-
-.if ${MK_PIE} != "no"
-DPADD=	${LIBWRAP_PIC} ${LIBUTIL_PIC}
-LDADD=	-lwrap_pic -lutil_pic
-.else
-DPADD=	${LIBWRAP} ${LIBUTIL}
-LDADD=	-lwrap -lutil
-.endif
+DPADD=	${LIBWRAP}
+LDADD=	-lwrap
 
 .include <bsd.prog.mk>
