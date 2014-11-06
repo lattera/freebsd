@@ -123,7 +123,6 @@ MAN+=	abort2.2 \
 	fsync.2 \
 	getdirentries.2 \
 	getdtablesize.2 \
-	getentropy.2 \
 	getfh.2 \
 	getfsstat.2 \
 	getgid.2 \

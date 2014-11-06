@@ -79,10 +79,8 @@ SET_DECLARE(dumpset, struct dumpers);
 int
 main(int argc, char *argv[])
 {
-	int ch, efd, fd, pid_max, name[4];
-	size_t pid_max_len;
+	int ch, efd, fd, name[4];
 	char *binfile, *corefile;
-	const char *errstr = NULL;
 	char passpath[MAXPATHLEN], fname[MAXPATHLEN];
 	struct dumpers **d, *dumper;
 	size_t len;
@@ -107,16 +105,10 @@ main(int argc, char *argv[])
 	}
 	argv += optind;
 	argc -= optind;
-	pid_max_len = sizeof(pid_max);
-	if (sysctlbyname("kern.pid_max", &pid_max, &pid_max_len,
-			NULL, 0) < 0)
-		errx(1, "kern.pid_max failure");
 	/* XXX we should check that the pid argument is really a number */
 	switch (argc) {
 	case 1:
-		pid = strtonum(argv[0], 0, pid_max, &errstr);
-		if (errstr)
-			errx(1, "pid argument invalid (%s)", errstr);
+		pid = atoi(argv[0]);
 		name[0] = CTL_KERN;
 		name[1] = KERN_PROC;
 		name[2] = KERN_PROC_PATHNAME;
@@ -127,9 +119,7 @@ main(int argc, char *argv[])
 		binfile = passpath;
 		break;
 	case 2:
-		pid = strtonum(argv[1], 0, pid_max, &errstr);
-		if (errstr)
-			errx(1, "pid argument invalid (%s)", errstr);
+		pid = atoi(argv[1]);
 		binfile = argv[0];
 		break;
 	default:

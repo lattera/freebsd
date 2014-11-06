@@ -823,11 +823,8 @@ static void
 setifmetric(const char *val, int dummy __unused, int s, 
     const struct afswtch *afp)
 {
-	const char *errstr = NULL;
 	strncpy(ifr.ifr_name, name, sizeof (ifr.ifr_name));
-	ifr.ifr_metric = strtonum(val, 0, INT_MAX, &errstr);
-	if (errstr)
-		warn("invalid metric value %s", errstr);
+	ifr.ifr_metric = atoi(val);
 	if (ioctl(s, SIOCSIFMETRIC, (caddr_t)&ifr) < 0)
 		warn("ioctl (set metric)");
 }
@@ -836,11 +833,8 @@ static void
 setifmtu(const char *val, int dummy __unused, int s, 
     const struct afswtch *afp)
 {
-	const char *errstr = NULL;
 	strncpy(ifr.ifr_name, name, sizeof (ifr.ifr_name));
-	ifr.ifr_mtu = strtonum(val, 0, INT_MAX, &errstr);
-	if (errstr)
-		warn("invalid mtu value %s", errstr);
+	ifr.ifr_mtu = atoi(val);
 	if (ioctl(s, SIOCSIFMTU, (caddr_t)&ifr) < 0)
 		warn("ioctl (set mtu)");
 }

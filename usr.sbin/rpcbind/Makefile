@@ -15,6 +15,7 @@ CFLAGS+= -DINET6
 .endif
 
 WARNS?=	1
+
 DPADD=	${LIBWRAP}
 LDADD=	-lwrap
 

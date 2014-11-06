@@ -1,19 +1,11 @@
 # $FreeBSD$
 
-.include <src.opts.mk>
-
 PROG=	casperd
 
 SRCS=	casperd.c zygote.c
 
-WANTS_PIE=	yes
-.if ${MK_PIE} != "no"
-DPADD=	${LIBCASPER_PIC} ${LIBCAPSICUM_PIC} ${LIBNV_PIC} ${LIBPJDLOG_PIC} ${LIBUTIL_PIC}
-LDADD=	-lcasper_pic -lcapsicum_pic -lnv_pic -lpjdlog_pic -lutil_pic
-.else
 DPADD=	${LIBCASPER} ${LIBCAPSICUM} ${LIBNV} ${LIBPJDLOG} ${LIBUTIL}
 LDADD=	-lcasper -lcapsicum -lnv -lpjdlog -lutil
-.endif
 
 MAN=	casperd.8
 

@@ -1,7 +1,6 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/4/93
 #	$FreeBSD$
 
-INSTALL_PIC_ARCHIVE=	yes
 SHLIBDIR?= /lib
 
 .include <src.opts.mk>

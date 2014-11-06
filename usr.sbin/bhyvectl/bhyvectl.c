@@ -314,6 +314,12 @@ dump_vm_run_exitcode(struct vm_exit *vmexit, int vcpu)
 		printf("\tinst_type\t\t%d\n", vmexit->u.vmx.inst_type);
 		printf("\tinst_error\t\t%d\n", vmexit->u.vmx.inst_error);
 		break;
+	case VM_EXITCODE_SVM:
+		printf("\treason\t\tSVM\n");
+		printf("\texit_reason\t\t%#lx\n", vmexit->u.svm.exitcode);
+		printf("\texitinfo1\t\t%#lx\n", vmexit->u.svm.exitinfo1);
+		printf("\texitinfo2\t\t%#lx\n", vmexit->u.svm.exitinfo2);
+		break;
 	default:
 		printf("*** unknown vm run exitcode %d\n", vmexit->exitcode);
 		break;
@@ -1460,7 +1466,6 @@ int
 main(int argc, char *argv[])
 {
 	char *vmname;
-	const char *errstr = NULL;
 	int error, ch, vcpu, ptenum;
 	vm_paddr_t gpa, gpa_pmap;
 	size_t len;
@@ -1490,19 +1495,11 @@ main(int argc, char *argv[])
 			vmname = optarg;
 			break;
 		case VCPU:
-			vcpu = strtonum(optarg, 0, INT_MAX, &errstr);
-			if (errstr)
-				vcpu = 0;
+			vcpu = atoi(optarg);
 			break;
 		case SET_MEM:
-			memsize = strtoul(optarg, NULL, 0);
-
-			if (errno != 0) {
-				error = 1;
-			} else {
-		 		memsize *= MB;
-				memsize = roundup(memsize, 2 * MB);
-			}
+			memsize = atoi(optarg) * MB;
+			memsize = roundup(memsize, 2 * MB);
 			break;
 		case SET_EFER:
 			efer = strtoul(optarg, NULL, 0);

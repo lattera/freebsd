@@ -2,7 +2,6 @@
 
 EXPAT=		${.CURDIR}/../../contrib/expat
 
-INSTALL_PIC_ARCHIVE=	yes
 LIB=		bsdxml
 SHLIBDIR?=	/lib
 SHLIB_MAJOR=	4

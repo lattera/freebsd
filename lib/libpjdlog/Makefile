@@ -2,7 +2,6 @@
 # $FreeBSD$
 #
 
-INSTALL_PIC_ARCHIVE=	yes
 SHLIBDIR?=	/lib
 
 .include <bsd.own.mk>

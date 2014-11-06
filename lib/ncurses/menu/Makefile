@@ -2,7 +2,6 @@
 
 .include "${.CURDIR}/../config.mk"
 
-INSTALL_PIC_ARCHIVE=	yes
 SRCDIR=	${NCURSES_DIR}/menu
 
 LIB=	menu${LIB_SUFFIX}

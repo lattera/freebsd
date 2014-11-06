@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#include <limits.h>
+#include <sys/cdefs.h>
 
 __FBSDID("$FreeBSD$");
 
@@ -138,7 +138,6 @@ process(const char *cap, char *str, char **argv)
 	    "too many arguments (%d) for capability `%s'";
 	static const char erresc[] =
 	    "unknown %% escape `%c' for capability `%s'";
-	const char *errstr = NULL;
 	char *cp;
 	int arg_need, arg_rows, arg_cols;
 
@@ -183,24 +182,18 @@ process(const char *cap, char *str, char **argv)
 
 		if (*++argv == NULL || *argv[0] == '\0')
 			errx(2, errfew, 1, cap);
-		arg_rows = strtonum(*argv, 0, INT_MAX, &errstr);
-		if (errstr)
-			errx(1, "rows %s", errstr);
+		arg_rows = atoi(*argv);
 
 		(void)tputs(tgoto(str, arg_cols, arg_rows), 1, outc);
 		break;
 	case 2:
 		if (*++argv == NULL || *argv[0] == '\0')
 			errx(2, errfew, 2, cap);
-		arg_cols = strtonum(*argv, 0, INT_MAX, &errstr);
-		if (errstr)
-			errx(1, "cols %s", errstr);
+		arg_cols = atoi(*argv);
 
 		if (*++argv == NULL || *argv[0] == '\0')
 			errx(2, errfew, 2, cap);
-		arg_rows = strtonum(*argv, 0, INT_MAX, &errstr);
-		if (errstr)
-			errx(1, "rows %s", errstr);
+		arg_rows = atoi(*argv);
 
 		(void) tputs(tgoto(str, arg_cols, arg_rows), arg_rows, outc);
 		break;

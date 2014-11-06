@@ -24,7 +24,6 @@
 #
 #	$FreeBSD$
 
-INSTALL_PIC_ARCHIVE=	yes
 LIB=		tacplus
 SRCS=		taclib.c
 INCS=		taclib.h

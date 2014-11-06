@@ -69,8 +69,7 @@ __DEFAULT_NO_OPTIONS = \
     DEBUG_FILES \
     DTRACE_HARDENING \
     INSTALL_AS_USER \
-    INFO \
-    PIE
+    INFO
 
 .include <bsd.mkopt.mk>
 

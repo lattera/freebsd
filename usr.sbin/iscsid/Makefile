@@ -1,7 +1,5 @@
 # $FreeBSD$
 
-.include <src.opts.mk>
-
 PROG=		iscsid
 SRCS=		chap.c discovery.c iscsid.c keys.c log.c login.c pdu.c
 CFLAGS+=	-I${.CURDIR}

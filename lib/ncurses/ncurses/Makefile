@@ -11,7 +11,6 @@ MK_MAN=no
 
 .include "${.CURDIR}/../config.mk"
 
-INSTALL_PIC_ARCHIVE=	yes
 LIB=		ncurses${LIB_SUFFIX}
 SHLIB_MAJOR=	8
 
@@ -296,10 +295,6 @@ SYMLINKS+=	libncurses${LIB_SUFFIX}.a ${LIBDIR}/libtermlib${LIB_SUFFIX}.a
 SYMLINKS+=	libncurses${LIB_SUFFIX}.a ${LIBDIR}/libtinfo${LIB_SUFFIX}.a
 .endif
 .if !defined(NO_PIC)
-SYMLINKS+=	libncurses${LIB_SUFFIX}_pic.a ${LIBDIR}/libcurses${LIB_SUFFIX}_pic.a
-SYMLINKS+=	libncurses${LIB_SUFFIX}_pic.a ${LIBDIR}/libtermcap${LIB_SUFFIX}_pic.a
-SYMLINKS+=	libncurses${LIB_SUFFIX}_pic.a ${LIBDIR}/libtermlib${LIB_SUFFIX}_pic.a
-SYMLINKS+=	libncurses${LIB_SUFFIX}_pic.a ${LIBDIR}/libtinfo${LIB_SUFFIX}_pic.a
 # no need for major at all, it's an ld-time redirection only
 SYMLINKS+=	libncurses${LIB_SUFFIX}.so ${LIBDIR}/libcurses${LIB_SUFFIX}.so
 SYMLINKS+=	libncurses${LIB_SUFFIX}.so ${LIBDIR}/libtermcap${LIB_SUFFIX}.so
