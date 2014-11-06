@@ -40,7 +40,6 @@ __FBSDID("$FreeBSD$");
 #include <err.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -157,12 +156,7 @@ void
 f_columns(struct info *ip)
 {
 
-	const char *errstr = NULL;
-	ip->win.ws_col = strtonum(ip->arg, 0, USHRT_MAX, 
-					&errstr);
-	if (errstr)
-		err(1, "COLUMNS");		
-
+	ip->win.ws_col = atoi(ip->arg);
 	ip->wset = 1;
 }
 

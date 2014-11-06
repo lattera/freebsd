@@ -1,6 +1,5 @@
 # $FreeBSD$
 
-INSTALL_PIC_ARCHIVE=	yes
 LIB=	casper
 
 SHLIB_MAJOR=	0

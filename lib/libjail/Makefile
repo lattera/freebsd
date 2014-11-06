@@ -1,6 +1,5 @@
 # $FreeBSD$
 
-INSTALL_PIC_ARCHIVE=	yes
 LIB=	jail
 SHLIBDIR?= /lib
 SHLIB_MAJOR= 1

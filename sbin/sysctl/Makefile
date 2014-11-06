@@ -1,11 +1,8 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/6/93
 # $FreeBSD$
 
-.include <src.opts.mk>
-
 PROG=	sysctl
 WARNS?=	3
 MAN=	sysctl.8
-WANTS_PIE=	yes
 
 .include <bsd.prog.mk>

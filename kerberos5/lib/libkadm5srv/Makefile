@@ -1,6 +1,5 @@
 # $FreeBSD$
 
-INSTALL_PIC_ARCHIVE=	yes
 LIB=	kadm5srv
 LDFLAGS=	-Wl,--no-undefined
 LDADD=	-lcom_err -lhdb -lkrb5 -lroken

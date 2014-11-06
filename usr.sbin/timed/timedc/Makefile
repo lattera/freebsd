@@ -3,15 +3,11 @@
 
 .PATH: ${.CURDIR}/../timed
 
-.include <src.opts.mk>
-
 PROG=	timedc
 MAN=	timedc.8
 SRCS=	cmds.c cmdtab.c timedc.c byteorder.c measure.c cksum.c
 BINOWN=	root
 BINMODE= 4555
-
-WANTS_PIE=	yes
 
 WARNS?=	1
 

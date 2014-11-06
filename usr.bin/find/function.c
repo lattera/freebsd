@@ -981,7 +981,6 @@ c_group(OPTION *option, char ***argvp)
 	PLAN *new;
 	struct group *g;
 	gid_t gid;
-	const char *errstr = NULL;
 
 	gname = nextarg(option, argvp);
 	ftsoptions &= ~FTS_NOSTAT;
@@ -990,8 +989,10 @@ c_group(OPTION *option, char ***argvp)
 	g = getgrnam(gname);
 	if (g == NULL) {
 		char* cp = gname;
-		gid = strtonum(gname, 0, GID_MAX, &errstr);
-		if (errstr)
+		if (gname[0] == '-' || gname[0] == '+')
+			gname++;
+		gid = atoi(gname);
+		if (gid == 0 && gname[0] != '0')
 			errx(1, "%s: %s: no such group", option->name, gname);
 		gid = find_parsenum(new, option->name, cp, NULL);
 	} else
@@ -1632,7 +1633,6 @@ c_user(OPTION *option, char ***argvp)
 	PLAN *new;
 	struct passwd *p;
 	uid_t uid;
-	const char *errstr = NULL;
 
 	username = nextarg(option, argvp);
 	ftsoptions &= ~FTS_NOSTAT;
@@ -1641,8 +1641,10 @@ c_user(OPTION *option, char ***argvp)
 	p = getpwnam(username);
 	if (p == NULL) {
 		char* cp = username;
-		uid = strtonum(username, 0, UID_MAX, &errstr);
-		if (errstr)
+		if( username[0] == '-' || username[0] == '+' )
+			username++;
+		uid = atoi(username);
+		if (uid == 0 && username[0] != '0')
 			errx(1, "%s: %s: no such user", option->name, username);
 		uid = find_parsenum(new, option->name, cp, NULL);
 	} else

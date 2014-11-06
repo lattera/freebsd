@@ -1229,7 +1229,6 @@ charsperline(void)
 	int columns;
 	char *cp;
 	struct winsize ws;
-	const char *errstr = NULL;
 
 	DBG_ENTER;
 
@@ -1237,8 +1236,8 @@ charsperline(void)
 	if (ioctl(0, TIOCGWINSZ, &ws) != -1)
 		columns = ws.ws_col;
 	if (columns == 0 && (cp = getenv("COLUMNS")))
-		columns = strtonum(cp, 0, INT_MAX, &errstr);
-	if (errstr)
+		columns = atoi(cp);
+	if (columns == 0)
 		columns = 80;	/* last resort */
 
 	DBG_LEAVE;

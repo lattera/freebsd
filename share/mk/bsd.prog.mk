@@ -47,30 +47,12 @@ CTFFLAGS+= -g
 STRIP?=	-s
 .endif
 
-
 .if defined(NO_SHARED) && (${NO_SHARED} != "no" && ${NO_SHARED} != "NO")
 LDFLAGS+= -static
 .endif
 
 .if defined(USEPRIVATELIB)
 LDFLAGS+= -L${_SHLIBDIRPREFIX}${LIBPRIVATEDIR} -rpath ${LIBPRIVATEDIR}
-.endif
-
-.if ${MACHINE_CPUARCH} == "sparc64"
-PIEFLAG=-fPIE
-.else
-PIEFLAG=-fpie
-.endif
-
-.if ${MK_PIE} != "no"
-.if defined(WANTS_PIE) && ${WANTS_PIE} != "no" && ${WANTS_PIE} != "NO" 
-.if !defined(PROG_CXX)
-CFLAGS+=${PIEFLAG}
-.else
-CXXFLAGS+=${PIEFLAG}
-.endif
-LDFLAGS+=-pie
-.endif
 .endif
 
 .if ${MK_DEBUG_FILES} != "no"

@@ -1,6 +1,5 @@
 # $FreeBSD$
 
-INSTALL_PIC_ARCHIVE=	yes
 LIB=	sl
 INTERNALLIB=
 SRCS=	sl.c
