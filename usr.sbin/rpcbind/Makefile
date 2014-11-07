@@ -16,7 +16,6 @@ CFLAGS+= -DINET6
 
 WARNS?=	1
 
-<<<<<<< HEAD
 WANTS_PIE=	yes
 
 .if ${MK_PIE} != "no"
@@ -26,9 +25,5 @@ LDADD=	-lwrap_pic -lutil_pic
 DPADD=	${LIBWRAP} ${LIBUTIL}
 LDADD=	-lwrap -lutil
 .endif
-=======
-DPADD=	${LIBWRAP}
-LDADD=	-lwrap
->>>>>>> hardened/current/master
 
 .include <bsd.prog.mk>
