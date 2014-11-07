@@ -32,7 +32,6 @@
 
 #ifdef _KERNEL
 
-struct image_params;
 struct thread;
 struct proc;
 
@@ -52,7 +51,6 @@ extern gid_t ptrace_hardening_allowed_gid;
 #define PTRACE_HARDENING_MODE_PUBLIC	0x01
 
 int ptrace_hardening(struct thread *, struct proc *, int);
-void ptrace_hardening_mode(struct image_params *, uint32_t);
 void ptrace_hardening_init_prison(struct prison *);
 
 extern int hardening_log_log;
