@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014, by David Carlier <devnexen at gmail.com>
+ * Copyright (c) 2014, by Theo de Raadt
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,38 +27,35 @@
  * $FreeBSD$
  */
 
-#ifndef	__SYS_PTRACE_HARDENING_H
-#define	__SYS_PTRACE_HARDENING_H
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-#ifdef _KERNEL
+#include <sys/sysent.h>
+#include <sys/sysproto.h>
+#include <sys/libkern.h>
+#include <sys/proc.h>
 
-struct thread;
-struct proc;
-
-extern int ptrace_hardening_status;
-extern int ptrace_hardening_flag_status;
-
-#ifdef PTRACE_HARDENING_GRP
-extern gid_t ptrace_hardening_allowed_gid;
+#ifndef	_SYS_SYSPROTO_H_
+struct getentropy_args {
+	void	*ptr;
+	size_t	len;
+};
 #endif
 
-#define PTRACE_HARDENING_DISABLED			0
-#define PTRACE_HARDENING_ENABLED			1
-#define PTRACE_HARDENING_REQFLAG_DISABLED	0
-#define PTRACE_HARDENING_REQFLAG_ENABLED	1
+int
+sys_getentropy(struct thread *td, struct getentropy_args *uap)
+{
+	char buf[256];
+	int error;
 
-#define PTRACE_HARDENING_MODE_ROOTONLY	0x00
-#define PTRACE_HARDENING_MODE_PUBLIC	0x01
+	if (uap->len > sizeof(buf))
+		return (EIO);
 
-int ptrace_hardening(struct thread *, struct proc *, int);
-void ptrace_hardening_init_prison(struct prison *);
+	arc4rand(buf, uap->len, 1);
+	if ((error = copyout(buf, uap->ptr, uap->len)) != 0)	
+		return (error);
 
-extern int hardening_log_log;
-extern int hardening_log_ulog;
+	explicit_bzero(buf, sizeof(buf));
 
-void ptrace_log_hardening(struct proc *, const char *func,
-	const char *fmt, ...);
-void ptrace_ulog_hardening(const char *func, const char *fmt, ...);
-#endif /* _KERNEL */
-
-#endif /* __SYS_PTRACE_HARDENING_H */
+	return (0);
+}

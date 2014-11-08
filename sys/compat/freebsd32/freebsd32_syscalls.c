@@ -578,4 +578,5 @@ const char *freebsd32_syscallnames[] = {
 #else
 	"freebsd32_procctl",			/* 544 = freebsd32_procctl */
 #endif
+	"getentropy",			/* 545 = getentropy */
 };

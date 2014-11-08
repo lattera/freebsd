@@ -581,6 +581,7 @@ off_t	 __syscall(quad_t, ...);
 int	 undelete(const char *);
 int	 unwhiteout(const char *);
 void	*valloc(size_t);			/* obsoleted by malloc() */
+int	 getentropy(void *, size_t);
 
 #ifndef _OPTRESET_DECLARED
 #define	_OPTRESET_DECLARED

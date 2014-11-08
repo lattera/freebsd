@@ -409,4 +409,5 @@ MIASM =  \
 	accept4.o \
 	pipe2.o \
 	aio_mlock.o \
-	procctl.o
+	procctl.o \
+	getentropy.o

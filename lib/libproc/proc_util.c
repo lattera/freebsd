@@ -60,6 +60,10 @@ proc_continue(struct proc_handle *phdl)
 {
 	int pending = 0;
 
+#ifdef	DTRACE_HARDENING_PTRACE
+	return (0);
+#endif
+
 	if (phdl == NULL)
 		return (-1);
 
@@ -77,6 +81,10 @@ int
 proc_detach(struct proc_handle *phdl, int reason)
 {
 	int status;
+
+#ifdef	DTRACE_HARDENING_PTRACE
+	return (0);
+#endif
 
 	if (phdl == NULL)
 		return (EINVAL);
@@ -133,6 +141,10 @@ pid_t
 proc_getpid(struct proc_handle *phdl)
 {
 
+#ifdef	DTRACE_HARDENING_PTRACE
+	return (-1);
+#endif
+
 	if (phdl == NULL)
 		return (-1);
 
@@ -184,6 +196,10 @@ proc_read(struct proc_handle *phdl, void *buf, size_t size, size_t addr)
 {
 	struct ptrace_io_desc piod;
 
+#ifdef	DTRACE_HARDENING_PTRACE
+	return (0);
+#endif
+
 	if (phdl == NULL)
 		return (-1);
 	piod.piod_op = PIOD_READ_D;
@@ -202,6 +218,10 @@ proc_getlwpstatus(struct proc_handle *phdl)
 	struct ptrace_lwpinfo lwpinfo;
 	lwpstatus_t *psp = &phdl->lwps;
 	siginfo_t *siginfo;
+
+#ifdef	DTRACE_HARDENING_PTRACE
+	return (0);
+#endif
 
 	if (phdl == NULL)
 		return (NULL);

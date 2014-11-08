@@ -552,4 +552,5 @@ const char *syscallnames[] = {
 	"pipe2",			/* 542 = pipe2 */
 	"aio_mlock",			/* 543 = aio_mlock */
 	"procctl",			/* 544 = procctl */
+	"getentropy",			/* 545 = getentropy */
 };

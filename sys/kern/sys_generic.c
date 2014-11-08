@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_capsicum.h"
 #include "opt_compat.h"
 #include "opt_ktrace.h"
+#include "opt_dtrace_hardening.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -654,6 +655,12 @@ sys_ioctl(struct thread *td, struct ioctl_args *uap)
 	int arg, error;
 	u_int size;
 	caddr_t data;
+
+#ifdef	DTRACE_HARDENING
+	/* is DTRACEIOC_GO flag ... will return EDT_DESTRUCTIVE in dtrace side */
+	if (uap->com == 0x4004780c) 
+		return (EACCES);
+#endif
 
 	if (uap->com > 0xffffffff) {
 		printf(
