@@ -1269,7 +1269,7 @@ exec_copyout_strings(imgp)
 	}
 	destp =	(uintptr_t)arginfo;
 #ifdef PAX_ASLR
-	pax_aslr_stack(curthread, &destp);
+	pax_aslr_stack(p, &destp);
 #endif
 
 	/*

@@ -69,8 +69,6 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/pax.h>
 
-#include <security/mac_bsdextended/mac_bsdextended.h>
-
 SYSCTL_NODE(_hardening, OID_AUTO, pax, CTLFLAG_RD, 0,
     "PaX (exploit mitigation) features.");
 
@@ -88,25 +86,21 @@ const char *pax_status_simple_str[] = {
 };
 
 struct prison *
-pax_get_prison(struct proc *proc)
+pax_get_prison(struct proc *p)
 {
-	if ((proc == NULL) || (proc->p_ucred == NULL))
-		return (NULL);
 
-	return (proc->p_ucred->cr_prison);
+	/* p can be NULL with kernel threads, so use prison0 */
+	if (p == NULL || p->p_ucred == NULL)
+		return (&prison0);
+
+	return (p->p_ucred->cr_prison);
 }
 
-int
-pax_get_flags(struct proc *proc, uint32_t *flags)
+void
+pax_get_flags(struct proc *p, uint32_t *flags)
 {
-	*flags = 0;
 
-	if (proc != NULL)
-		*flags = proc->p_pax;
-	else
-		return (1);
-
-	return (0);
+	*flags = p->p_pax;
 }
 
 int
@@ -114,35 +108,24 @@ pax_elf(struct image_params *imgp, uint32_t mode)
 {
 	u_int flags, flags_aslr, flags_segvuard, flags_hardening;
 
-	flags = 0;
+	flags = mode;
 	flags_aslr = flags_segvuard = flags_hardening = 0;
-
-	if ((mode & MBI_ALLPAX) != MBI_ALLPAX) {
-		if (mode & MBI_ASLR_ENABLED)
-			flags |= PAX_NOTE_ASLR;
-		if (mode & MBI_ASLR_DISABLED)
-			flags |= PAX_NOTE_NOASLR;
-		if (mode & MBI_SEGVGUARD_ENABLED)
-			flags |= PAX_NOTE_SEGVGUARD;
-		if (mode & MBI_SEGVGUARD_DISABLED)
-			flags |= PAX_NOTE_NOSEGVGUARD;
-	}
 
 	if ((flags & ~PAX_NOTE_ALL) != 0) {
 		pax_log_aslr(imgp->proc, __func__, "unknown paxflags: %x\n", flags);
 		pax_ulog_aslr(NULL, "unknown paxflags: %x\n", flags);
 
-		return (1);
+		return (ENOEXEC);
 	}
 
-	if (((flags & PAX_NOTE_ALL_ENABLED) & ((flags & PAX_NOTE_ALL_DISABLED) >> 1)) != 0) {
+	if (((mode & PAX_NOTE_ALL_ENABLED) & ((mode & PAX_NOTE_ALL_DISABLED) >> 1)) != 0) {
 		/*
 		 * indicate flags inconsistencies in dmesg and in user terminal
 		 */
 		pax_log_aslr(imgp->proc, __func__, "inconsistent paxflags: %x\n", flags);
 		pax_ulog_aslr(NULL, "inconsistent paxflags: %x\n", flags);
 
-		return (1);
+		return (ENOEXEC);
 	}
 
 #ifdef PAX_ASLR
@@ -159,18 +142,11 @@ pax_elf(struct image_params *imgp, uint32_t mode)
 
 	flags = flags_aslr | flags_segvuard | flags_hardening;
 
-
 	CTR3(KTR_PAX, "%s : flags = %x mode = %x",
 	    __func__, flags, mode);
 
-	if (imgp != NULL) {
-		imgp->pax_flags = flags;
-		if (imgp->proc != NULL) {
-			PROC_LOCK(imgp->proc);
-			imgp->proc->p_pax = flags;
-			PROC_UNLOCK(imgp->proc);
-		}
-	}
+	imgp->pax_flags = flags;
+	imgp->proc->p_pax = flags;
 
 	return (0);
 }
@@ -191,50 +167,106 @@ void
 pax_init_prison(struct prison *pr)
 {
 
-	if (pr == NULL)
-		return;
-
-	if (pr->pr_pax_set)
-		return;
-
-	prison_lock(pr);
-
 	CTR2(KTR_PAX, "%s: Setting prison %s PaX variables\n",
 	    __func__, pr->pr_name);
 
+	if (pr == &prison0) {
+		/* prison0 has no parent, use globals */
 #ifdef PAX_ASLR
-	pr->pr_pax_aslr_status = pax_aslr_status;
-	pr->pr_pax_aslr_debug = pax_aslr_debug;
-	pr->pr_pax_aslr_mmap_len = pax_aslr_mmap_len;
-	pr->pr_pax_aslr_stack_len = pax_aslr_stack_len;
-	pr->pr_pax_aslr_exec_len = pax_aslr_exec_len;
+		pr->pr_hardening.hr_pax_aslr_status = pax_aslr_status;
+		pr->pr_hardening.hr_pax_aslr_mmap_len =
+		    pax_aslr_mmap_len;
+		pr->pr_hardening.hr_pax_aslr_stack_len =
+		    pax_aslr_stack_len;
+		pr->pr_hardening.hr_pax_aslr_exec_len =
+		    pax_aslr_exec_len;
 
 #ifdef COMPAT_FREEBSD32
-	pr->pr_pax_aslr_compat_status = pax_aslr_compat_status;
-	pr->pr_pax_aslr_compat_mmap_len = pax_aslr_compat_mmap_len;
-	pr->pr_pax_aslr_compat_stack_len = pax_aslr_compat_stack_len;
-	pr->pr_pax_aslr_compat_exec_len = pax_aslr_compat_exec_len;
+		pr->pr_hardening.hr_pax_aslr_compat_status =
+		    pax_aslr_compat_status;
+		pr->pr_hardening.hr_pax_aslr_compat_mmap_len =
+		    pax_aslr_compat_mmap_len;
+		pr->pr_hardening.hr_pax_aslr_compat_stack_len =
+		    pax_aslr_compat_stack_len;
+		pr->pr_hardening.hr_pax_aslr_compat_exec_len =
+		    pax_aslr_compat_exec_len;
 #endif /* COMPAT_FREEBSD32 */
 #endif /* PAX_ASLR */
 
 #ifdef PAX_SEGVGUARD
-	pr->pr_pax_segvguard_status = pax_segvguard_status;
-	pr->pr_pax_segvguard_debug = pax_segvguard_debug;
-	pr->pr_pax_segvguard_expiry = pax_segvguard_expiry;
-	pr->pr_pax_segvguard_suspension = pax_segvguard_suspension;
-	pr->pr_pax_segvguard_maxcrashes = pax_segvguard_maxcrashes;
-#endif
-
-#if defined(PAX_HARDENING) && defined(MAP_32BIT)
-	pr->pr_pax_map32_enabled = pax_map32_enabled_global;
+		pr->pr_hardening.hr_pax_segvguard_status =
+		    pax_segvguard_status;
+		pr->pr_hardening.hr_pax_segvguard_debug =
+		    pax_segvguard_debug;
+		pr->pr_hardening.hr_pax_segvguard_expiry =
+		    pax_segvguard_expiry;
+		pr->pr_hardening.hr_pax_segvguard_suspension =
+		    pax_segvguard_suspension;
+		pr->pr_hardening.hr_pax_segvguard_maxcrashes =
+		    pax_segvguard_maxcrashes;
 #endif
 
 #ifdef PAX_HARDENING
-	pr->pr_pax_procfs_harden = pax_procfs_harden_global;
-	pr->pr_pax_mprotect_exec = pax_mprotect_exec_global;
+#ifdef MAP_32BIT
+		pr->pr_hardening.hr_pax_map32_enabled =
+		    pax_map32_enabled_global;
+#endif
+		pr->pr_hardening.hr_pax_procfs_harden =
+		    pax_procfs_harden_global;
+		pr->pr_hardening.hr_pax_mprotect_exec =
+		    pax_mprotect_exec_harden_global;
+#endif
+	} else {
+#ifdef PAX_ASLR
+		struct prison *pr_p;
+
+		KASSERT(pr->pr_parent != NULL,
+		   ("%s: pr->pr_parent == NULL", __func__));
+		pr_p = pr->pr_parent;
+
+		pr->pr_hardening.hr_pax_aslr_status =
+		    pr_p->pr_hardening.hr_pax_aslr_status;
+		pr->pr_hardening.hr_pax_aslr_mmap_len =
+		    pr_p->pr_hardening.hr_pax_aslr_mmap_len;
+		pr->pr_hardening.hr_pax_aslr_stack_len =
+		    pr_p->pr_hardening.hr_pax_aslr_stack_len;
+		pr->pr_hardening.hr_pax_aslr_exec_len =
+		    pr_p->pr_hardening.hr_pax_aslr_exec_len;
+
+#ifdef COMPAT_FREEBSD32
+		pr->pr_hardening.hr_pax_aslr_compat_status =
+		    pr_p->pr_hardening.hr_pax_aslr_compat_status;
+		pr->pr_hardening.hr_pax_aslr_compat_mmap_len =
+		    pr_p->pr_hardening.hr_pax_aslr_compat_mmap_len;
+		pr->pr_hardening.hr_pax_aslr_compat_stack_len =
+		    pr_p->pr_hardening.hr_pax_aslr_compat_stack_len;
+		pr->pr_hardening.hr_pax_aslr_compat_exec_len =
+		    pr_p->pr_hardening.hr_pax_aslr_compat_exec_len;
+#endif /* COMPAT_FREEBSD32 */
+#endif /* PAX_ASLR */
+
+#ifdef PAX_SEGVGUARD
+		pr->pr_hardening.hr_pax_segvguard_status =
+		    pr_p->pr_hardening.hr_pax_segvguard_status;
+		pr->pr_hardening.hr_pax_segvguard_debug =
+		    pr_p->pr_hardening.hr_pax_segvguard_debug;
+		pr->pr_hardening.hr_pax_segvguard_expiry =
+		    pr_p->pr_hardening.hr_pax_segvguard_expiry;
+		pr->pr_hardening.hr_pax_segvguard_suspension =
+		    pr_p->pr_hardening.hr_pax_segvguard_suspension;
+		pr->pr_hardening.hr_pax_segvguard_maxcrashes =
+		    pr_p->pr_hardening.hr_pax_segvguard_maxcrashes;
 #endif
 
-	pr->pr_pax_set = 1;
-
-	prison_unlock(pr);
+#ifdef PAX_HARDENING
+#ifdef MAP_32BIT
+		pr->pr_hardening.hr_pax_map32_enabled =
+		    pr_p->pr_hardening.hr_pax_map32_enabled;
+#endif
+		pr->pr_hardening.hr_pax_procfs_harden =
+		    pr_p->pr_hardening.hr_pax_procfs_harden;
+		pr->pr_hardening.hr_pax_mprotect_exec =
+		    pr_p->pr_hardening.hr_pax_mprotect_exec;
+#endif
+	}
 }

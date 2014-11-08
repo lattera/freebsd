@@ -19,12 +19,12 @@
 # $FreeBSD$
 
 cpu		HAMMER
-ident		OP-PERPETUA
+ident		OP-HARDENEDBSD
 
 options		HZ=100
 
 makeoptions	DEBUG=-gdwarf-2		# Build kernel with gdb(1) debug symbols
-makeoptions	MODULES_OVERRIDE="geom/geom_sched linux usb/umodem usb/u3g usb/umass usb/ucom"
+makeoptions	MODULES_OVERRIDE="geom/geom_sched linux usb/umodem usb/u3g usb/umass usb/ucom usb/uplcom drm2"
 #makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
 
 options 	SCHED_ULE		# ULE scheduler
@@ -52,11 +52,14 @@ options 	PSEUDOFS		# Pseudo-filesystem framework
 options 	GEOM_PART_GPT		# GUID Partition Tables.
 options 	GEOM_RAID		# Soft RAID functionality.
 options 	GEOM_LABEL		# Provides labelization
-options 	COMPAT_FREEBSD32	# Compatible with i386 binaries
+options 	GEOM_ELI
+#options 	COMPAT_FREEBSD32	# Compatible with i386 binaries
 options 	COMPAT_FREEBSD4		# Compatible with FreeBSD4
 options 	COMPAT_FREEBSD5		# Compatible with FreeBSD5
 options 	COMPAT_FREEBSD6		# Compatible with FreeBSD6
 options 	COMPAT_FREEBSD7		# Compatible with FreeBSD7
+options 	COMPAT_FREEBSD9		# Compatible with FreeBSD9
+options 	COMPAT_FREEBSD10	# Compatible with FreeBSD10
 options 	SCSI_DELAY=5000		# Delay (in ms) before probing SCSI
 options 	KTRACE			# ktrace(1) support
 options 	STACK			# stack(9) support
@@ -166,12 +169,15 @@ device		pass		# Passthrough device (direct ATA/SCSI access)
 #device		ida		# Compaq Smart RAID
 #device		mfi		# LSI MegaRAID SAS
 #device		mlx		# Mylex DAC960 family
+#device		mrsas			# LSI/Avago MegaRAID SAS/SATA, 6Gb/s and 12Gb/s
 #XXX pointer/int warnings
 #device		pst		# Promise Supertrak SX6000
 #device		twe		# 3ware ATA RAID
 
 # atkbdc0 controls both the keyboard and the PS/2 mouse
 device		atkbdc		# AT keyboard controller
+options		ATKBD_DFLT_KEYMAP
+makeoptions	ATKBD_DFLT_KEYMAP="/usr/share/vt/keymaps/us.ctrl.kbd"
 device		atkbd		# AT keyboard
 device		psm		# PS/2 mouse
 
@@ -217,6 +223,8 @@ device		uart		# Generic UART driver
 device		em		# Intel PRO/1000 Gigabit Ethernet Family
 #device		igb		# Intel PRO/1000 PCIE Server Gigabit Family
 #device		ixgbe		# Intel PRO/10GbE PCIE Ethernet Family
+#device		ixl			# Intel XL710 40Gbe PCIE Ethernet
+#device		ixlv			# Intel XL710 40Gbe VF PCIE Ethernet
 #device		le		# AMD Am7900 LANCE and Am79C9xx PCnet
 #device		ti		# Alteon Networks Tigon I/II gigabit Ethernet
 #device		txp		# 3Com 3cR990 (``Typhoon'')
@@ -227,7 +235,7 @@ device		em		# Intel PRO/1000 Gigabit Ethernet Family
 device		miibus		# MII bus support
 #device		ae		# Attansic/Atheros L2 FastEthernet
 #device		age		# Attansic/Atheros L1 Gigabit Ethernet
-#device		alc		# Atheros AR8131/AR8132 Ethernet
+device		alc		# Atheros AR8131/AR8132 Ethernet
 #device		ale		# Atheros AR8121/AR8113/AR8114 Ethernet
 #device		bce		# Broadcom BCM5706/BCM5708 Gigabit Ethernet
 #device		bfe		# Broadcom BCM440x 10/100 Ethernet
@@ -249,7 +257,7 @@ device		re		# RealTek 8139C+/8169/8169S/8110S
 #device		sf		# Adaptec AIC-6915 (``Starfire'')
 #device		sge		# Silicon Integrated Systems SiS190/191
 #device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
-#device		sk		# SysKonnect SK-984x & SK-982x gigabit Ethernet
+device		sk		# SysKonnect SK-984x & SK-982x gigabit Ethernet
 #device		ste		# Sundance ST201 (D-Link DFE-550TX)
 #device		stge		# Sundance/Tamarack TC9021 gigabit Ethernet
 #device		tl		# Texas Instruments ThunderLAN
@@ -291,6 +299,7 @@ device		ath_rate_sample	# SampleRate tx rate control for ath
 #device		ipw		# Intel 2100 wireless NICs.
 #device		iwi		# Intel 2200BG/2225BG/2915ABG wireless NICs.
 device		iwn		# Intel 4965/1000/5000/6000 wireless NICs.
+device		iwn1000fw
 device		iwn2030fw
 #device		malo		# Marvell Libertas wireless NICs.
 #device		mwl		# Marvell 88W8363 802.11n wireless NICs.
@@ -323,6 +332,8 @@ device		ohci		# OHCI PCI->USB interface
 device		ehci		# EHCI PCI->USB interface (USB 2.0)
 device		xhci		# XHCI PCI->USB interface (USB 3.0)
 device		usb		# USB Bus (required)
+options		UKBD_DFLT_KEYMAP
+makeoptions	UKBD_DFLT_KEYMAP="/usr/share/vt/keymaps/us.ctrl.kbd"
 device		ukbd		# Keyboard
 device		ums		# Mouse
 #device		umass		# Disks/Mass storage - Requires scbus and da
@@ -367,10 +378,6 @@ device		cpuctl
 
 # sc related
 options		SC_DISABLE_REBOOT
-
-# ukbd
-options		UKBD_DFLT_KEYMAP
-makeoptions	UKBD_DFLT_KEYMAP=us.pc-ctrl
 
 # ipfw
 options		IPFIREWALL

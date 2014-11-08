@@ -32,6 +32,33 @@
 #ifndef	__SYS_PAX_H
 #define	__SYS_PAX_H
 
+#if defined(_KERNEL) || defined(_WANT_PRISON)
+struct hardening_features {
+	int	 hr_pax_aslr_status;		/* (p) PaX ASLR enabled */
+	int	 hr_pax_aslr_mmap_len;		/* (p) Number of bits randomized with mmap */
+	int	 hr_pax_aslr_stack_len;		/* (p) Number of bits randomized with stack */
+	int	 hr_pax_aslr_exec_len;		/* (p) Number of bits randomized with the execbase */
+	int	 hr_pax_aslr_compat_status;	/* (p) PaX ASLR enabled (compat32) */
+	int	 hr_pax_aslr_compat_mmap_len;	/* (p) Number of bits randomized with mmap (compat32) */
+	int	 hr_pax_aslr_compat_stack_len;	/* (p) Number of bits randomized with stack (compat32) */
+	int	 hr_pax_aslr_compat_exec_len;	/* (p) Number of bits randomized with the execbase (compat32) */
+	int	 hr_pax_segvguard_status;       /* (p) PaX segvguard enabled */
+	int	 hr_pax_segvguard_debug;        /* (p) PaX segvguard debug */
+	int	 hr_pax_segvguard_expiry;       /* (p) Number of seconds to expire an entry */
+	int	 hr_pax_segvguard_suspension;   /* (p) Number of seconds to suspend an application */
+	int	 hr_pax_segvguard_maxcrashes;   /* (p) Maximum number of crashes before suspending application */
+	int	 hr_pax_map32_enabled;		/* (p) MAP_32BIT enabled (amd64 only) */
+	int	 hr_ptrace_hardening_set;		/* (p) Ptrace flags set */
+	int	 hr_ptrace_hardening_status;	/* (p) Ptrace hardening enabled */
+	int	 hr_ptrace_hardening_flag_status;	/* (p) Ptrace hardening flag enabled */
+	int	 hr_ptrace_request_flags_all;	/* (p) Ptrace hardening request set for all */
+	char	 hr_ptrace_request_flags[65];	/* (p) Ptrace requests types */
+	gid_t	 hr_ptrace_hardening_allowed_gid;	/* (p) Ptrace hardening per gid */
+	int	 hr_pax_procfs_harden;		/* (p) Harden procfs */
+	int	 hr_pax_mprotect_exec;		/* (p) Disallow setting exec bit on non-exec mappings */
+};
+#endif
+
 #ifdef _KERNEL
 
 struct image_params;
@@ -58,152 +85,8 @@ extern const char *pax_status_str[];
 
 extern const char *pax_status_simple_str[];
 
-#ifndef PAX_ASLR_DELTA
-#define	PAX_ASLR_DELTA(delta, lsb, len)	\
-	(((delta) & ((1UL << (len)) - 1)) << (lsb))
-#endif /* PAX_ASLR_DELTA */
-
-/*
- * generic ASLR values
- *
- *  	MMAP	| 32 bit | 64 bit |
- * 	+-------+--------+--------+
- * 	| MIN	|  8 bit | 16 bit |
- * 	+-------+--------+--------+
- * 	| DEF	| 14 bit | 21 bit |
- * 	+-------+--------+--------+
- * 	| MAX   | 20 bit | 32 bit |
- * 	+-------+--------+--------+
- *
- *  	STACK	| 32 bit | 64 bit |
- * 	+-------+--------+--------+
- * 	| MIN	|  6 bit | 12 bit |
- * 	+-------+--------+--------+
- * 	| DEF	|  6 bit | 16 bit |
- * 	+-------+--------+--------+
- * 	| MAX   | 10 bit | 21 bit |
- * 	+-------+--------+--------+
- *
- *  	EXEC	| 32 bit | 64 bit |
- * 	+-------+--------+--------+
- * 	| MIN	|  6 bit | 12 bit |
- * 	+-------+--------+--------+
- * 	| DEF	| 14 bit | 21 bit |
- * 	+-------+--------+--------+
- * 	| MAX   | 20 bit | 21 bit |
- * 	+-------+--------+--------+
- *
- */
-#ifndef PAX_ASLR_DELTA_MMAP_LSB
-#define PAX_ASLR_DELTA_MMAP_LSB		PAGE_SHIFT
-#endif /* PAX_ASLR_DELTA_MMAP_LSB */
-
-#ifndef PAX_ASLR_DELTA_MMAP_MIN_LEN
-#define PAX_ASLR_DELTA_MMAP_MIN_LEN	((sizeof(void *) * NBBY) / 4)
-#endif /* PAX_ASLR_DELTA_MMAP_MAX_LEN */
-
-#ifndef PAX_ASLR_DELTA_MMAP_MAX_LEN
-#ifdef __LP64__
-#define PAX_ASLR_DELTA_MMAP_MAX_LEN	((sizeof(void *) * NBBY) / 2)
-#else
-#define PAX_ASLR_DELTA_MMAP_MAX_LEN 20
-#endif /* __LP64__ */
-#endif /* PAX_ASLR_DELTA_MMAP_MAX_LEN */
-
-#ifndef PAX_ASLR_DELTA_STACK_LSB
-#define PAX_ASLR_DELTA_STACK_LSB	3
-#endif /* PAX_ASLR_DELTA_STACK_LSB */
-
-#ifndef PAX_ASLR_DELTA_STACK_MIN_LEN
-#define PAX_ASLR_DELTA_STACK_MIN_LEN	((sizeof(void *) * NBBY) / 5)
-#endif /* PAX_ASLR_DELTA_STACK_MAX_LEN */
-
-#ifndef PAX_ASLR_DELTA_STACK_MAX_LEN
-#define PAX_ASLR_DELTA_STACK_MAX_LEN	((sizeof(void *) * NBBY) / 3)
-#endif /* PAX_ASLR_DELTA_STACK_MAX_LEN */
-
-#ifndef PAX_ASLR_DELTA_EXEC_LSB
-#define PAX_ASLR_DELTA_EXEC_LSB		PAGE_SHIFT
-#endif /* PAX_ASLR_DELTA_EXEC_LSB */
-
-#ifndef PAX_ASLR_DELTA_EXEC_MIN_LEN
-#define PAX_ASLR_DELTA_EXEC_MIN_LEN	((sizeof(void *) * NBBY) / 5)
-#endif /* PAX_ASLR_DELTA_EXEC_MIN_LEN */
-
-#ifndef PAX_ASLR_DELTA_EXEC_MAX_LEN
-#ifdef __LP64__
-#define PAX_ASLR_DELTA_EXEC_MAX_LEN	((sizeof(void *) * NBBY) / 3)
-#else
-#define PAX_ASLR_DELTA_EXEC_MAX_LEN 20
-#endif /* __LP64__ */
-#endif /* PAX_ASLR_DELTA_EXEC_MAX_LEN */
-
-/*
- * ASLR default values for native host
- */
-#ifdef __LP64__
-#ifndef PAX_ASLR_DELTA_MMAP_DEF_LEN
-#define PAX_ASLR_DELTA_MMAP_DEF_LEN	21
-#endif /* PAX_ASLR_DELTA_MMAP_DEF_LEN */
-#ifndef PAX_ASLR_DELTA_STACK_DEF_LEN
-#define PAX_ASLR_DELTA_STACK_DEF_LEN	16
-#endif /* PAX_ASLR_DELTA_STACK_DEF_LEN */
-#ifndef PAX_ASLR_DELTA_EXEC_DEF_LEN
-#define PAX_ASLR_DELTA_EXEC_DEF_LEN	21
-#endif /* PAX_ASLR_DELTA_EXEC_DEF_LEN */
-#else
-#ifndef PAX_ASLR_DELTA_MMAP_DEF_LEN
-#define PAX_ASLR_DELTA_MMAP_DEF_LEN	14
-#endif /* PAX_ASLR_DELTA_MMAP_DEF_LEN */
-#ifndef PAX_ASLR_DELTA_STACK_DEF_LEN
-#define PAX_ASLR_DELTA_STACK_DEF_LEN	PAX_ASLR_DELTA_STACK_MIN_LEN
-#endif /* PAX_ASLR_DELTA_STACK_DEF_LEN */
-#ifndef PAX_ASLR_DELTA_EXEC_DEF_LEN
-#define PAX_ASLR_DELTA_EXEC_DEF_LEN	14
-#endif /* PAX_ASLR_DELTA_EXEC_DEF_LEN */
-#endif /* __LP64__ */
-
-/*
- * ASLR values for COMPAT_FREEBSD32 and COMPAT_LINUX
- */
-#ifndef PAX_ASLR_COMPAT_DELTA_MMAP_LSB
-#define PAX_ASLR_COMPAT_DELTA_MMAP_LSB		PAGE_SHIFT
-#endif /* PAX_ASLR_COMPAT_DELTA_MMAP_LSB */
-
-#ifndef PAX_ASLR_COMPAT_DELTA_MMAP_MIN_LEN
-#define PAX_ASLR_COMPAT_DELTA_MMAP_MIN_LEN	((sizeof(int) * NBBY) / 4)
-#endif /* PAX_ASLR_COMPAT_DELTA_MMAP_MAX_LEN */
-
-#ifndef PAX_ASLR_COMPAT_DELTA_MMAP_MAX_LEN
-#define PAX_ASLR_COMPAT_DELTA_MMAP_MAX_LEN	((sizeof(int) * NBBY) / 2)
-#endif /* PAX_ASLR_COMPAT_DELTA_MMAP_MAX_LEN */
-
-#ifndef PAX_ASLR_COMPAT_DELTA_STACK_LSB
-#define PAX_ASLR_COMPAT_DELTA_STACK_LSB		3
-#endif /* PAX_ASLR_COMPAT_DELTA_STACK_LSB */
-
-#ifndef PAX_ASLR_COMPAT_DELTA_STACK_MIN_LEN
-#define PAX_ASLR_COMPAT_DELTA_STACK_MIN_LEN	((sizeof(int) * NBBY) / 5)
-#endif /* PAX_ASLR_COMPAT_DELTA_STACK_MAX_LEN */
-
-#ifndef PAX_ASLR_COMPAT_DELTA_STACK_MAX_LEN
-#define PAX_ASLR_COMPAT_DELTA_STACK_MAX_LEN	((sizeof(int) * NBBY) / 3)
-#endif /* PAX_ASLR_COMPAT_DELTA_STACK_MAX_LEN */
-
-#ifndef PAX_ASLR_COMPAT_DELTA_EXEC_LSB
-#define PAX_ASLR_COMPAT_DELTA_EXEC_LSB		PAGE_SHIFT
-#endif /* PAX_ASLR_COMPAT_DELTA_EXEC_LSB */
-
-#ifndef PAX_ASLR_COMPAT_DELTA_EXEC_MIN_LEN
-#define PAX_ASLR_COMPAT_DELTA_EXEC_MIN_LEN	((sizeof(int) * NBBY) / 5)
-#endif /* PAX_ASLR_COMPAT_DELTA_EXEC_MAX_LEN */
-
-#ifndef PAX_ASLR_COMPAT_DELTA_EXEC_MAX_LEN
-#define PAX_ASLR_COMPAT_DELTA_EXEC_MAX_LEN	((sizeof(int) * NBBY) / 3)
-#endif /* PAX_ASLR_COMPAT_DELTA_EXEC_MAX_LEN */
 
 extern int pax_aslr_status;
-extern int pax_aslr_debug;
 
 extern int pax_aslr_mmap_len;
 extern int pax_aslr_stack_len;
@@ -225,7 +108,7 @@ extern int pax_segvguard_maxcrashes;
 
 #ifdef PAX_HARDENING
 extern int pax_map32_enabled_global;
-extern int pax_mprotect_exec_global;
+extern int pax_mprotect_exec_harden_global;
 extern int pax_procfs_harden_global;
 #endif /* PAX_HARDENING*/
 
@@ -259,21 +142,22 @@ extern int hardening_log_ulog;
  * generic pax functions
  */
 int pax_elf(struct image_params *, uint32_t);
-int pax_get_flags(struct proc *proc, uint32_t *flags);
-struct prison *pax_get_prison(struct proc *proc);
+void pax_get_flags(struct proc *p, uint32_t *flags);
+struct prison *pax_get_prison(struct proc *p);
 void pax_init_prison(struct prison *pr);
 
 /*
  * ASLR related functions
  */
-bool pax_aslr_active(struct proc *proc);
-void _pax_aslr_init(struct vmspace *vm, struct proc *p);
-void _pax_aslr_init32(struct vmspace *vm, struct proc *p);
+int pax_aslr_active(struct proc *p);
+void pax_aslr_init_vmspace(struct proc *p);
+void pax_aslr_init_vmspace32(struct proc *p);
 void pax_aslr_init(struct image_params *imgp);
+void pax_aslr_execbase(struct proc *p, u_long *et_dyn_addr);
 void pax_aslr_mmap(struct proc *p, vm_offset_t *addr, 
     vm_offset_t orig_addr, int flags);
 u_int pax_aslr_setup_flags(struct image_params *imgp, u_int mode);
-void pax_aslr_stack(struct thread *td, uintptr_t *addr);
+void pax_aslr_stack(struct proc *p, uintptr_t *addr);
 
 /*
  * Log related functions
@@ -298,7 +182,7 @@ int pax_segvguard_update_flags_if_setuid(struct image_params *imgp,
  * Hardening related functions
  */
 int pax_map32_enabled(struct thread *td);
-int pax_mprotect_exec_enabled(void);
+int pax_mprotect_exec_harden(void);
 int pax_procfs_harden(struct thread *td);
 
 #endif /* _KERNEL */
