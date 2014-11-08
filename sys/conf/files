@@ -2132,16 +2132,15 @@ rt2860.fw			optional rt2860fw | ralfw		\
 	compile-with	"${NORMAL_FW}"					\
 	no-obj no-implicit-rule						\
 	clean		"rt2860.fw"
-dev/random/harvest.c		standard
-dev/random/dummy_rng.c		standard
+dev/random/randomdev.c		standard
 dev/random/random_adaptors.c	standard
-dev/random/live_entropy_sources.c	optional random
-dev/random/random_harvestq.c	optional random
-dev/random/randomdev.c		optional random
+dev/random/dummy_rng.c		standard
+dev/random/live_entropy_sources.c	standard
+dev/random/random_harvestq.c	standard
 dev/random/randomdev_soft.c	optional random
 dev/random/yarrow.c		optional random
+dev/random/fortuna.c		optional random
 dev/random/hash.c		optional random
-dev/random/rwfile.c		optional random
 dev/rc/rc.c			optional rc
 dev/re/if_re.c			optional re
 dev/rl/if_rl.c			optional rl pci
@@ -2647,6 +2646,8 @@ dev/xen/pvcpu/pvcpu.c		optional xen | xenhvm
 dev/xen/xenstore/xenstore.c	optional xen | xenhvm
 dev/xen/xenstore/xenstore_dev.c	optional xen | xenhvm
 dev/xen/xenstore/xenstored_dev.c	optional xen | xenhvm
+dev/xen/evtchn/evtchn_dev.c	optional xen | xenhvm
+dev/xen/privcmd/privcmd.c	optional xen | xenhvm
 dev/xl/if_xl.c			optional xl pci
 dev/xl/xlphy.c			optional xl pci
 fs/autofs/autofs.c		optional autofs
@@ -3239,11 +3240,12 @@ net/if_fddisubr.c		optional fddi
 net/if_fwsubr.c			optional fwip
 net/if_gif.c			optional gif inet | gif inet6 | \
 					 netgraph_gif inet | netgraph_gif inet6
-net/if_gre.c			optional gre inet
+net/if_gre.c			optional gre inet | gre inet6
 net/if_iso88025subr.c		optional token
 net/if_lagg.c			optional lagg
 net/if_loop.c			optional loop
 net/if_llatbl.c			standard
+net/if_me.c			optional me inet
 net/if_media.c			standard
 net/if_mib.c			standard
 net/if_spppfr.c			optional sppp | netgraph_sppp
@@ -3478,6 +3480,7 @@ netinet6/in6_proto.c		optional inet6
 netinet6/in6_rmx.c		optional inet6
 netinet6/in6_src.c		optional inet6
 netinet6/ip6_forward.c		optional inet6
+netinet6/ip6_gre.c		optional gre inet6
 netinet6/ip6_id.c		optional inet6
 netinet6/ip6_input.c		optional inet6
 netinet6/ip6_mroute.c		optional mrouting inet6
