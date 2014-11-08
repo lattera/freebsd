@@ -12,15 +12,8 @@ CFLAGS+=	-I${.CURDIR}/../../sys/dev/iscsi
 #CFLAGS+=	-DICL_KERNEL_PROXY
 MAN=		ctld.8 ctl.conf.5
 
-WANTS_PIE=	yes
-
-.if ${MK_PIE} != "no"
-DPADD=		${LIBBSDXML_PIC} ${LIBCAM_PIC} ${LIBCRYPTO_PIC} ${LIBL_PIC} ${LIBSBUF_PIC} ${LIBSSL_PIC} ${LIBUTIL_PIC}
-LDADD=		-lbsdxml_pic -lcam_pic -lcrypto_pic -ll_pic -lsbuf_pic -lssl_pic -lutil_pic
-.else
-DPADD=		${LIBBSDXML} ${LIBCAM} ${LIBCRYPTO} ${LIBL} ${LIBSBUF} ${LIBSSL} ${LIBUTIL}
-LDADD=		-lbsdxml -lcam -lcrypto -ll -lsbuf -lssl -lutil
-.endif
+DPADD=		${LIBBSDXML} ${LIBCRYPTO} ${LIBL} ${LIBSBUF} ${LIBUTIL}
+LDADD=		-lbsdxml -lcrypto -ll -lsbuf -lutil
 
 YFLAGS+=	-v
 CLEANFILES=	y.tab.c y.tab.h y.output
