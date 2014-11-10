@@ -68,8 +68,9 @@ __FBSDID("$FreeBSD$");
 #include <security/pam_mod_misc.h>
 
 #define PASSWORD_HASH		"md5"
+#define	NOMODULAR			"disabled"
 #define DEFAULT_WARN		(2L * 7L * 86400L)  /* Two weeks */
-#define	SALTSIZE		32
+#define	SALTSIZE		64
 
 #define	LOCKED_PREFIX		"*LOCKED*"
 #define	LOCKED_PREFIX_LEN	(sizeof(LOCKED_PREFIX) - 1)
@@ -77,6 +78,7 @@ __FBSDID("$FreeBSD$");
 static void makesalt(char []);
 
 static char password_hash[] =		PASSWORD_HASH;
+static char password_nomodular[] =	NOMODULAR;
 
 #define PAM_OPT_LOCAL_PASS	"local_pass"
 #define PAM_OPT_NIS_PASS	"nis_pass"
@@ -272,7 +274,7 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags,
 	char salt[SALTSIZE + 1];
 	login_cap_t *lc;
 	struct passwd *pwd, *old_pwd;
-	const char *user, *old_pass, *new_pass;
+	const char *user, *old_pass, *new_pass, *modular_salt;
 	char *encrypted;
 	time_t passwordtime;
 	int pfd, tfd, retval;
@@ -378,10 +380,18 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags,
 			return (PAM_BUF_ERR);
 
 		lc = login_getclass(pwd->pw_class);
-		if (login_setcryptfmt(lc, password_hash, NULL) == NULL)
-			openpam_log(PAM_LOG_ERROR,
-			    "can't set password cipher, relying on default");
-		
+
+		explicit_bzero(salt, sizeof(salt));
+		modular_salt = login_getcapstr(lc, "passwd_modular",
+			password_nomodular, NULL);
+
+		if (strcmp(modular_salt, password_nomodular) == 0) {
+				if (login_setcryptfmt(lc, password_hash, NULL) == NULL)
+						openpam_log(PAM_LOG_ERROR,
+						"can't set password cipher, relying on default");
+		} else {
+				strlcpy(salt, modular_salt, sizeof(salt));
+		}
 		/* set password expiry date */
 		pwd->pw_change = 0;
 		passwordtime = login_getcaptime(lc, "passwordtime", 0, 0);
@@ -464,13 +474,24 @@ static void
 makesalt(char salt[SALTSIZE + 1])
 {
 	int i;
+	int remainder;
+
+
+	/* If a salt magic has already been set, skip to free area */
+	for (i = 0; i < SALTSIZE; i ++)
+		if (salt[i] == '\0')
+			break;
 
 	/* These are not really random numbers, they are just
 	 * numbers that change to thwart construction of a
 	 * dictionary.
 	 */
-	for (i = 0; i < SALTSIZE; i += 4)
-		to64(&salt[i], arc4random(), 4);
+	while (i < SALTSIZE) {
+		remainder = SALTSIZE - i;
+		to64(&salt[i], arc4random(), (remainder < 4 ? remainder : 4));
+		i += 4;
+	}
+
 	salt[SALTSIZE] = '\0';
 }
 
