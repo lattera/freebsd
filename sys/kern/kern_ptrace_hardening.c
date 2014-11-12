@@ -58,7 +58,8 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/stdarg.h>
 
-#include <security/mac_bsdextended/mac_bsdextended.h>
+#define	PTRACE_HARDENING_MODE_ROOTONLY	0x00
+#define	PTRACE_HARDENING_MODE_PUBLIC	0x01
 
 FEATURE(ptrace_hardening, "Ptrace call restrictions.");
 
@@ -69,7 +70,7 @@ int ptrace_hardening_status = PAX_FEATURE_SIMPLE_ENABLED;
 int ptrace_hardening_flag_status = PAX_FEATURE_SIMPLE_ENABLED;
 
 #ifdef PTRACE_HARDENING_GRP
-gid_t ptrace_hardening_allowed_gid = 0;
+gid_t ptrace_hardening_allowed_gid = 0; // XXXOP PTRACE_H_DFLT_GRP
 #endif
 
 static char ptrace_request_flags[PT_FIRSTMACH + 1] = { 0 };
@@ -403,19 +404,45 @@ fail:
 	return (EPERM);
 }
 
-// XXXOP
 static void
 ptrace_hardening_sysinit(void)
 {
 	int mtx_flag;
 	size_t i;
 
-	if (ptrace_hardening_status < 0 || ptrace_hardening_status > 1)
+	switch (ptrace_hardening_status) {
+	case PAX_FEATURE_SIMPLE_DISABLED:
+	case PAX_FEATURE_SIMPLE_ENABLED:
+		break;
+	default:
+		printf("[PTRACE HARDENING] WARNING, invalid settings in "
+		    "loader.conf! (hardening.ptrace.status = %d)\n",
+		    pax_map32_enabled_global);
 		ptrace_hardening_status = PAX_FEATURE_SIMPLE_ENABLED;
+	}
+	printf("[PTRACE HARDENING] support: %s\n",
+	    pax_status_simple_str[ptrace_hardening_status]);
 
-	if (ptrace_hardening_flag_status < 0 || ptrace_hardening_flag_status > 1)
+#ifdef PTRACE_HARDENING_GRP
+	printf("[PTRACE HARDENING] allowed gid : %d\n",
+	    ptrace_hardening_allowed_gid);
+#endif
+
+	switch (ptrace_hardening_flag_status) {
+	case PAX_FEATURE_SIMPLE_DISABLED:
+	case PAX_FEATURE_SIMPLE_ENABLED:
+		break;
+	default:
+		printf("[PTRACE HARDENING] WARNING, invalid settings in "
+		    "loader.conf! (hardening.ptrace.flag_status = %d)\n",
+		    pax_map32_enabled_global);
 		ptrace_hardening_flag_status = PAX_FEATURE_SIMPLE_ENABLED;
+	}
+	printf("[PTRACE HARDENING] fine grade control: %s\n",
+	    pax_status_simple_str[ptrace_hardening_flag_status]);
 
+
+	// XXXOP
 	for (i = 0; i < sizeof(ptrace_request_flags); i++)
 		if (ptrace_request_flags[i] < 0 || ptrace_request_flags[i] > 1)
 			ptrace_request_flags[i] = 0;
@@ -424,16 +451,6 @@ ptrace_hardening_sysinit(void)
 
 #ifndef PTRACE_HARDENING_DEBUG
 	mtx_flag |= MTX_NOWITNESS;
-#endif
-
-	printf("[PTRACE HARDENING] status : %s\n",
-	    ptrace_hardening_status ? "enabled" : "disabled");
-	printf("[PTRACE HARDENING] flags : %s\n",
-	    ptrace_hardening_flag_status ? "enabled" : "disabled");
-
-#ifdef PTRACE_HARDENING_GRP
-	printf("[PTRACE HARDENING] allowed gid : %d\n",
-	    ptrace_hardening_allowed_gid);
 #endif
 
 	mtx_init(&ptrace_request_flags_mtx, "Ptrace request flags mutex",

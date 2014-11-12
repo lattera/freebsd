@@ -42,9 +42,6 @@ extern int ptrace_hardening_flag_status;
 extern gid_t ptrace_hardening_allowed_gid;
 #endif
 
-#define PTRACE_HARDENING_MODE_ROOTONLY	0x00
-#define PTRACE_HARDENING_MODE_PUBLIC	0x01
-
 int ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag);
 void ptrace_hardening_init_prison(struct prison *pr);
 
