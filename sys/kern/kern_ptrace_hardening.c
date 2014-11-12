@@ -54,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 
 #include <sys/ptrace_hardening.h>
+#include <sys/pax.h>
 
 #include <machine/stdarg.h>
 
@@ -64,8 +65,8 @@ FEATURE(ptrace_hardening, "Ptrace call restrictions.");
 static MALLOC_DEFINE(HARDENING_PTRACE, "ptrace hardening",
 	"Ptrace Hardening allocations");
 
-int ptrace_hardening_status = PTRACE_HARDENING_ENABLED;
-int ptrace_hardening_flag_status = PTRACE_HARDENING_REQFLAG_ENABLED;
+int ptrace_hardening_status = PAX_FEATURE_SIMPLE_ENABLED;
+int ptrace_hardening_flag_status = PAX_FEATURE_SIMPLE_ENABLED;
 
 #ifdef PTRACE_HARDENING_GRP
 gid_t ptrace_hardening_allowed_gid = 0;
@@ -94,59 +95,54 @@ static int sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS);
 
 #ifdef PTRACE_HARDENING_GRP
 static int sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS);
-#endif	/* PTRACE_HARDENING_GTP */
+#endif	/* PTRACE_HARDENING_GRP */
 #endif	/* PTRACE_HARDENING_SYSCTLS */
 
 #ifdef PTRACE_HARDENING_SYSCTLS
-#define PTRACE_REQUEST_FLAG_SYSCTL(PTFLAG, name)						\
-static int sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS);	\
-																		\
-SYSCTL_PROC(_hardening_ptrace_flag, OID_AUTO, name,						\
-    CTLTYPE_INT|CTLFLAG_RWTUN|CTLFLAG_PRISON|CTLFLAG_SECURE,			\
-    NULL, 0, sysctl_ptrace_hardening_##name##_flag, "I",				\
-    "Request "#name" flag");											\
-																		\
-int																		\
-sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS)				\
-{																		\
-	struct prison *pr = NULL;											\
-	int err, val;                   									\
-																		\
-	pr = ptrace_get_prison(req->td->td_proc);							\
-																		\
-	val = (pr != NULL) ?												\
-		pr->pr_hardening.hr_ptrace_request_flags[PTFLAG] :				\
-	    ptrace_request_flags[PTFLAG];									\
-	err = sysctl_handle_int(oidp, &val, sizeof(int), req);				\
-	if (err || (req->newptr == NULL))									\
-		return (err);													\
-																		\
-	switch (val) {														\
-	case 0:																\
-	case 1:																\
-		if ((pr == NULL) || (pr == &prison0))							\
-			ptrace_request_flags[PTFLAG] = val;							\
-																		\
-		if (pr != NULL) {												\
-			prison_lock(pr);											\
-			pr->pr_hardening.hr_ptrace_request_flags[PTFLAG] = val;	\
-			prison_unlock(pr);											\
-		}																\
-		break;															\
-	default:															\
-		return (EINVAL);												\
-	}																	\
-																		\
-	return (0);															\
+#define PTRACE_REQUEST_FLAG_SYSCTL(PTFLAG, name)			\
+static int sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS);	\										\
+SYSCTL_PROC(_hardening_ptrace_flag, OID_AUTO, name,			\
+    CTLTYPE_INT|CTLFLAG_RWTUN|CTLFLAG_PRISON|CTLFLAG_SECURE,		\
+    NULL, 0, sysctl_ptrace_hardening_##name##_flag, "I",		\
+    "Request "#name" flag");						\
+									\
+int									\
+sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS)		\
+{									\
+	struct prison *pr;					\
+	int err, val;                   				\
+									\
+	pr = pax_get_prison(req->td->td_proc);				\
+									\
+	val = pr->pr_hardening.hr_ptrace_request_flags[PTFLAG];		\
+	err = sysctl_handle_int(oidp, &val, sizeof(int), req);		\
+	if (err || (req->newptr == NULL))				\
+		return (err);						\
+									\
+	switch (val) {							\
+	case PAX_FEATURE_SIMPLE_DISABLED:				\
+	case PAX_FEATURE_SIMPLE_ENABLED:				\
+		if (pr == &prison0)					\
+			ptrace_request_flags[PTFLAG] = val;		\
+									\
+		prison_lock(pr);					\
+		pr->pr_hardening.hr_ptrace_request_flags[PTFLAG] = val;	\
+		prison_unlock(pr);					\
+		break;							\
+	default:							\
+		return (EINVAL);					\
+	}								\
+									\
+	return (0);							\
 }
 #else
 #define PTRACE_REQUEST_FLAG_SYSCTL(PTFLAG, name)
 #endif	/* PTRACE_HARDENING_SYSCTLS */
 
-#define PTRACE_REQUEST_FLAG(PTFLAG, name)								\
-TUNABLE_STR("hardening.ptrace.flag."#name, 								\
-    &ptrace_request_flags[PTFLAG], 1);									\
-																		\
+#define PTRACE_REQUEST_FLAG(PTFLAG, name)				\
+TUNABLE_STR("hardening.ptrace.flag."#name, 				\
+    &ptrace_request_flags[PTFLAG], 1);					\
+									\
 PTRACE_REQUEST_FLAG_SYSCTL(PTFLAG, name)
 
 #ifdef PTRACE_HARDENING_SYSCTLS
@@ -217,28 +213,28 @@ PTRACE_REQUEST_FLAG(PT_FIRSTMACH, firstmach)
 int
 sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS)
 {
-	struct prison *pr = NULL;
+	struct prison *pr;
 	int err, val;
 
-	pr = ptrace_get_prison(req->td->td_proc);
+	/*
+	 * pax_get_prison always returns not NULL value
+	 */
+	pr = pax_get_prison(req->td->td_proc);
 
-	val = (pr != NULL) ? pr->pr_hardening.hr_ptrace_hardening_status :
-	    ptrace_hardening_status;
+	val = pr->pr_hardening.hr_ptrace_hardening_status;
 	err = sysctl_handle_int(oidp, &val, sizeof(int), req);
 	if (err || (req->newptr == NULL))
 		return (err);
 
 	switch (val) {
-	case    PTRACE_HARDENING_DISABLED:
-	case    PTRACE_HARDENING_ENABLED:
-		if ((pr == NULL) || (pr == &prison0))
+	case    PAX_FEATURE_SIMPLE_DISABLED:
+	case    PAX_FEATURE_SIMPLE_ENABLED:
+		if (pr == &prison0)
 			ptrace_hardening_status = val;
 
-		if (pr != NULL) {
-			prison_lock(pr);
-			pr->pr_hardening.hr_ptrace_hardening_status = val;
-			prison_unlock(pr);
-		}
+		prison_lock(pr);
+		pr->pr_hardening.hr_ptrace_hardening_status = val;
+		prison_unlock(pr);
 		break;
 	default:
 		return (EINVAL);
@@ -250,28 +246,25 @@ sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS)
 int
 sysctl_ptrace_hardening_flag(SYSCTL_HANDLER_ARGS)
 {
-	struct prison *pr = NULL;
+	struct prison *pr;
 	int err, val;
 
-	pr = ptrace_get_prison(req->td->td_proc);
+	pr = pax_get_prison(req->td->td_proc);
 
-	val = (pr != NULL) ? pr->pr_hardening.hr_ptrace_hardening_flag_status :
-	    ptrace_hardening_flag_status;
+	val = pr->pr_hardening.hr_ptrace_hardening_flag_status;
 	err = sysctl_handle_int(oidp, &val, sizeof(int), req);
 	if (err || (req->newptr == NULL))
 		return (err);
 
 	switch (val) {
-	case PTRACE_HARDENING_REQFLAG_ENABLED:
-	case PTRACE_HARDENING_REQFLAG_DISABLED:
-		if ((pr == NULL) || (pr == &prison0))
+	case PAX_FEATURE_SIMPLE_DISABLED:
+	case PAX_FEATURE_SIMPLE_ENABLED:
+		if (pr == &prison0)
 			ptrace_hardening_flag_status = val;
 
-		if (pr != NULL) {
-			prison_lock(pr);
-			pr->pr_hardening.hr_ptrace_hardening_flag_status = val;
-			prison_unlock(pr);
-		}
+		prison_lock(pr);
+		pr->pr_hardening.hr_ptrace_hardening_flag_status = val;
+		prison_unlock(pr);
 		break;
 	default:
 		return (EINVAL);
@@ -283,33 +276,31 @@ sysctl_ptrace_hardening_flag(SYSCTL_HANDLER_ARGS)
 int
 sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 {
-	struct prison *pr = NULL;
+	struct prison *pr;
 	struct sysctl_oid_list *oidlist;
 	struct sysctl_oid *oid;
 	size_t buflen, sysctlpreflen;
 	int err, val;
 
-	pr = ptrace_get_prison(req->td->td_proc);
+	pr = pax_get_prison(req->td->td_proc);
+
 	oidlist = &sysctl___hardening_ptrace_flag.oid_children;
 	sysctlpreflen = sizeof("hardening.ptrace.flag.");
 
-	val = (pr != NULL) ? pr->pr_hardening.hr_ptrace_request_flags_all :
-	    ptrace_request_flags_all;
+	val = pr->pr_hardening.hr_ptrace_request_flags_all;
 	err = sysctl_handle_int(oidp, &val, sizeof(int), req);
 	if (err || (req->newptr == NULL))
 		return (err);
 
 	switch (val) {
-	case 0:
-	case 1:
-		if ((pr == NULL) || (pr == &prison0))
+	case PAX_FEATURE_SIMPLE_DISABLED:
+	case PAX_FEATURE_SIMPLE_ENABLED:
+		if (pr == &prison0)
 			ptrace_request_flags_all = val;
 
-		if (pr != NULL) {
-			prison_lock(pr);
-			pr->pr_hardening.hr_ptrace_request_flags_all = val;
-			prison_unlock(pr);
-		}
+		prison_lock(pr);
+		pr->pr_hardening.hr_ptrace_request_flags_all = val;
+		prison_unlock(pr);
 
 		mtx_lock(&ptrace_request_flags_mtx);
 
@@ -339,14 +330,13 @@ sysctl_ptrace_hardening_flagall(SYSCTL_HANDLER_ARGS)
 int
 sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS)
 {
-	struct prison *pr = NULL;
+	struct prison *pr;
 	long val;
 	int err;
 
-	pr = ptrace_get_prison(req->td->td_proc);
+	pr = pax_get_prison(req->td->td_proc);
 
-	val = (pr != NULL) ? pr->pr_hardening.hr_ptrace_hardening_allowed_gid :
-	    ptrace_hardening_allowed_gid;
+	val = pr->pr_hardening.hr_ptrace_hardening_allowed_gid;
 	err = sysctl_handle_long(oidp, &val, sizeof(long), req);
 	if (err || (req->newptr == NULL))
 		return (err);
@@ -354,14 +344,12 @@ sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS)
 	if (val < 0 || val > GID_MAX)
 		return (EINVAL);
 
-	if ((pr == NULL) || (pr == &prison0))
+	if (pr == &prison0)
 		ptrace_hardening_allowed_gid = val;
 
-	if (pr != NULL) {
-		prison_lock(pr);
-		pr->pr_hardening.hr_ptrace_hardening_allowed_gid = val;
-		prison_unlock(pr);
-	}
+	prison_lock(pr);
+	pr->pr_hardening.hr_ptrace_hardening_allowed_gid = val;
+	prison_unlock(pr);
 
 	return (0);
 }
@@ -371,18 +359,21 @@ sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS)
 int
 ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag)
 {
-	struct prison *pr = NULL;
+	struct prison *pr;
 	uid_t uid;
 	gid_t gid;
 	pid_t pid;
 
-	pr = ptrace_get_prison(td->td_proc);
+	pr = pax_get_prison(td->td_proc);
 
-	if (pr == NULL && !ptrace_hardening_status)
-		return (0);
-	if (pr != NULL && !pr->pr_hardening.hr_ptrace_hardening_status)
+	if (pr->pr_hardening.hr_ptrace_hardening_status ==
+	    PAX_FEATURE_SIMPLE_DISABLED)
 		return (0);
 
+	/*
+	 * XXXOP
+	 * td->td_proc instead of p?
+	 */
 	if (p->p_ptrace_hardening & PTRACE_HARDENING_MODE_PUBLIC)
 		return (0);
 
@@ -395,22 +386,15 @@ ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag)
 		return (0);
 #endif
 
-
-	if (pr == NULL && ptrace_hardening_flag_status &&
-	    !ptrace_request_flags[ptrace_flag])
-		goto fail;
-	if (pr != NULL && pr->pr_hardening.hr_ptrace_hardening_flag_status &&
-	    !pr->pr_hardening.hr_ptrace_request_flags[ptrace_flag])
+	if ((pr->pr_hardening.hr_ptrace_hardening_flag_status ==
+	    PAX_FEATURE_SIMPLE_ENABLED) &&
+	    (pr->pr_hardening.hr_ptrace_request_flags[ptrace_flag] ==
+	    PAX_FEATURE_SIMPLE_DISABLED))
 		goto fail;
 
 #ifdef PTRACE_HARDENING_GRP
-	if (pr == NULL && (ptrace_hardening_allowed_gid &&
-	    gid != ptrace_hardening_allowed_gid))
-		goto fail;
-
-	if (pr != NULL && 
-		(pr->pr_hardening.hr_ptrace_hardening_allowed_gid &&
-	    gid != pr->pr_hardening.hr_ptrace_hardening_allowed_gid))
+	if ((pr->pr_hardening.hr_ptrace_hardening_allowed_gid != 0) &&
+	    (gid != pr->pr_hardening.hr_ptrace_hardening_allowed_gid))
 		goto fail;
 #endif	/* PTRACE_HARDENING_GRP */
 
@@ -423,6 +407,7 @@ fail:
 	return (EPERM);
 }
 
+// XXXOP
 static void
 ptrace_hardening_sysinit(void)
 {
@@ -467,15 +452,6 @@ ptrace_hardening_sysuninit(void)
 }
 SYSUNINIT(ptrace, SI_SUB_PTRACE_HARDENING, SI_ORDER_FIRST,
 	ptrace_hardening_sysuninit, NULL);
-
-struct prison *
-ptrace_get_prison(struct proc *p)
-{
-	if ((p == NULL) || (p->p_ucred == NULL))
-		return (NULL);
-
-	return (p->p_ucred->cr_prison);
-}
 
 void
 ptrace_hardening_init_prison(struct prison *pr)
