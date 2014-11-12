@@ -42,22 +42,13 @@ extern int ptrace_hardening_flag_status;
 extern gid_t ptrace_hardening_allowed_gid;
 #endif
 
-#define PTRACE_HARDENING_DISABLED			0
-#define PTRACE_HARDENING_ENABLED			1
-#define PTRACE_HARDENING_REQFLAG_DISABLED	0
-#define PTRACE_HARDENING_REQFLAG_ENABLED	1
-
-#define PTRACE_HARDENING_MODE_ROOTONLY	0x00
-#define PTRACE_HARDENING_MODE_PUBLIC	0x01
-
-int ptrace_hardening(struct thread *, struct proc *, int);
-void ptrace_hardening_init_prison(struct prison *);
+int ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag);
+void ptrace_hardening_init_prison(struct prison *pr);
 
 extern int hardening_log_log;
 extern int hardening_log_ulog;
 
-void ptrace_log_hardening(struct proc *, const char *func,
-	const char *fmt, ...);
+void ptrace_log_hardening(struct proc *, const char *func, const char *fmt, ...);
 void ptrace_ulog_hardening(const char *func, const char *fmt, ...);
 #endif /* _KERNEL */
 
