@@ -100,7 +100,8 @@ static int sysctl_ptrace_hardening_gid(SYSCTL_HANDLER_ARGS);
 
 #ifdef PTRACE_HARDENING_SYSCTLS
 #define PTRACE_REQUEST_FLAG_SYSCTL(PTFLAG, name)			\
-static int sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS);	\										\
+static int sysctl_ptrace_hardening_##name##_flag(SYSCTL_HANDLER_ARGS);	\
+									\
 SYSCTL_PROC(_hardening_ptrace_flag, OID_AUTO, name,			\
     CTLTYPE_INT|CTLFLAG_RWTUN|CTLFLAG_PRISON|CTLFLAG_SECURE,		\
     NULL, 0, sysctl_ptrace_hardening_##name##_flag, "I",		\
