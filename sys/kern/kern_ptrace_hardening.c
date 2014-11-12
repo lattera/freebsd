@@ -417,7 +417,7 @@ ptrace_hardening_sysinit(void)
 	default:
 		printf("[PTRACE HARDENING] WARNING, invalid settings in "
 		    "loader.conf! (hardening.ptrace.status = %d)\n",
-		    pax_map32_enabled_global);
+		    ptrace_hardening_status);
 		ptrace_hardening_status = PAX_FEATURE_SIMPLE_ENABLED;
 	}
 	printf("[PTRACE HARDENING] support: %s\n",
@@ -435,7 +435,7 @@ ptrace_hardening_sysinit(void)
 	default:
 		printf("[PTRACE HARDENING] WARNING, invalid settings in "
 		    "loader.conf! (hardening.ptrace.flag_status = %d)\n",
-		    pax_map32_enabled_global);
+		    ptrace_hardening_flag_status);
 		ptrace_hardening_flag_status = PAX_FEATURE_SIMPLE_ENABLED;
 	}
 	printf("[PTRACE HARDENING] fine grade control: %s\n",
