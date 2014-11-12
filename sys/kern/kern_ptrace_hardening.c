@@ -227,8 +227,8 @@ sysctl_ptrace_hardening_status(SYSCTL_HANDLER_ARGS)
 		return (err);
 
 	switch (val) {
-	case    PAX_FEATURE_SIMPLE_DISABLED:
-	case    PAX_FEATURE_SIMPLE_ENABLED:
+	case PAX_FEATURE_SIMPLE_DISABLED:
+	case PAX_FEATURE_SIMPLE_ENABLED:
 		if (pr == &prison0)
 			ptrace_hardening_status = val;
 
@@ -370,10 +370,6 @@ ptrace_hardening(struct thread *td, struct proc *p, int ptrace_flag)
 	    PAX_FEATURE_SIMPLE_DISABLED)
 		return (0);
 
-	/*
-	 * XXXOP
-	 * td->td_proc instead of p?
-	 */
 	if (p->p_ptrace_hardening & PTRACE_HARDENING_MODE_PUBLIC)
 		return (0);
 
@@ -415,10 +411,10 @@ ptrace_hardening_sysinit(void)
 	size_t i;
 
 	if (ptrace_hardening_status < 0 || ptrace_hardening_status > 1)
-		ptrace_hardening_status = PTRACE_HARDENING_ENABLED;
+		ptrace_hardening_status = PAX_FEATURE_SIMPLE_ENABLED;
 
 	if (ptrace_hardening_flag_status < 0 || ptrace_hardening_flag_status > 1)
-		ptrace_hardening_flag_status = PTRACE_HARDENING_REQFLAG_ENABLED;
+		ptrace_hardening_flag_status = PAX_FEATURE_SIMPLE_ENABLED;
 
 	for (i = 0; i < sizeof(ptrace_request_flags); i++)
 		if (ptrace_request_flags[i] < 0 || ptrace_request_flags[i] > 1)
