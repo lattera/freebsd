@@ -255,7 +255,6 @@ fdused_init(struct filedesc *fdp, int fd)
 	KASSERT(!fdisused(fdp, fd), ("fd=%d is already used", fd));
 
 	fdp->fd_map[NDSLOT(fd)] |= NDBIT(fd);
-	fdp->fd_openfd++;
 }
 
 static void
@@ -289,7 +288,6 @@ fdunused(struct filedesc *fdp, int fd)
 		fdp->fd_freefile = fd;
 	if (fd == fdp->fd_lastfile)
 		fdp->fd_lastfile = fd_last_used(fdp, fd);
-	fdp->fd_openfd--;
 }
 
 /*
@@ -1277,16 +1275,20 @@ struct getdtablecount_args {
 int
 sys_getdtablecount(struct thread *td, struct getdtablecount_args *uap)
 {
-	struct proc *p;
 	struct filedesc *fdp;
+	size_t i;
+	int open_fd;
 
-	p = td->td_proc;
-	PROC_LOCK(p);
-	fdp = p->p_fd;
+	fdp = td->td_proc->p_fd;
+	open_fd = 0;
+
 	FILEDESC_SLOCK(fdp);
-	td->td_retval[0] = fdp->fd_openfd;
+	for (i = 0; i < fdp->fd_nfiles; i ++) {
+		if ((fdp->fd_map[NDSLOT(i)] & NDBIT(i)) != 0)
+			open_fd ++; 
+	}
+	td->td_retval[0] = open_fd;
 	FILEDESC_SUNLOCK(fdp);
-	PROC_UNLOCK(p);
 	
 	return (0);
 }
