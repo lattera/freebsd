@@ -3372,8 +3372,18 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* getentropy */
+	/* ppoll */
 	case 545: {
+		struct ppoll_args *p = params;
+		uarg[0] = (intptr_t) p->fds; /* struct pollfd * */
+		uarg[1] = p->nfds; /* u_int */
+		uarg[2] = (intptr_t) p->ts; /* const struct timespec * */
+		uarg[3] = (intptr_t) p->set; /* const sigset_t * */
+		*n_args = 4;
+		break;
+	}
+	/* getentropy */
+	case 546: {
 		struct getentropy_args *p = params;
 		uarg[0] = (intptr_t) p->ptr; /* void * */
 		uarg[1] = p->len; /* size_t */
@@ -8998,8 +9008,27 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getentropy */
+	/* ppoll */
 	case 545:
+		switch(ndx) {
+		case 0:
+			p = "struct pollfd *";
+			break;
+		case 1:
+			p = "u_int";
+			break;
+		case 2:
+			p = "const struct timespec *";
+			break;
+		case 3:
+			p = "const sigset_t *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* getentropy */
+	case 546:
 		switch(ndx) {
 		case 0:
 			p = "void *";
@@ -10949,8 +10978,13 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getentropy */
+	/* ppoll */
 	case 545:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* getentropy */
+	case 546:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
