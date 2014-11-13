@@ -393,6 +393,7 @@ FBSD_1.3 {
 	ffclock_getcounter;
 	ffclock_getestimate;
 	ffclock_setestimate;
+	getdtablecount;
 	getentropy;
 	pipe2;
 	posix_fadvise;
@@ -608,6 +609,8 @@ FBSDprivate_1.0 {
 	__sys_getdents;
 	_getdirentries;
 	__sys_getdirentries;
+	_getdtablecount;
+	__sys_getdtablecount;
 	_getdtablesize;
 	__sys_getdtablesize;
 	_getegid;

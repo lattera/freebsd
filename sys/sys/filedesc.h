@@ -82,6 +82,7 @@ struct filedesc {
 	NDSLOTTYPE *fd_map;		/* bitmap of free fds */
 	int	fd_lastfile;		/* high-water mark of fd_ofiles */
 	int	fd_freefile;		/* approx. next free file */
+	int fd_openfd;			/* number of files currently open */
 	u_short	fd_cmask;		/* mask for file creation */
 	u_short	fd_refcnt;		/* thread reference count */
 	u_short	fd_holdcnt;		/* hold count on structure + mutex */

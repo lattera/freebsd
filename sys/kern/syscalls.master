@@ -981,5 +981,6 @@
 544	AUE_NULL	STD	{ int procctl(idtype_t idtype, id_t id, \
 				    int com, void *data); }
 545	AUE_NULL	STD	{ int getentropy(void *ptr, size_t len); }
+546	AUE_NULL	STD	{ int getdtablecount(void); }
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/compat/freebsd32/syscalls.master
