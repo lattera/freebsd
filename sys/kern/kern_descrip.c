@@ -1278,10 +1278,14 @@ int
 sys_getdtablecount(struct thread *td, struct getdtablecount_args *uap)
 {
 	struct proc *p;
+	struct filedesc *fdp;
 
 	p = td->td_proc;
 	PROC_LOCK(p);
-	td->td_retval[0] = p->p_fd->fd_openfd;
+	fdp = p->p_fd;
+	FILEDESC_SLOCK(fdp);
+	td->td_retval[0] = fdp->fd_openfd;
+	FILEDESC_SUNLOCK(fdp);
 	PROC_UNLOCK(p);
 	
 	return (0);
