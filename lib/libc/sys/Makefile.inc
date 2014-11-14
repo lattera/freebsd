@@ -122,6 +122,7 @@ MAN+=	abort2.2 \
 	fork.2 \
 	fsync.2 \
 	getdirentries.2 \
+	getdtablecount.2 \
 	getdtablesize.2 \
 	getfh.2 \
 	getfsstat.2 \

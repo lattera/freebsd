@@ -390,7 +390,9 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags,
 						openpam_log(PAM_LOG_ERROR,
 						"can't set password cipher, relying on default");
 		} else {
-				strlcpy(salt, modular_salt, sizeof(salt));
+				if (strlcpy(salt, modular_salt, sizeof(salt)) > sizeof(salt))
+					return (PAM_BUF_ERR);
+					
 		}
 		/* set password expiry date */
 		pwd->pw_change = 0;
