@@ -9022,6 +9022,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "const sigset_t *";
+<<<<<<< HEAD
 			break;
 		default:
 			break;
