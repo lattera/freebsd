@@ -2215,10 +2215,7 @@ int	sys_pipe2(struct thread *, struct pipe2_args *);
 int	sys_aio_mlock(struct thread *, struct aio_mlock_args *);
 int	sys_procctl(struct thread *, struct procctl_args *);
 int	sys_ppoll(struct thread *, struct ppoll_args *);
-<<<<<<< HEAD
 int	sys_getentropy(struct thread *, struct getentropy_args *);
-=======
->>>>>>> hardened/current/ptrace
 
 #ifdef COMPAT_43
 
@@ -2925,10 +2922,7 @@ int	freebsd7_shmctl(struct thread *, struct freebsd7_shmctl_args *);
 #define	SYS_AUE_aio_mlock	AUE_NULL
 #define	SYS_AUE_procctl	AUE_NULL
 #define	SYS_AUE_ppoll	AUE_POLL
-<<<<<<< HEAD
 #define	SYS_AUE_getentropy	AUE_NULL
-=======
->>>>>>> hardened/current/ptrace
 
 #undef PAD_
 #undef PADL_
