@@ -1262,6 +1262,36 @@ sys_closefrom(struct thread *td, struct closefrom_args *uap)
 	return (0);
 }
 
+/*
+ * Number of file descriptors per process
+ */ 
+#ifndef _SYS_SYSPROTO_H_
+struct getdtablecount_args {
+	int	dummy;
+};
+#endif
+/* ARGSUSED */
+
+int
+sys_getdtablecount(struct thread *td, struct getdtablecount_args *uap)
+{
+	struct filedesc *fdp;
+	int open_fd;
+	int i;
+
+	fdp = td->td_proc->p_fd;
+	open_fd = 0;
+
+	FILEDESC_SLOCK(fdp);
+	for (i = 0; i < (fdp->fd_lastfile + 1); i ++)
+		if ((fdp->fd_map[NDSLOT(i)] & NDBIT(i)) != 0)
+			open_fd++;
+	td->td_retval[0] = open_fd;
+	FILEDESC_SUNLOCK(fdp);
+	
+	return (0);
+}
+
 #if defined(COMPAT_43)
 /*
  * Return status information about a file descriptor.
