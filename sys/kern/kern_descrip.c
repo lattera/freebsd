@@ -1276,17 +1276,16 @@ int
 sys_getdtablecount(struct thread *td, struct getdtablecount_args *uap)
 {
 	struct filedesc *fdp;
-	size_t i;
 	int open_fd;
+	int i;
 
 	fdp = td->td_proc->p_fd;
 	open_fd = 0;
 
 	FILEDESC_SLOCK(fdp);
-	for (i = 0; i < fdp->fd_nfiles; i ++) {
+	for (i = 0; i < (fdp->fd_lastfile + 1); i ++)
 		if ((fdp->fd_map[NDSLOT(i)] & NDBIT(i)) != 0)
-			open_fd ++; 
-	}
+			open_fd++;
 	td->td_retval[0] = open_fd;
 	FILEDESC_SUNLOCK(fdp);
 	
