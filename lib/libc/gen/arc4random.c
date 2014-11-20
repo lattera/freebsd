@@ -145,12 +145,6 @@ _rs_sysctl(u_char *buf, size_t size)
 	return (done);
 }
 
-static size_t
-arc4_sysctl(u_char *buf, size_t size)
-{
-	return (_rs_sysctl(buf, size));
-}
-
 static void
 _rs_stir(void)
 {
