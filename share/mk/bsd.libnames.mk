@@ -222,3 +222,13 @@ LIBZ_PIC?=		${DESTDIR}${LIBDIR}/libz_pic.a
 LIBZFS?=	${DESTDIR}${LIBDIR}/libzfs.a
 LIBZFS_CORE?=	${DESTDIR}${LIBDIR}/libzfs_core.a
 LIBZPOOL?=	${DESTDIR}${LIBDIR}/libzpool.a
+
+# enforce the 2 -lpthread and -lc to always be the last in that exact order
+.if defined(LDADD)
+.if ${LDADD:M-lpthread}
+LDADD:=	${LDADD:N-lpthread} -lpthread
+.endif
+.if ${LDADD:M-lc}
+LDADD:=	${LDADD:N-lc} -lc
+.endif
+.endif
