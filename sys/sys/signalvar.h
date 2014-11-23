@@ -108,7 +108,13 @@ typedef void __osiginfohandler_t(int, osiginfo_t *, void *);
  * sigset_t manipulation macros.
  */
 #define	SIGADDSET(set, signo)						\
-	((set).__bits[_SIG_WORD(signo)] |= _SIG_BIT(signo))
+	do {													\
+		if ((set).__bits[_SIG_WORD(signo)] == ~0U)	{			\
+			((set).__bits[_SIG_WORD(signo)] = _SIG_BIT(signo));	\
+		} else {													\
+			((set).__bits[_SIG_WORD(signo)] |= _SIG_BIT(signo));	\
+		}															\
+	} while (0)
 
 #define	SIGDELSET(set, signo)						\
 	((set).__bits[_SIG_WORD(signo)] &= ~_SIG_BIT(signo))

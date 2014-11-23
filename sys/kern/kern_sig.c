@@ -622,7 +622,7 @@ sig_ffs(sigset_t *set)
 
 	for (i = 0; i < _SIG_WORDS; i++)
 		if (set->__bits[i])
-			return (ffs(set->__bits[i]) + (i * 32));
+			return (fls(set->__bits[i]) + (i * 32));
 	return (0);
 }
 
