@@ -325,12 +325,6 @@ pax_segvguard_setup_flags(struct image_params *imgp, u_int mode)
 		} else {
 			flags &= ~PAX_NOTE_SEGVGUARD;
 			flags |= PAX_NOTE_NOSEGVGUARD;
-			pax_log_segvguard(imgp->proc, __func__,
-			    "SEGVGUARD is opt-in, and executable don't have "
-			    "enabled SEGVGUARD!\n");
-			pax_ulog_segvguard(NULL,
-			    "SEGVGUARD is opt-in, and executable don't have "
-			    "enabled SEGVGUARD!\n");
 		}
 
 		return (flags);
@@ -340,12 +334,10 @@ pax_segvguard_setup_flags(struct image_params *imgp, u_int mode)
 		if (mode & PAX_NOTE_NOSEGVGUARD) {
 			flags &= ~PAX_NOTE_SEGVGUARD;
 			flags |= PAX_NOTE_NOSEGVGUARD;
-			pax_log_segvguard(imgp->proc, __func__,
-			    "SEGVGUARD is opt-out, and executable explicitly "
-			    "disabled SEGVGUARD!\n");
-			pax_ulog_segvguard(NULL,
-			    "SEGVGUARD is opt-out, and executable explicitly "
-			    "disabled SEGVGUARD!\n");
+			pax_log_segvguard(imgp->proc, "SEGVGUARD is opt-out, "
+			    "and executable explicitly disabled SEGVGUARD!\n");
+			pax_ulog_segvguard("SEGVGUARD is opt-out, and "
+			    "executable explicitly disabled SEGVGUARD!\n");
 		} else {
 			flags |= PAX_NOTE_SEGVGUARD;
 			flags &= ~PAX_NOTE_NOSEGVGUARD;
