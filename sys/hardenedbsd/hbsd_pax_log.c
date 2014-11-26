@@ -40,58 +40,52 @@
 #include <sys/jail.h>
 #include <machine/stdarg.h>
 
-#define __HARDENING_LOG_TEMPLATE(MAIN, SUBJECT, prefix, name)			\
-void										\
-prefix##_log_##name(struct proc *p, const char *caller_name, 			\
-		const char* fmt, ...)						\
-{										\
-	struct sbuf *sb;							\
-	va_list args;								\
-										\
-	if (hardening_log_log == 0)						\
-		return;								\
-										\
-	sb = sbuf_new_auto();							\
-	if (sb == NULL)								\
-		panic("%s: Could not allocate memory", __func__);		\
-	sbuf_printf(sb, "["#MAIN" "#SUBJECT"] ");				\
-	if (caller_name != NULL)						\
-		sbuf_printf(sb, "%s: ", caller_name);				\
-	va_start(args, fmt);							\
-	sbuf_vprintf(sb, fmt, args);						\
-	va_end(args);								\
-	if (sbuf_finish(sb) != 0)						\
-		panic("%s: Could not generate message", __func__);		\
-										\
-	printf("%s", sbuf_data(sb));						\
-	sbuf_delete(sb);							\
-}										\
-										\
-void										\
-prefix##_ulog_##name(const char *caller_name, const char* fmt, ...)		\
-{										\
-	struct sbuf *sb;							\
-	va_list args;								\
-										\
-	if (hardening_log_ulog == 0)						\
-		return;								\
-										\
-	sb = sbuf_new_auto();							\
-	if (sb == NULL)								\
-		panic("%s: Could not allocate memory", __func__);		\
-	sbuf_printf(sb, "["#MAIN" "#SUBJECT"] ");				\
-	if (caller_name != NULL)						\
-		sbuf_printf(sb, "%s: ", caller_name);				\
-	va_start(args, fmt);							\
-	sbuf_vprintf(sb, fmt, args);						\
-	va_end(args);								\
-	if (sbuf_finish(sb) != 0)						\
-		panic("%s: Could not generate message", __func__);		\
-										\
-	hbsd_uprintf("%s", sbuf_data(sb));					\
-	sbuf_delete(sb);							\
+#define __HARDENING_LOG_TEMPLATE(MAIN, SUBJECT, prefix, name)		\
+void									\
+prefix##_log_##name(struct proc *p, const char* fmt, ...)		\
+{									\
+	struct sbuf *sb;						\
+	va_list args;							\
+									\
+	if (hardening_log_log == 0)					\
+		return;							\
+									\
+	sb = sbuf_new_auto();						\
+	if (sb == NULL)							\
+		panic("%s: Could not allocate memory", __func__);	\
+	sbuf_printf(sb, "["#MAIN" "#SUBJECT"] ");			\
+	va_start(args, fmt);						\
+	sbuf_vprintf(sb, fmt, args);					\
+	va_end(args);							\
+	if (sbuf_finish(sb) != 0)					\
+		panic("%s: Could not generate message", __func__);	\
+									\
+	printf("%s", sbuf_data(sb));					\
+	sbuf_delete(sb);						\
+}									\
+									\
+void									\
+prefix##_ulog_##name(const char* fmt, ...)				\
+{									\
+	struct sbuf *sb;						\
+	va_list args;							\
+									\
+	if (hardening_log_ulog == 0)					\
+		return;							\
+									\
+	sb = sbuf_new_auto();						\
+	if (sb == NULL)							\
+		panic("%s: Could not allocate memory", __func__);	\
+	sbuf_printf(sb, "["#MAIN" "#SUBJECT"] ");			\
+	va_start(args, fmt);						\
+	sbuf_vprintf(sb, fmt, args);					\
+	va_end(args);							\
+	if (sbuf_finish(sb) != 0)					\
+		panic("%s: Could not generate message", __func__);	\
+									\
+	hbsd_uprintf("%s", sbuf_data(sb));				\
+	sbuf_delete(sb);						\
 }
-
 
 static int sysctl_hardening_log_log(SYSCTL_HANDLER_ARGS);
 static int sysctl_hardening_log_ulog(SYSCTL_HANDLER_ARGS);
@@ -130,11 +124,11 @@ hardening_log_sysinit(void)
 	case PAX_FEATURE_SIMPLE_ENABLED:
 		break;
 	default:
-		printf("[HARDENING LOG] WARNING, invalid settings in loader.conf!"
+		printf("[PAX LOG] WARNING, invalid settings in loader.conf!"
 		    " (hardening.log.log = %d)\n", hardening_log_log);
 		hardening_log_log = PAX_FEATURE_SIMPLE_ENABLED;
 	}
-	printf("[HARDENING LOG] logging to system: %s\n",
+	printf("[PAX LOG] logging to system: %s\n",
 	    pax_status_simple_str[hardening_log_log]);
 
 	switch (hardening_log_ulog) {
@@ -142,11 +136,11 @@ hardening_log_sysinit(void)
 	case PAX_FEATURE_SIMPLE_ENABLED:
 		break;
 	default:
-		printf("[HARDENING LOG] WARNING, invalid settings in loader.conf!"
+		printf("[PAX LOG] WARNING, invalid settings in loader.conf!"
 		    " (hardening.log.ulog = %d)\n", hardening_log_ulog);
 		hardening_log_ulog = PAX_FEATURE_SIMPLE_ENABLED;
 	}
-	printf("[HARDENING LOG] logging to user: %s\n",
+	printf("[PAX LOG] logging to user: %s\n",
 	    pax_status_simple_str[hardening_log_ulog]);
 }
 SYSINIT(hardening_log, SI_SUB_PAX, SI_ORDER_SECOND, hardening_log_sysinit, NULL);
@@ -203,6 +197,6 @@ sysctl_hardening_log_ulog(SYSCTL_HANDLER_ARGS)
 }
 #endif
 
-__HARDENING_LOG_TEMPLATE(PAX, ASLR, pax, aslr)
-__HARDENING_LOG_TEMPLATE(PAX, SEGVGUARD, pax, segvguard)
-__HARDENING_LOG_TEMPLATE(PTRACE, HARDENING, ptrace, hardening)
+__HARDENING_LOG_TEMPLATE(PAX, ASLR, pax, aslr);
+__HARDENING_LOG_TEMPLATE(PAX, SEGVGUARD, pax, segvguard);
+__HARDENING_LOG_TEMPLATE(PAX, PTRACE_HARDENING, pax, ptrace_hardening);

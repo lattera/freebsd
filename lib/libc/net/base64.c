@@ -231,7 +231,7 @@ b64_pton(src, target, targsize)
 					return (-1);
 				target[tarindex]   |=  (pos - Base64) >> 4;
 				nextbyte = ((pos - Base64) & 0x0f) << 4;
-				if (tarindex + 1 < targsize)
+				if ((size_t)tarindex + 1 < targsize)
 					target[tarindex + 1] = nextbyte;
 				else if (nextbyte)
 					return (-1);
@@ -245,7 +245,7 @@ b64_pton(src, target, targsize)
 					return (-1);
 				target[tarindex]   |=  (pos - Base64) >> 2;
 				nextbyte = ((pos - Base64) & 0x03) << 6;
-				if (tarindex + 1 < targsize)
+				if ((size_t)tarindex + 1 < targsize)
 					target[tarindex + 1] = nextbyte;
 				else if (nextbyte)
 					return (-1);
@@ -306,8 +306,8 @@ b64_pton(src, target, targsize)
 			 * zeros.  If we don't check them, they become a
 			 * subliminal channel.
 			 */
-			if (target && tarindex < targsize &&
-				target[tarindex] != 0)
+			if (target && (size_t)tarindex < targsize &&
+			    target[tarindex] != 0)
 				return (-1);
 		}
 	} else {
