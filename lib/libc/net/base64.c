@@ -307,7 +307,7 @@ b64_pton(src, target, targsize)
 			 * subliminal channel.
 			 */
 			if (target && tarindex < targsize &&
-				target[tarindex] != 0)
+			    target[tarindex] != 0)
 				return (-1);
 		}
 	} else {
