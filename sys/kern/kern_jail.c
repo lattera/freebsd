@@ -34,7 +34,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_pax.h"
-#include "opt_ptrace_hardening.h"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -45,7 +44,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/osd.h>
 #include <sys/pax.h>
-#include <sys/ptrace_hardening.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/taskqueue.h>
