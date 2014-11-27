@@ -54,9 +54,8 @@ strlcpy(char * __restrict dst, const char * __restrict src, size_t siz)
 		if (siz != 0) {
 			while (--n != 0)
 				*d++ = '\0';
+			*d = '\0';
 		}
-
-		*d = '\0';
 #endif
 	}
 
