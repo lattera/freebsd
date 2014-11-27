@@ -1308,6 +1308,10 @@ _kerberos5_bootstrap_tools= \
 	usr.bin/compile_et
 .endif
 
+.if ${MK_HBSD_EXTRA_SANITIZE} != "no"
+CFLAGS+=	-DHBSD_EXTRA_SANITIZE
+.endif
+
 #	Please document (add comment) why something is in 'bootstrap-tools'.
 #	Try to bound the building of the bootstrap-tool to just the
 #	FreeBSD versions that need the tool built at this stage of the build.
