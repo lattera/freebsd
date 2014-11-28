@@ -62,7 +62,6 @@ struct prison;
 struct thread;
 struct proc;
 struct vnode;
-struct vmspace;
 struct vm_offset_t;
 
 /*
@@ -81,36 +80,6 @@ extern const char *pax_status_str[];
 
 extern const char *pax_status_simple_str[];
 
-
-extern int pax_aslr_status;
-
-extern int pax_aslr_mmap_len;
-extern int pax_aslr_stack_len;
-extern int pax_aslr_exec_len;
-#ifdef COMPAT_FREEBSD32
-extern int pax_aslr_compat_status;
-extern int pax_aslr_compat_mmap_len;
-extern int pax_aslr_compat_stack_len;
-extern int pax_aslr_compat_exec_len;
-#endif /* COMPAT_FREEBSD32 */
-
-#ifdef PAX_SEGVGUARD
-extern int pax_segvguard_status;
-extern int pax_segvguard_debug;
-extern int pax_segvguard_expiry;
-extern int pax_segvguard_suspension;
-extern int pax_segvguard_maxcrashes;
-#endif /* PAX_SEGVGUARD */
-
-#ifdef PAX_HARDENING
-extern int pax_map32_enabled_global;
-extern int pax_mprotect_exec_harden_global;
-extern int pax_procfs_harden_global;
-#endif /* PAX_HARDENING*/
-
-extern int hardening_log_log;
-extern int hardening_log_ulog;
-
 #define PAX_NOTE_MPROTECT	0x00000001
 #define PAX_NOTE_NOMPROTECT	0x00000002
 #define PAX_NOTE_SEGVGUARD	0x00000004
@@ -127,13 +96,6 @@ extern int hardening_log_ulog;
 			(PAX_NOTE_NOMPROTECT | PAX_NOTE_NOSEGVGUARD | PAX_NOTE_NOASLR)
 #define PAX_NOTE_ALL	(PAX_NOTE_ALL_ENABLED | PAX_NOTE_ALL_DISABLED)
 
-#define HARDENING_LOG_LOG		PAX_FEATURE_DISABLED
-#define HARDENING_LOG_ULOG		PAX_FEATURE_SIMPLE_DISABLED
-
-#define PAX_SEGVGUARD_EXPIRY		(2 * 60)
-#define PAX_SEGVGUARD_SUSPENSION	(10 * 60)
-#define PAX_SEGVGUARD_MAXCRASHES	5
-
 /*
  * generic pax functions
  */
@@ -148,6 +110,13 @@ void pax_init_prison(struct prison *pr);
 int pax_aslr_active(struct proc *p);
 void pax_aslr_init_vmspace(struct proc *p);
 void pax_aslr_init_vmspace32(struct proc *p);
+#ifdef PAX_ASLR
+void pax_aslr_init_prison(struct prison *pr);
+void pax_aslr_init_prison32(struct prison *pr);
+#else
+static void pax_aslr_init_prison(struct prison *pr __unused) {}
+static void pax_aslr_init_prison32(struct prison *pr __unused) {}
+#endif
 void pax_aslr_init(struct image_params *imgp);
 void pax_aslr_execbase(struct proc *p, u_long *et_dyn_addr);
 void pax_aslr_mmap(struct proc *p, vm_offset_t *addr, 
@@ -169,6 +138,11 @@ void pax_ulog_ptrace_hardening(const char *fmt, ...);
 /*
  * SegvGuard related functions
  */
+#ifdef PAX_SEGVGUARD
+void pax_segvguard_init_prison(struct prison *pr);
+#else
+static void pax_segvguard_init_prison(struct prison *pr __unused) {}
+#endif
 int pax_segvguard_check(struct thread *, struct vnode *, const char *);
 int pax_segvguard_segfault(struct thread *, const char *);
 void pax_segvguard_remove(struct thread *td, struct vnode *vn);
@@ -179,6 +153,11 @@ int pax_segvguard_update_flags_if_setuid(struct image_params *imgp,
 /*
  * Hardening related functions
  */
+#ifdef PAX_HARDENING
+void pax_hardening_init_prison(struct prison *pr);
+#else
+static void pax_hardening_init_prison(struct prison *pr __unused) {}
+#endif
 int pax_map32_enabled(struct thread *td);
 int pax_mprotect_exec_harden(void);
 int pax_procfs_harden(struct thread *td);
