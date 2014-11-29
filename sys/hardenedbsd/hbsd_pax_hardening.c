@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2014, by Shawn Webb <shawn.webb at hardenedbsd.org>
- * Copyright (c) 2014, by Oliver Pinter <oliver.pntr at gmail.com>
+ * Copyright (c) 2014, by Oliver Pinter <oliver.pinter@hardenedbsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -71,13 +71,13 @@ __FBSDID("$FreeBSD$");
 #include <security/mac_bsdextended/mac_bsdextended.h>
 
 #ifdef PAX_HARDENING
-int pax_map32_enabled_global = PAX_FEATURE_SIMPLE_DISABLED;
-int pax_mprotect_exec_harden_global = PAX_FEATURE_SIMPLE_ENABLED;
-int pax_procfs_harden_global = PAX_FEATURE_SIMPLE_ENABLED;
+static int pax_map32_enabled_global = PAX_FEATURE_SIMPLE_DISABLED;
+static int pax_mprotect_exec_harden_global = PAX_FEATURE_SIMPLE_ENABLED;
+static int pax_procfs_harden_global = PAX_FEATURE_SIMPLE_ENABLED;
 #else
-int pax_map32_enabled_global = PAX_FEATURE_SIMPLE_ENABLED;
-int pax_mprotect_exec_harden_global = PAX_FEATURE_SIMPLE_DISABLED;
-int pax_procfs_harden_global = PAX_FEATURE_SIMPLE_DISABLED;
+static int pax_map32_enabled_global = PAX_FEATURE_SIMPLE_ENABLED;
+static int pax_mprotect_exec_harden_global = PAX_FEATURE_SIMPLE_DISABLED;
+static int pax_procfs_harden_global = PAX_FEATURE_SIMPLE_DISABLED;
 #endif
 
 static int sysctl_pax_allow_map32(SYSCTL_HANDLER_ARGS);
@@ -226,6 +226,40 @@ sysctl_pax_procfs(SYSCTL_HANDLER_ARGS)
 }
 #endif
 
+void
+pax_hardening_init_prison(struct prison *pr)
+{
+	struct prison *pr_p;
+
+	CTR2(KTR_PAX, "%s: Setting prison %s PaX variables\n",
+	    __func__, pr->pr_name);
+
+	if (pr == &prison0) {
+		/* prison0 has no parent, use globals */
+#ifdef MAP_32BIT
+		pr->pr_hardening.hr_pax_map32_enabled =
+		    pax_map32_enabled_global;
+#endif
+		pr->pr_hardening.hr_pax_procfs_harden =
+		    pax_procfs_harden_global;
+		pr->pr_hardening.hr_pax_mprotect_exec =
+		    pax_mprotect_exec_harden_global;
+	} else {
+		KASSERT(pr->pr_parent != NULL,
+		   ("%s: pr->pr_parent == NULL", __func__));
+		pr_p = pr->pr_parent;
+
+#ifdef MAP_32BIT
+		pr->pr_hardening.hr_pax_map32_enabled =
+		    pr_p->pr_hardening.hr_pax_map32_enabled;
+#endif
+		pr->pr_hardening.hr_pax_procfs_harden =
+		    pr_p->pr_hardening.hr_pax_procfs_harden;
+		pr->pr_hardening.hr_pax_mprotect_exec =
+		    pr_p->pr_hardening.hr_pax_mprotect_exec;
+	}
+}
+
 int
 pax_map32_enabled(struct thread *td)
 {
@@ -237,9 +271,13 @@ pax_map32_enabled(struct thread *td)
 }
 
 int
-pax_mprotect_exec_harden(void)
+pax_mprotect_exec_harden(struct thread *td)
 {
-	return (pax_mprotect_exec_harden_global);
+	struct prison *pr;
+
+	pr = pax_get_prison(td->td_proc);
+
+	return (pr->pr_hardening.hr_pax_mprotect_exec);
 }
 
 int
