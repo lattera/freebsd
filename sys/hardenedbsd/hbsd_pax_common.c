@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2006 Elad Efrat <elad@NetBSD.org>
- * Copyright (c) 2013-2014, by Oliver Pinter <oliver.pntr at gmail.com>
+ * Copyright (c) 2013-2014, by Oliver Pinter <oliver.pinter@hardenedbsd.org>
  * Copyright (c) 2014, by Shawn Webb <lattera at gmail.com>
  * All rights reserved.
  *
@@ -177,6 +177,7 @@ pax_init_prison(struct prison *pr)
 	pax_aslr_init_prison(pr);
 	pax_hardening_init_prison(pr);
 	pax_segvguard_init_prison(pr);
+	pax_ptrace_hardening_init_prison(pr);
 
 #ifdef FREEBSD_COMPAT32
 	pax_aslr_init_prison32(pr);
