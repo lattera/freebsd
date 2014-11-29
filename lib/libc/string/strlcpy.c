@@ -48,6 +48,15 @@ strlcpy(char * __restrict dst, const char * __restrict src, size_t siz)
 			*d = '\0';		/* NUL-terminate dst */
 		while (*s++)
 			;
+#ifdef	HBSD_EXTRA_SANITIZE
+	/* Otherwise, nullify the remaining bytes */
+	} else {
+		if (siz != 0) {
+			while (--n != 0)
+				*d++ = '\0';
+			*d = '\0';
+		}
+#endif
 	}
 
 	return(s - src - 1);	/* count does not include NUL */
