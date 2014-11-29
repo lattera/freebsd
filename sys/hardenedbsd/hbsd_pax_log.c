@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014, by Oliver Pinter <oliver.pntr at gmail.com>
+ * Copyright (c) 2014, by Oliver Pinter <oliver.pinter@hardenedbsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -89,8 +89,8 @@ prefix##_ulog_##name(const char* fmt, ...)				\
 static int sysctl_hardening_log_log(SYSCTL_HANDLER_ARGS);
 static int sysctl_hardening_log_ulog(SYSCTL_HANDLER_ARGS);
 
-int hardening_log_log = HARDENING_LOG_LOG;
-int hardening_log_ulog = HARDENING_LOG_ULOG;
+static int hardening_log_log = PAX_FEATURE_SIMPLE_ENABLED;
+static int hardening_log_ulog = PAX_FEATURE_SIMPLE_DISABLED;
 
 TUNABLE_INT("hardening.log.log", &hardening_log_log);
 TUNABLE_INT("hardening.log.ulog", &hardening_log_ulog);
