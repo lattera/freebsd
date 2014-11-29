@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2014, by Shawn Webb <shawn.webb at hardenedbsd.org>
- * Copyright (c) 2014, by Oliver Pinter <oliver.pntr at gmail.com>
+ * Copyright (c) 2014, by Oliver Pinter <oliver.pinter@hardenedbsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -271,9 +271,13 @@ pax_map32_enabled(struct thread *td)
 }
 
 int
-pax_mprotect_exec_harden(void)
+pax_mprotect_exec_harden(struct thread *td)
 {
-	return (pax_mprotect_exec_harden_global);
+	struct prison *pr;
+
+	pr = pax_get_prison(td->td_proc);
+
+	return (pr->pr_hardening.hr_pax_mprotect_exec);
 }
 
 int
