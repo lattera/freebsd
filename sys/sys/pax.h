@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2006 Elad Efrat <elad@NetBSD.org>
- * Copyright (c) 2013-2014, by Oliver Pinter <oliver.pntr at gmail.com>
+ * Copyright (c) 2013-2014, by Oliver Pinter <oliver.pinter@hardenedbsd.org>
  * Copyright (c) 2014, by Shawn Webb <lattera at gmail.com>
  * All rights reserved.
  *
@@ -32,7 +32,7 @@
 #ifndef	__SYS_PAX_H
 #define	__SYS_PAX_H
 
-#define	__HardenedBSD_version	4
+#define	__HardenedBSD_version	6
 
 #if defined(_KERNEL) || defined(_WANT_PRISON)
 struct hardening_features {
@@ -52,6 +52,8 @@ struct hardening_features {
 	int	 hr_pax_map32_enabled;		/* (p) MAP_32BIT enabled (amd64 only) */
 	int	 hr_pax_procfs_harden;		/* (p) Harden procfs */
 	int	 hr_pax_mprotect_exec;		/* (p) Disallow setting exec bit on non-exec mappings */
+	int	 hr_pax_ptrace_hardening_status;	/* (p) Disallow unprivileged ptrace */
+	gid_t	 hr_pax_ptrace_hardening_gid;	/* (p) Allowed ptrace users group */
 };
 #endif
 
@@ -159,13 +161,18 @@ void pax_hardening_init_prison(struct prison *pr);
 static void pax_hardening_init_prison(struct prison *pr __unused) {}
 #endif
 int pax_map32_enabled(struct thread *td);
-int pax_mprotect_exec_harden(void);
+int pax_mprotect_exec_harden(struct thread *td);
 int pax_procfs_harden(struct thread *td);
 
 /*
  * ptrace hardening related functions
  */
-int ptrace_hardening(struct thread *td);
+#if defined(PAX_PTRACE_HARDENING) || defined(PAX_PTRACE_HARDENING_GRP)
+void pax_ptrace_hardening_init_prison(struct prison *pr);
+#else
+static void pax_ptrace_hardening_init_prison(struct prison *pr __unused) {}
+#endif
+int pax_ptrace_hardening(struct thread *td);
 
 #endif /* _KERNEL */
 
