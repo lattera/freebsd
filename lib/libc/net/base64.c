@@ -228,7 +228,7 @@ b64_pton(const char *src, u_char *target, size_t targsize)
 					return (-1);
 				target[tarindex]   |=  (pos - Base64) >> 4;
 				nextbyte = ((pos - Base64) & 0x0f) << 4;
-				if ((size_t)tarindex + 1 < targsize)
+				if (tarindex + 1 < targsize)
 					target[tarindex + 1] = nextbyte;
 				else if (nextbyte)
 					return (-1);
@@ -242,7 +242,7 @@ b64_pton(const char *src, u_char *target, size_t targsize)
 					return (-1);
 				target[tarindex]   |=  (pos - Base64) >> 2;
 				nextbyte = ((pos - Base64) & 0x03) << 6;
-				if ((size_t)tarindex + 1 < targsize)
+				if (tarindex + 1 < targsize)
 					target[tarindex + 1] = nextbyte;
 				else if (nextbyte)
 					return (-1);
@@ -303,7 +303,7 @@ b64_pton(const char *src, u_char *target, size_t targsize)
 			 * zeros.  If we don't check them, they become a
 			 * subliminal channel.
 			 */
-			if (target && (size_t)tarindex < targsize &&
+			if (target && tarindex < targsize &&
 			    target[tarindex] != 0)
 				return (-1);
 		}
