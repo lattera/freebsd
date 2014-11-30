@@ -55,8 +55,10 @@ __FBSDID("$FreeBSD$");
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <string.h>
+#include <errno.h>
 #include <pwd.h>
 #include "blowfish.h"
 #include "crypt.h"
@@ -70,6 +72,8 @@ __FBSDID("$FreeBSD$");
 #define BCRYPT_MAXSALT 16	/* Precomputation is just so nice */
 #define BCRYPT_BLOCKS 6		/* Ciphertext blocks */
 #define BCRYPT_MINLOGROUNDS 4	/* we have log2(rounds) in salt */
+#define	BCRYPT_SALTSPACE (7 + (BCRYPT_MAXSALT * 4 + 2) / 3 + 1)
+#define	BCRYPT_HASHSPACE 61
 
 
 static void encode_base64(u_int8_t *, u_int8_t *, u_int16_t);
@@ -323,3 +327,110 @@ main()
 	printf("Passwd entry: %s\n", p);
 }
 #endif
+
+static int
+_crypt_initsalt(int rounds, uint8_t *salt, size_t saltsize)
+{
+	char initsalt[BCRYPT_MAXSALT];
+
+	if (saltsize < BCRYPT_SALTSPACE)
+		return (-1);
+
+	arc4random_buf(initsalt, sizeof(initsalt));
+
+	if (rounds < 4)
+		rounds = 4;
+	else if (rounds > 31)
+		rounds = 31;
+
+	snprintf(salt, saltsize, "$2b$%2.2u$", rounds);
+	encode_base64(salt + 7, initsalt, sizeof(initsalt));
+
+	explicit_bzero(initsalt, sizeof(initsalt));
+
+	return (0);
+}
+
+static int
+_crypt_checkpass(const char *passwd, const char *hash)
+{
+	char *res;
+
+	res = crypt_blowfish(passwd, hash);
+	if (res == NULL)
+		return (-1);
+
+	if (strlen(res) != strlen(hash) ||
+		timingsafe_bcmp(res, hash, strlen(hash)) != 0)
+		return (-1);
+
+	return (0);
+}
+
+int
+crypt_newhash(const char *passwd, const char *pref, char *hash, size_t hashlen)
+{
+	const char *defpref = "blowfish,8";
+	const char *errstr;
+	char salt[BCRYPT_SALTSPACE];
+	char *buf;
+	int rounds;
+
+	if (pref == NULL)
+		pref = defpref;
+
+	if (strncmp(pref, "blowfish,", 9) != 0) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	rounds = strtonum(pref + 9, 4, 31, &errstr);
+	if (errstr != NULL)
+		return (-1);
+
+	_crypt_initsalt(rounds, salt, sizeof(salt));
+
+	buf = crypt_blowfish(passwd, salt);
+	if (buf == NULL)
+		return (-1);
+
+	if (strlcpy(hash, buf, hashlen) > hashlen)
+		return (-1);
+
+	explicit_bzero(salt, sizeof(salt));
+
+	return (0);
+}
+
+int
+crypt_checkpass(const char *passwd, const char *hash)
+{
+	char dummy[_PASSWORD_LEN];
+	char *res;
+
+	if (hash == NULL) {
+		_crypt_initsalt(8, dummy, sizeof(dummy));
+		crypt_blowfish(passwd, hash);
+		goto fail;
+	}
+
+	if (strlen(hash) == 0 && strlen(passwd) == 0)
+		return (0);
+
+	if (strlen(hash) > 1 && hash[0] == '$' && hash[1] == '2') {
+		if (_crypt_checkpass(passwd, hash) == -1)
+			goto fail;
+		return (0);
+	}
+
+	res = crypt_mp(passwd, hash);
+	if (res == NULL || strlen(res) != strlen(hash) ||
+		timingsafe_bcmp(res, hash, strlen(hash)) != 0)
+		goto fail;
+
+	return (0);
+
+fail:
+	errno = EACCES;
+	return (-1);
+}

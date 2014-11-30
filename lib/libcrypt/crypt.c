@@ -33,6 +33,7 @@ __FBSDID("$FreeBSD$");
 #include <libutil.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "crypt.h"
 
@@ -121,3 +122,49 @@ crypt(const char *passwd, const char *salt)
 #endif
 	return (crypt_format->func(passwd, salt));
 }
+
+char *
+crypt_mp(const char *passwd, const char *salt)
+{
+	const struct crypt_format crypt_formats_mp[] = {
+			{ "md5",	crypt_md5,		"$1$"	},
+#ifdef	HAS_BLOWFISH
+			{ "blf",	crypt_blowfish,		"$2"	},
+#endif
+			{ "nth",	crypt_nthash,		"$3$"	},
+			{ "sha256",	crypt_sha256,		"$5$"	},
+			{ "sha512",	crypt_sha512,		"$6$"	},
+#ifdef HAS_DES
+			{ "des",	crypt_des,		"_"	},
+#endif
+			{ NULL,		NULL,			NULL	}
+	};
+
+	const struct crypt_format *fb;
+	const struct crypt_format *cf;
+
+	fb = &crypt_formats_mp[sizeof(crypt_formats_mp) /
+		sizeof(crypt_formats_mp[0]) - 2];
+
+	for (cf = crypt_formats_mp; cf->name != NULL; ++cf)
+		if (cf->magic != NULL && strstr(salt, cf->magic) == salt)
+			return (cf->func(passwd, salt));
+
+	return (fb->func(passwd, salt));
+}
+
+#ifndef	HAS_BLOWFISH
+int
+crypt_newhash(const char *passwd, const char *pref, char *hash,
+	size_t hashsize)
+{
+	errno = ENOSYS;
+	return (-1);
+}
+
+int crypt_checkpass(const char *passwd, const char *hash)
+{
+	errno = ENOSYS;
+	return (-1);
+}
+#endif
