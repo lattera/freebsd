@@ -38,6 +38,10 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20141204 ibcs support removal
+OLD_FILES+=etc/rc.d/archdep
+OLD_FILES+=shate/examples/ibcs2/README
+OLD_FILES+=shate/examples/ibcs2/hello.uu
 # 20141202: update to mandoc CVS 20141201
 OLD_FILES+=usr.bin/preconv
 OLD_FILES+=share/man/man1/preconv.1.gz
