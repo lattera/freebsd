@@ -12,12 +12,6 @@
     include
     ..
     lib
-        aout
-        ..
-        compat
-            aout
-            ..
-        ..
         dtrace
         ..
         engines
@@ -318,8 +312,6 @@
             hast
             ..
             hostapd
-            ..
-            ibcs2
             ..
             indent
             ..
