@@ -46,6 +46,7 @@ void	 bzero(void *, size_t);					/* LEGACY */
 #if __BSD_VISIBLE
 void	 explicit_bzero(void *, size_t);
 int 	 timingsafe_bcmp(const void *, const void *, size_t);	
+int 	 timingsafe_memcmp(const void *, const void *, size_t);
 #endif
 #if __XSI_VISIBLE
 int	 ffs(int) __pure2;
