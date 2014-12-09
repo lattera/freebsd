@@ -2028,10 +2028,12 @@ process_needed(Obj_Entry *obj, Needed_Entry *needed, int flags)
     Obj_Entry *obj1;
 
     for (; needed != NULL; needed = needed->next) {
+	    dbg("%s: %s requires %s.", __func__, obj->path ? obj->path : "[nopath]", obj->strtab + needed->name);
 	obj1 = needed->obj = load_object(obj->strtab + needed->name, -1, obj,
 	  flags & ~RTLD_LO_NOLOAD);
-	if (obj1 == NULL && !ld_tracing && (flags & RTLD_LO_FILTEES) == 0)
+	if (obj1 == NULL && !ld_tracing && (flags & RTLD_LO_FILTEES) == 0) {
 	    return (-1);
+	}
     }
     return (0);
 }
@@ -2044,13 +2046,62 @@ process_needed(Obj_Entry *obj, Needed_Entry *needed, int flags)
 static int
 load_needed_objects(Obj_Entry *first, int flags)
 {
-    Obj_Entry *obj;
+	Obj_Entry *obj;
+	Needed_Entry **needs, *need=NULL;
+	unsigned int i, j, nneed;
+	size_t sz = sizeof(unsigned int);
+	int mib[2], err=0;
 
-    for (obj = first;  obj != NULL;  obj = obj->next) {
-	if (process_needed(obj, obj->needed, flags) == -1)
-	    return (-1);
-    }
-    return (0);
+	mib[0] = CTL_KERN;
+	mib[1] = KERN_ARND;
+
+	/* XXX (Shawn Webb): Clean up this logic for randomizing shared object loading order */
+	for (obj = first;  obj != NULL;  obj = obj->next) {
+		if (obj->needed && err == 0 && !(flags & RTLD_LO_FILTEES)) {
+			for (nneed=0, need = obj->needed; need != NULL; need = need->next)
+				nneed++;
+
+			if (nneed > 1) {
+				needs = xcalloc(nneed, sizeof(Needed_Entry **));
+				for (i=0, need = obj->needed; i < nneed; i++, need = need->next)
+					needs[i] = need;
+
+				for (i=0; i < nneed; i++) {
+					do {
+						if ((err = sysctl(mib, 2, &j, &sz, NULL, 0)) == -1)
+							break;
+						
+						j %= nneed;
+					} while (j == i);
+
+					if (err)
+						break;
+
+					need = needs[i];
+					needs[i] = needs[j];
+					needs[j] = need;
+				}
+
+				if (err == 0) {
+					for (i=0; i < nneed; i++)
+						needs[i]->next = i + 1 < nneed ? needs[i + 1] : NULL;
+
+					obj->needed = needs[0];
+				} else {
+					need = NULL;
+				}
+
+				free(needs);
+			} else {
+				need = NULL;
+			}
+		}
+
+		if (process_needed(obj, obj->needed, flags) == -1)
+			return (-1);
+	}
+
+	return (0);
 }
 
 static int
