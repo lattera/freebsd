@@ -69,6 +69,7 @@ MLINKS+=strstr.3 strcasestr.3 \
 	strstr.3 strcasestr_l.3
 MLINKS+=strtok.3 strtok_r.3
 MLINKS+=strxfrm.3 strxfrm_l.3
+MLINKS+=timingsafe_bcmp.3
 MLINKS+=wmemchr.3 wcpcpy.3 \
 	wmemchr.3 wcpncpy.3 \
 	wmemchr.3 wcscasecmp.3 \
