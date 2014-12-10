@@ -102,6 +102,8 @@ FBSD_1.3 {
 
 FBSD_1.4 {
 	explicit_bzero;
+	timingsafe_bcmp;
+	timingsafe_memcmp;
 };
 
 FBSDprivate_1.0 {

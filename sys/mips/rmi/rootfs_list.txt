@@ -175,7 +175,6 @@
 ./etc/rc.d/amd
 ./etc/rc.d/apm
 ./etc/rc.d/apmd
-./etc/rc.d/archdep
 ./etc/rc.d/atm1
 ./etc/rc.d/atm2
 ./etc/rc.d/atm3
@@ -197,7 +196,6 @@
 ./etc/rc.d/dmesg
 ./etc/rc.d/dumpon
 ./etc/rc.d/encswap
-./etc/rc.d/faith
 ./etc/rc.d/fsck
 ./etc/rc.d/ftp-proxy
 ./etc/rc.d/ftpd

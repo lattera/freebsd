@@ -446,6 +446,9 @@ cpuset_which(cpuwhich_t which, id_t id, struct proc **pp, struct thread **tdp,
 		/* Find `set' for prison with given id. */
 		struct prison *pr;
 
+		if (id < 0)
+			return (EINVAL);
+
 		sx_slock(&allprison_lock);
 		pr = prison_find_child(curthread->td_ucred->cr_prison, id);
 		sx_sunlock(&allprison_lock);

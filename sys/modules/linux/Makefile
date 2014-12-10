@@ -26,7 +26,7 @@ SRCS+=	opt_apic.h
 .endif
 
 .if ${MACHINE_CPUARCH} == "i386"
-SRCS+=	linux_ptrace.c imgact_linux.c opt_cpu.h
+SRCS+=	linux_ptrace.c opt_cpu.h
 .endif
 
 EXPORT_SYMS=
@@ -40,10 +40,7 @@ EXPORT_SYMS+=	linux_ioctl_unregister_handler
 CLEANFILES=	linux${SFX}_assym.h linux${SFX}_genassym.o
 
 linux${SFX}_assym.h: linux${SFX}_genassym.o
-.if exists(@)
-linux${SFX}_assym.h: @/kern/genassym.sh
-.endif
-	sh @/kern/genassym.sh linux${SFX}_genassym.o > ${.TARGET}
+	sh ${SYSDIR}/kern/genassym.sh linux${SFX}_genassym.o > ${.TARGET}
 
 linux${SFX}_locore.o: linux${SFX}_assym.h assym.s
 	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \

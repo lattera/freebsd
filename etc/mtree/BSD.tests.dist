@@ -145,9 +145,19 @@
             ..
             libnv
             ..
+            libpam
+            ..
             libproc
             ..
+            librt
+            ..
+            libthr
+                dlopen
+                ..
+            ..
             libutil
+            ..
+            msun
             ..
         ..
         libexec

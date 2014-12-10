@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ktrace.h"
 #include "opt_kstack_pages.h"
+#include "opt_pax.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/pax.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/procdesc.h>
@@ -333,7 +335,7 @@ fork_norfproc(struct thread *td, int flags)
 	 */
 	if (flags & RFCFDG) {
 		struct filedesc *fdtmp;
-		fdtmp = fdinit(td->td_proc->p_fd);
+		fdtmp = fdinit(td->td_proc->p_fd, false);
 		fdescfree(td);
 		p1->p_fd = fdtmp;
 	}
@@ -418,7 +420,7 @@ do_fork(struct thread *td, int flags, struct proc *p2, struct thread *td2,
 	 * Copy filedesc.
 	 */
 	if (flags & RFCFDG) {
-		fd = fdinit(p1->p_fd);
+		fd = fdinit(p1->p_fd, false);
 		fdtol = NULL;
 	} else if (flags & RFFDG) {
 		fd = fdcopy(p1->p_fd);
@@ -752,6 +754,15 @@ fork1(struct thread *td, int flags, int pages, struct proc **procp,
 	static int curfail;
 	static struct timeval lastfail;
 	struct file *fp_procdesc = NULL;
+
+#ifdef PAX_SEGVGUARD
+	if (td->td_proc->p_pid != 0) {
+		error = pax_segvguard_check(curthread, curthread->td_proc->p_textvp,
+				td->td_proc->p_comm);
+		if (error)
+			return (error);
+	}
+#endif
 
 	/* Check for the undefined or unimplemented flags. */
 	if ((flags & ~(RFFLAGS | RFTSIGFLAGS(RFTSIGMASK))) != 0)

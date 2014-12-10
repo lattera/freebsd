@@ -30,7 +30,12 @@
 #ifndef _SYS_JAIL_H_
 #define _SYS_JAIL_H_
 
+#if defined(_KERNEL) || defined(_WANT_PRISON)
+#include <sys/pax.h>
+#endif
+
 #ifdef _KERNEL
+
 struct jail_v0 {
 	u_int32_t	version;
 	char		*path;
@@ -184,6 +189,8 @@ struct prison {
 	char		 pr_hostname[MAXHOSTNAMELEN];	/* (p) jail hostname */
 	char		 pr_domainname[MAXHOSTNAMELEN];	/* (p) jail domainname */
 	char		 pr_hostuuid[HOSTUUIDLEN];	/* (p) jail hostuuid */
+    /* Lock only needed for pax_* if pr_pax_set == 0 */
+	struct hardening_features pr_hardening;		/* (p) PaX-inspired hardening features */
 };
 
 struct prison_racct {

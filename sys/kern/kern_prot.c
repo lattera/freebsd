@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_compat.h"
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_pax.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1330,7 +1331,11 @@ securelevel_ge(struct ucred *cr, int level)
  * using a variety of system MIBs.
  * XXX: data declarations should be together near the beginning of the file.
  */
+#ifdef PAX_HARDENING
+static int	see_other_uids = 0;
+#else
 static int	see_other_uids = 1;
+#endif
 SYSCTL_INT(_security_bsd, OID_AUTO, see_other_uids, CTLFLAG_RW,
     &see_other_uids, 0,
     "Unprivileged processes may see subjects/objects with different real uid");
@@ -1360,7 +1365,11 @@ cr_seeotheruids(struct ucred *u1, struct ucred *u2)
  * using a variety of system MIBs.
  * XXX: data declarations should be together near the beginning of the file.
  */
+#ifdef PAX_HARDENING
+static int	see_other_gids = 0;
+#else
 static int	see_other_gids = 1;
+#endif
 SYSCTL_INT(_security_bsd, OID_AUTO, see_other_gids, CTLFLAG_RW,
     &see_other_gids, 0,
     "Unprivileged processes may see subjects/objects with different real gid");
@@ -1817,7 +1826,9 @@ crget(void)
 #ifdef MAC
 	mac_cred_init(cr);
 #endif
-	crextend(cr, XU_NGROUPS);
+	cr->cr_groups = cr->cr_smallgroups;
+	cr->cr_agroups =
+	    sizeof(cr->cr_smallgroups) / sizeof(cr->cr_smallgroups[0]);
 	return (cr);
 }
 
@@ -1864,7 +1875,8 @@ crfree(struct ucred *cr)
 #ifdef MAC
 		mac_cred_destroy(cr);
 #endif
-		free(cr->cr_groups, M_CRED);
+		if (cr->cr_groups != cr->cr_smallgroups)
+			free(cr->cr_groups, M_CRED);
 		free(cr, M_CRED);
 	}
 }
@@ -1997,7 +2009,7 @@ crextend(struct ucred *cr, int n)
 		cnt = roundup2(n, PAGE_SIZE / sizeof(gid_t));
 
 	/* Free the old array. */
-	if (cr->cr_groups)
+	if (cr->cr_groups != cr->cr_smallgroups)
 		free(cr->cr_groups, M_CRED);
 
 	cr->cr_groups = malloc(cnt * sizeof(gid_t), M_CRED, M_WAITOK | M_ZERO);
@@ -2066,21 +2078,20 @@ struct getlogin_args {
 int
 sys_getlogin(struct thread *td, struct getlogin_args *uap)
 {
-	int error;
 	char login[MAXLOGNAME];
 	struct proc *p = td->td_proc;
+	size_t len;
 
 	if (uap->namelen > MAXLOGNAME)
 		uap->namelen = MAXLOGNAME;
 	PROC_LOCK(p);
 	SESS_LOCK(p->p_session);
-	bcopy(p->p_session->s_login, login, uap->namelen);
+	len = strlcpy(login, p->p_session->s_login, uap->namelen) + 1;
 	SESS_UNLOCK(p->p_session);
 	PROC_UNLOCK(p);
-	if (strlen(login) + 1 > uap->namelen)
+	if (len > uap->namelen)
 		return (ERANGE);
-	error = copyout(login, uap->namebuf, uap->namelen);
-	return (error);
+	return (copyout(login, uap->namebuf, len));
 }
 
 /*
@@ -2099,21 +2110,23 @@ sys_setlogin(struct thread *td, struct setlogin_args *uap)
 	int error;
 	char logintmp[MAXLOGNAME];
 
+	CTASSERT(sizeof(p->p_session->s_login) >= sizeof(logintmp));
+
 	error = priv_check(td, PRIV_PROC_SETLOGIN);
 	if (error)
 		return (error);
 	error = copyinstr(uap->namebuf, logintmp, sizeof(logintmp), NULL);
-	if (error == ENAMETOOLONG)
-		error = EINVAL;
-	else if (!error) {
-		PROC_LOCK(p);
-		SESS_LOCK(p->p_session);
-		(void) memcpy(p->p_session->s_login, logintmp,
-		    sizeof(logintmp));
-		SESS_UNLOCK(p->p_session);
-		PROC_UNLOCK(p);
+	if (error != 0) {
+		if (error == ENAMETOOLONG)
+			error = EINVAL;
+		return (error);
 	}
-	return (error);
+	PROC_LOCK(p);
+	SESS_LOCK(p->p_session);
+	strcpy(p->p_session->s_login, logintmp);
+	SESS_UNLOCK(p->p_session);
+	PROC_UNLOCK(p);
+	return (0);
 }
 
 void

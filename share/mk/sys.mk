@@ -137,6 +137,8 @@ OBJCFLAGS	?=	${OBJCINCLUDES} ${CFLAGS} -Wno-import
 
 OBJCOPY		?=	objcopy
 
+OBJDUMP		?=	objdump
+
 PC		?=	pc
 PFLAGS		?=
 
@@ -366,3 +368,5 @@ SHELL=	${__MAKE_SHELL}
 .include <bsd.cpu.mk>
 
 .endif # ! Posix
+
+.include <bsd.hardenedbsd.mk>

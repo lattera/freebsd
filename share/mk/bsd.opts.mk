@@ -51,6 +51,7 @@ __<bsd.opts.mk>__:
 __DEFAULT_YES_OPTIONS = \
     ASSERT_DEBUG \
     DOCCOMPRESS \
+    INCLUDES \
     INSTALLLIB \
     KERBEROS \
     MAN \
@@ -67,6 +68,7 @@ __DEFAULT_YES_OPTIONS = \
 __DEFAULT_NO_OPTIONS = \
     CTF \
     DEBUG_FILES \
+    DTRACE_HARDENING \
     INSTALL_AS_USER \
     INFO
 

@@ -65,12 +65,15 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_pax.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/pax.h>
 #include <sys/proc.h>
 #include <sys/vmmeter.h>
 #include <sys/mman.h>
@@ -297,6 +300,12 @@ vmspace_alloc(vm_offset_t min, vm_offset_t max, pmap_pinit_t pinit)
 	vm->vm_taddr = 0;
 	vm->vm_daddr = 0;
 	vm->vm_maxsaddr = 0;
+#ifdef PAX_ASLR
+	vm->vm_aslr_delta_mmap = 0;
+	vm->vm_aslr_delta_stack = 0;
+	vm->vm_aslr_delta_exec = 0;
+#endif
+
 	return (vm);
 }
 
@@ -2003,6 +2012,15 @@ vm_map_protect(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	current = entry;
 	while ((current != &map->header) && (current->start < end)) {
 		old_prot = current->protection;
+#ifdef PAX_HARDENING
+		if ((new_prot & VM_PROT_EXECUTE) == VM_PROT_EXECUTE &&
+		    ((old_prot & VM_PROT_EXECUTE) != VM_PROT_EXECUTE)) {
+			if (pax_mprotect_exec_harden(curthread)) {
+				vm_map_unlock(map);
+				return (KERN_PROTECTION_FAILURE);
+			}
+		}
+#endif
 
 		if (set_max)
 			current->protection =
@@ -2240,6 +2258,7 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	case VM_INHERIT_NONE:
 	case VM_INHERIT_COPY:
 	case VM_INHERIT_SHARE:
+	case VM_INHERIT_ZERO:
 		break;
 	default:
 		return (KERN_INVALID_ARGUMENT);
@@ -3372,6 +3391,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 			break;
 
 		case VM_INHERIT_COPY:
+		case VM_INHERIT_ZERO:
 			/*
 			 * Clone the entry and link into the map.
 			 */
@@ -3389,8 +3409,9 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 			vm_map_entry_link(new_map, new_map->header.prev,
 			    new_entry);
 			vmspace_map_entry_forked(vm1, vm2, new_entry);
-			vm_map_copy_entry(old_map, new_map, old_entry,
-			    new_entry, fork_charge);
+			if (old_entry->inheritance == VM_INHERIT_COPY)
+				vm_map_copy_entry(old_map, new_map, old_entry,
+			    		new_entry, fork_charge);
 			break;
 		}
 		old_entry = old_entry->next;
@@ -3519,7 +3540,11 @@ vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
 	return (rv);
 }
 
+#ifdef PAX_HARDENING
+static int stack_guard_page = 1;
+#else
 static int stack_guard_page = 0;
+#endif
 SYSCTL_INT(_security_bsd, OID_AUTO, stack_guard_page, CTLFLAG_RWTUN,
     &stack_guard_page, 0,
     "Insert stack guard page ahead of the growable segments.");

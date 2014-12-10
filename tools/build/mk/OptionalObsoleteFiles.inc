@@ -1198,6 +1198,11 @@ OLD_FILES+=usr/share/dict/words
 OLD_DIRS+=usr/share/dict
 .endif
 
+.if ${MK_ELFTOOLCHAIN_TOOLS} == no
+OLD_FILES+=usr/bin/elfcopy
+OLD_FILES+=usr/share/man/man1/elfcopy.1.gz
+.endif
+
 #.if ${MK_EXAMPLES} == no
 # to be filled in
 #.endif
@@ -1737,8 +1742,6 @@ OLD_FILES+=usr/share/man/man7/groff_mmse.7.gz
 OLD_FILES+=usr/share/man/man7/groff_ms.7.gz
 OLD_FILES+=usr/share/man/man7/groff_trace.7.gz
 OLD_FILES+=usr/share/man/man7/groff_www.7.gz
-OLD_FILES+=usr/share/man/man7/man.7.gz
-OLD_FILES+=usr/share/man/man7/mdoc.7.gz
 OLD_FILES+=usr/share/man/man7/mdoc.samples.7.gz
 OLD_FILES+=usr/share/man/man7/me.7.gz
 OLD_FILES+=usr/share/man/man7/mm.7.gz
@@ -1954,7 +1957,6 @@ OLD_FILES+=usr/share/man/man3/iconvlist.3.gz
 .if ${MK_INET6} == no
 OLD_FILES+=sbin/ping6
 OLD_FILES+=sbin/rtsol
-OLD_FILES+=usr/sbin/faithd
 OLD_FILES+=usr/sbin/ip6addrctl
 OLD_FILES+=usr/sbin/mld6query
 OLD_FILES+=usr/sbin/ndp

@@ -14,7 +14,6 @@ FILES=	DAEMON \
 	amd \
 	apm \
 	apmd \
-	archdep \
 	atm1 \
 	atm2 \
 	atm3 \
@@ -42,7 +41,6 @@ FILES=	DAEMON \
 	dhclient \
 	dmesg \
 	dumpon \
-	faith \
 	fsck \
 	ftpd \
 	gbde \
@@ -91,7 +89,6 @@ FILES=	DAEMON \
 	mountd \
 	moused \
 	mroute6d \
-	mrouted \
 	msgs \
 	natd \
 	netif \

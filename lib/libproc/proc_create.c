@@ -53,6 +53,11 @@ proc_init(pid_t pid, int flags, int status, struct proc_handle *phdl)
 	phdl->flags = flags;
 	phdl->status = status;
 
+#ifdef	DTRACE_HARDENING_PTRACE
+	phdl->execname[0] = '\0';
+	return (0);
+#endif
+
 	mib[0] = CTL_KERN;
 	mib[1] = KERN_PROC;
 	mib[2] = KERN_PROC_PATHNAME;

@@ -2,10 +2,10 @@
 
 .include <src.opts.mk>
 
+INSTALL_PIC_ARCHIVE=	yes
 LIB=		mp
 SHLIB_MAJOR=	7
-DPADD=		${LIBCRYPTO}
-LDADD=		-lcrypto
+LIBADD=		crypto
 MAN=		libmp.3
 INCS=		mp.h
 SRCS=		mpasbn.c

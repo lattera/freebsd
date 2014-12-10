@@ -97,11 +97,22 @@ SUBDIR+=contrib/ofed
 #
 SUBDIR+=etc
 
-# These are last, since it is nice to at least get the base system
-# rebuilt before you do them.
-.for _DIR in ${LOCAL_LIB_DIRS} ${LOCAL_DIRS}
+# Local directories are last, since it is nice to at least get the base
+# system rebuilt before you do them.
+.for _DIR in ${LOCAL_DIRS}
 .if exists(${.CURDIR}/${_DIR}/Makefile)
-SUBDIR+= ${_DIR}
+SUBDIR+=	${_DIR}
+.endif
+.endfor
+# Add LOCAL_LIB_DIRS, but only if they will not be picked up as a SUBDIR
+# of a LOCAL_DIRS directory.  This allows LOCAL_DIRS=foo and
+# LOCAL_LIB_DIRS=foo/lib to behave as expected.
+.for _DIR in ${LOCAL_DIRS:M*/} ${LOCAL_DIRS:N*/:S|$|/|}
+_REDUNDENT_LIB_DIRS+=    ${LOCAL_LIB_DIRS:M${_DIR}*}
+.endfor
+.for _DIR in ${LOCAL_LIB_DIRS}
+.if empty(_REDUNDENT_LIB_DIRS:M${_DIR}) && exists(${.CURDIR}/${_DIR}/Makefile)
+SUBDIR+=	${_DIR}
 .endif
 .endfor
 .endif
@@ -691,6 +702,11 @@ buildworld_epilogue:
 buildenvvars:
 	@echo ${WMAKEENV:Q}
 
+.if ${.TARGETS:Mbuildenv}
+.if ${.MAKEFLAGS:M-j}
+.error The buildenv target is incompatible with -j
+.endif
+.endif
 buildenv:
 	@echo Entering world for ${TARGET_ARCH}:${TARGET}
 	@cd ${.CURDIR} && env ${WMAKEENV} ${BUILDENV_SHELL} || true
@@ -774,6 +790,11 @@ ITOOLS=	[ awk cap_mkdb cat chflags chmod chown \
 	ln lockf make mkdir mtree mv pwd_mkdb \
 	rm sed services_mkdb sh sysctl test true uname wc ${_zoneinfo} \
 	${LOCAL_ITOOLS}
+
+# Needed for share/man
+.if ${MK_MAN} != "no"
+ITOOLS+=makewhatis
+.endif
 
 #
 # distributeworld
@@ -1292,6 +1313,10 @@ _kerberos5_bootstrap_tools= \
 	usr.bin/compile_et
 .endif
 
+.if ${MK_HBSD_EXTRA_SANITIZE} != "no"
+CFLAGS+=	-DHBSD_EXTRA_SANITIZE
+.endif
+
 #	Please document (add comment) why something is in 'bootstrap-tools'.
 #	Try to bound the building of the bootstrap-tool to just the
 #	FreeBSD versions that need the tool built at this stage of the build.
@@ -1399,6 +1424,14 @@ _kgzip=		usr.sbin/kgzip
 # If we're given an XAS, don't build binutils.
 .if ${XAS:M/*} == "" && ${MK_BINUTILS_BOOTSTRAP} != "no"
 _binutils=	gnu/usr.bin/binutils
+.if ${MK_ELFTOOLCHAIN_TOOLS} != "no"
+_elftctools=	lib/libelftc \
+		usr.bin/addr2line \
+		usr.bin/elfcopy \
+		usr.bin/nm \
+		usr.bin/size \
+		usr.bin/strings
+.endif
 .endif
 
 # If an full path to an external cross compiler is given, don't build
@@ -1418,6 +1451,7 @@ cross-tools: .MAKE
     ${_clang_libs} \
     ${_clang} \
     ${_binutils} \
+    ${_elftctools} \
     ${_cc} \
     usr.bin/xlint/lint1 usr.bin/xlint/lint2 usr.bin/xlint/xlint \
     ${_btxld} \
@@ -1447,25 +1481,72 @@ NXBMAKE=	${NXBENV} ${MAKE} \
 		MK_CLANG_FULL=no MK_LLDB=no
 
 native-xtools: .MAKE
+	mkdir -p ${OBJTREE}/nxb-bin/bin
+	mkdir -p ${OBJTREE}/nxb-bin/sbin
 	mkdir -p ${OBJTREE}/nxb-bin/usr
 	mtree -deU -f ${.CURDIR}/etc/mtree/BSD.usr.dist \
 	    -p ${OBJTREE}/nxb-bin/usr >/dev/null
 	mtree -deU -f ${.CURDIR}/etc/mtree/BSD.include.dist \
 	    -p ${OBJTREE}/nxb-bin/usr/include >/dev/null
 .for _tool in \
+    bin/cat \
+    bin/chmod \
+    bin/cp \
+    bin/csh \
+    bin/echo \
+    bin/expr \
+    bin/hostname \
+    bin/ln \
+    bin/ls \
+    bin/mkdir \
+    bin/mv \
+    bin/ps \
+    bin/realpath \
+    bin/rm \
+    bin/rmdir \
+    bin/sh \
+    bin/sleep \
     ${_clang_tblgen} \
     usr.bin/ar \
     ${_binutils} \
+    ${_elftctools} \
     ${_cc} \
     ${_gcc_tools} \
     ${_clang_libs} \
     ${_clang} \
+    sbin/md5 \
+    sbin/sysctl \
+    gnu/usr.bin/diff \
     usr.bin/awk \
+    usr.bin/basename \
     usr.bin/bmake \
+    usr.bin/bzip2 \
+    usr.bin/cmp \
+    usr.bin/dirname \
+    usr.bin/env \
+    usr.bin/fetch \
+    usr.bin/find \
+    usr.bin/grep \
+    usr.bin/gzip \
+    usr.bin/id \
     usr.bin/lex \
     usr.bin/lorder \
+    usr.bin/mktemp \
+    usr.bin/mt \
+    usr.bin/patch \
     usr.bin/sed \
-    usr.bin/yacc
+    usr.bin/sort \
+    usr.bin/tar \
+    usr.bin/touch \
+    usr.bin/tr \
+    usr.bin/true \
+    usr.bin/uniq \
+    usr.bin/unzip \
+    usr.bin/xargs \
+    usr.bin/xinstall \
+    usr.bin/xz \
+    usr.bin/yacc \
+    usr.sbin/chown
 	${_+_}@${ECHODIR} "===> ${_tool} (obj,depend,all,install)"; \
 		cd ${.CURDIR}/${_tool} && \
 		${NXBMAKE} DIRPRFX=${_tool}/ obj && \
@@ -1537,6 +1618,7 @@ _prebuild_libs=	${_kerberos5_lib_libasn1} \
 		${_kerberos5_lib_libwind} \
 		lib/libbz2 ${_libcom_err} lib/libcrypt \
 		lib/libelf lib/libexpat \
+		lib/libfigpar \
 		${_lib_libgssapi} \
 		lib/libkiconv lib/libkvm lib/liblzma lib/libmd lib/libnv \
 		${_lib_libcapsicum} \
@@ -1551,7 +1633,8 @@ _prebuild_libs=	${_kerberos5_lib_libasn1} \
 		${_cddl_lib_libctf} \
 		lib/libutil lib/libpjdlog ${_lib_libypclnt} lib/libz lib/msun \
 		${_secure_lib_libcrypto} ${_lib_libldns} \
-		${_secure_lib_libssh} ${_secure_lib_libssl}
+		${_secure_lib_libssh} ${_secure_lib_libssl} \
+		gnu/lib/libdialog
 .if ${MK_GNUCXX} != "no"
 _prebuild_libs+= gnu/lib/libstdc++ gnu/lib/libsupc++
 gnu/lib/libstdc++__L: lib/msun__L
@@ -1668,6 +1751,8 @@ _lib_libypclnt=	lib/libypclnt
 .if ${MK_OPENSSL} == "no"
 lib/libradius__L: lib/libmd__L
 .endif
+
+gnu/lib/libdialog__L: lib/msun__L lib/ncurses/ncursesw__L
 
 .for _lib in ${_prereq_libs}
 ${_lib}__PL: .PHONY .MAKE
@@ -1963,7 +2048,8 @@ _xb-worldtmp:
 
 _xb-bootstrap-tools:
 .for _tool in \
-    ${_clang_tblgen}
+    ${_clang_tblgen} \
+    ${_gperf}
 	${_+_}@${ECHODIR} "===> ${_tool} (obj,depend,all,install)"; \
 	cd ${.CURDIR}/${_tool} && \
 	${CDMAKE} DIRPRFX=${_tool}/ obj && \
@@ -1979,6 +2065,7 @@ _xb-build-tools:
 _xb-cross-tools:
 .for _tool in \
     ${_binutils} \
+    ${_elftctools} \
     usr.bin/ar \
     ${_clang_libs} \
     ${_clang} \
@@ -2011,6 +2098,7 @@ _xi-cross-tools:
 	@echo "_xi-cross-tools"
 .for _tool in \
     ${_binutils} \
+    ${_elftctools} \
     usr.bin/ar \
     ${_clang_libs} \
     ${_clang} \

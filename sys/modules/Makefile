@@ -39,7 +39,6 @@ SUBDIR=	\
 	${_amdtemp} \
 	amr \
 	${_an} \
-	${_aout} \
 	${_apm} \
 	${_arcmsr} \
 	${_arcnet} \
@@ -75,7 +74,6 @@ SUBDIR=	\
 	${_ciss} \
 	${_cm} \
 	${_cmx} \
-	${_coff} \
 	${_coretemp} \
 	${_cp} \
 	${_cpsw} \
@@ -90,7 +88,6 @@ SUBDIR=	\
 	cuse \
 	${_cxgb} \
 	${_cxgbe} \
-	${_cyclic} \
 	dc \
 	dcons \
 	dcons_crom \
@@ -137,7 +134,6 @@ SUBDIR=	\
 	${_hyperv} \
 	${_i2c} \
         ${_ibcore} \
-	${_ibcs2} \
 	${_ichwd} \
 	${_ida} \
 	${_ie} \
@@ -145,9 +141,9 @@ SUBDIR=	\
 	if_disc \
 	if_edsc \
 	if_epair \
-	if_faith \
-	if_gif \
+	${_if_gif} \
 	${_if_gre} \
+	${_if_me} \
 	if_lagg \
 	${_if_ndis} \
 	if_stf \
@@ -332,8 +328,6 @@ SUBDIR=	\
 	ste \
 	${_stg} \
 	stge \
-	${_streams} \
-	${_svr4} \
 	${_sym} \
 	${_syscons} \
 	sysvipc \
@@ -403,10 +397,12 @@ _random=	random
 	defined(ALL_MODULES)
 _carp=		carp
 _toecore=	toecore
+_if_gif=	if_gif
+_if_gre=	if_gre
 .endif
 
 .if ${MK_INET_SUPPORT} != "no" || defined(ALL_MODULES)
-_if_gre=	if_gre
+_if_me=		if_me
 _ipdivert=	ipdivert
 _ipfw=		ipfw
 .endif
@@ -467,16 +463,12 @@ _cxgb=		cxgb
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
 _agp=		agp
 _an=		an
-_aout=		aout
 _bktr=		bktr
 _bxe=		bxe
 _cardbus=	cardbus
 _cbb=		cbb
 _cpuctl=	cpuctl
 _cpufreq=	cpufreq
-.if ${MK_CDDL} != "no" || defined(ALL_MODULES)
-_cyclic=	cyclic
-.endif
 _dpms=		dpms
 _drm=		drm
 _drm2=		drm2
@@ -624,7 +616,6 @@ _arcnet=	arcnet
 .if ${MK_SOURCELESS_UCODE} != "no"
 _ce=		ce
 .endif
-_coff=		coff
 .if ${MK_SOURCELESS_UCODE} != "no"
 _cp=		cp
 .endif
@@ -634,7 +625,6 @@ _ep=		ep
 _fe=		fe
 _glxiic=	glxiic
 _glxsb=		glxsb
-_ibcs2=		ibcs2
 _ie=		ie
 _mse=		mse
 _ncr=		ncr
@@ -643,9 +633,7 @@ _nsp=		nsp
 _pcfclock=	pcfclock
 _pst=		pst
 _sbni=		sbni
-_streams=	streams
 _stg=		stg
-_svr4=		svr4
 _wds=		wds
 _xe=		xe
 .if ${MACHINE} == "i386"
@@ -684,9 +672,6 @@ _cardbus=	cardbus
 _cbb=		cbb
 _cfi=		cfi
 _cpufreq=	cpufreq
-.if ${MK_CDDL} != "no" || defined(ALL_MODULES)
-_cyclic=	cyclic
-.endif
 _drm=		drm
 .if ${MK_CDDL} != "no" || defined(ALL_MODULES)
 _dtrace=	dtrace

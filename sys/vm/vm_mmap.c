@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_compat.h"
 #include "opt_hwpmc_hooks.h"
+#include "opt_pax.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -54,6 +55,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/sysproto.h>
 #include <sys/filedesc.h>
+#include <sys/pax.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/procctl.h>
@@ -202,6 +204,9 @@ sys_mmap(td, uap)
 	struct file *fp;
 	struct vnode *vp;
 	vm_offset_t addr;
+#ifdef PAX_ASLR
+	vm_offset_t orig_addr;
+#endif
 	vm_size_t size, pageoff;
 	vm_prot_t cap_maxprot, maxprot;
 	void *handle;
@@ -212,6 +217,9 @@ sys_mmap(td, uap)
 	cap_rights_t rights;
 
 	addr = (vm_offset_t) uap->addr;
+#ifdef PAX_ASLR
+	orig_addr = addr;
+#endif
 	size = uap->len;
 	prot = uap->prot;
 	flags = uap->flags;
@@ -222,8 +230,7 @@ sys_mmap(td, uap)
 	/*
 	 * Ignore old flags that used to be defined but did not do anything.
 	 */
-	if (td->td_proc->p_osrel < P_OSREL_MAP_RENAME)
-		flags &= ~(MAP_RESERVED0020 | MAP_RESERVED0040);
+	flags &= ~(MAP_RESERVED0020 | MAP_RESERVED0040);
 	
 	/*
 	 * Enforce the constraints.
@@ -234,14 +241,9 @@ sys_mmap(td, uap)
 	 * ld.so sometimes issues anonymous map requests with non-zero
 	 * pos.
 	 */
-	if (!SV_CURPROC_FLAG(SV_AOUT)) {
-		if ((uap->len == 0 && curproc->p_osrel >= P_OSREL_MAP_ANON) ||
-		    ((flags & MAP_ANON) != 0 && (uap->fd != -1 || pos != 0)))
-			return (EINVAL);
-	} else {
-		if ((flags & MAP_ANON) != 0)
-			pos = 0;
-	}
+	if ((uap->len == 0 && curproc->p_osrel >= P_OSREL_MAP_ANON) ||
+	    ((flags & MAP_ANON) != 0 && (uap->fd != -1 || pos != 0)))
+		return (EINVAL);
 
 	if (flags & MAP_STACK) {
 		if ((uap->fd != -1) ||
@@ -283,6 +285,12 @@ sys_mmap(td, uap)
 	    (align >> MAP_ALIGNMENT_SHIFT >= sizeof(void *) * NBBY ||
 	    align >> MAP_ALIGNMENT_SHIFT < PAGE_SHIFT))
 		return (EINVAL);
+
+#if defined(MAP_32BIT) && defined(PAX_HARDENING)
+	if (flags & MAP_32BIT)
+		if (pax_map32_enabled(td) == 0)
+			return (EPERM);
+#endif
 
 	/*
 	 * Check for illegal addresses.  Watch out for address wrap... Note
@@ -440,6 +448,10 @@ map:
 	td->td_fpop = fp;
 	maxprot &= cap_maxprot;
 
+#ifdef PAX_ASLR
+	pax_aslr_mmap(td->td_proc, &addr, orig_addr, flags);
+#endif
+
 	/* This relies on VM_PROT_* matching PROT_*. */
 	error = vm_mmap(&vms->vm_map, &addr, size, prot, maxprot,
 	    flags, handle_type, handle, pos);
@@ -512,13 +524,6 @@ ommap(td, uap)
 	nargs.addr = uap->addr;
 	nargs.len = uap->len;
 	nargs.prot = cvtbsdprot[uap->prot & 0x7];
-#ifdef COMPAT_FREEBSD32
-#if defined(__amd64__)
-	if (i386_read_exec && SV_PROC_FLAG(td->td_proc, SV_ILP32) &&
-	    nargs.prot != 0)
-		nargs.prot |= PROT_EXEC;
-#endif
-#endif
 	nargs.flags = 0;
 	if (uap->flags & OMAP_ANON)
 		nargs.flags |= MAP_ANON;
