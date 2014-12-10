@@ -105,6 +105,7 @@ static void linkmap_add(Obj_Entry *);
 static void linkmap_delete(Obj_Entry *);
 static void load_filtees(Obj_Entry *, int flags, RtldLockState *);
 static void unload_filtees(Obj_Entry *);
+static void randomize_neededs(Obj_Entry *obj, int flags);
 static int load_needed_objects(Obj_Entry *, int);
 static int load_preload_objects(void);
 static Obj_Entry *load_object(const char *, int fd, const Obj_Entry *, int);
@@ -2038,6 +2039,55 @@ process_needed(Obj_Entry *obj, Needed_Entry *needed, int flags)
     return (0);
 }
 
+static void
+randomize_neededs(Obj_Entry *obj, int flags)
+{
+
+	Needed_Entry **needs=NULL, *need=NULL;
+	unsigned int i, j, nneed;
+	size_t sz = sizeof(unsigned int);
+	int mib[2];
+
+	if (!(obj->needed) || (flags & RTLD_LO_FILTEES))
+		return;
+
+	mib[0] = CTL_KERN;
+	mib[1] = KERN_ARND;
+
+	for (nneed=0, need = obj->needed; need != NULL; need = need->next)
+		nneed++;
+
+	if (nneed > 1) {
+		needs = xcalloc(nneed, sizeof(Needed_Entry **));
+		for (i=0, need = obj->needed; i < nneed; i++, need = need->next)
+			needs[i] = need;
+
+		for (i=0; i < nneed; i++) {
+			do {
+				if (sysctl(mib, 2, &j, &sz, NULL, 0))
+					goto err;
+
+				j %= nneed;
+			} while (j == i);
+
+			need = needs[i];
+			needs[i] = needs[j];
+			needs[j] = need;
+		}
+
+		for (i=0; i < nneed; i++)
+			needs[i]->next = i + 1 < nneed ? needs[i + 1] : NULL;
+
+		obj->needed = needs[0];
+	}
+
+err:
+	if (needs != NULL)
+		free(needs);
+
+	return;
+}
+
 /*
  * Given a shared object, traverse its list of needed objects, and load
  * each of them.  Returns 0 on success.  Generates an error message and
@@ -2047,56 +2097,9 @@ static int
 load_needed_objects(Obj_Entry *first, int flags)
 {
 	Obj_Entry *obj;
-	Needed_Entry **needs, *need=NULL;
-	unsigned int i, j, nneed;
-	size_t sz = sizeof(unsigned int);
-	int mib[2], err=0;
 
-	mib[0] = CTL_KERN;
-	mib[1] = KERN_ARND;
-
-	/* XXX (Shawn Webb): Clean up this logic for randomizing shared object loading order */
 	for (obj = first;  obj != NULL;  obj = obj->next) {
-		if (obj->needed && err == 0 && !(flags & RTLD_LO_FILTEES)) {
-			for (nneed=0, need = obj->needed; need != NULL; need = need->next)
-				nneed++;
-
-			if (nneed > 1) {
-				needs = xcalloc(nneed, sizeof(Needed_Entry **));
-				for (i=0, need = obj->needed; i < nneed; i++, need = need->next)
-					needs[i] = need;
-
-				for (i=0; i < nneed; i++) {
-					do {
-						if ((err = sysctl(mib, 2, &j, &sz, NULL, 0)) == -1)
-							break;
-						
-						j %= nneed;
-					} while (j == i);
-
-					if (err)
-						break;
-
-					need = needs[i];
-					needs[i] = needs[j];
-					needs[j] = need;
-				}
-
-				if (err == 0) {
-					for (i=0; i < nneed; i++)
-						needs[i]->next = i + 1 < nneed ? needs[i + 1] : NULL;
-
-					obj->needed = needs[0];
-				} else {
-					need = NULL;
-				}
-
-				free(needs);
-			} else {
-				need = NULL;
-			}
-		}
-
+		randomize_neededs(obj, flags);
 		if (process_needed(obj, obj->needed, flags) == -1)
 			return (-1);
 	}
