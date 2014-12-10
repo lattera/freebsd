@@ -34,7 +34,7 @@ timingsafe_bcmp(const void *b1, const void *b2, size_t n)
 	p2 = (char *)b2;
 	r = 0;
 
-	while (--n != 0)
+	while (n-- != 0)
 		r |= *p1++ ^ *p2++;
 	
 	return (r != 0);

@@ -29,17 +29,15 @@ timingsafe_memcmp(const void *s1, const void *s2, size_t n)
 	r = 0;
 	c = 0;
 
-	if (n != 0) {
-		p1 = (unsigned char *)s1;
-		p2 = (unsigned char *)s2;
+	p1 = (unsigned char *)s1;
+	p2 = (unsigned char *)s2;
 
-		for (i = 0; i < n; i ++) {
-			lt = (p1[i] - p2[i]) >> 8;
-			gt = (p2[i] - p1[i]) >> 8;
+	for (i = 0; i < n; i ++) {
+		lt = (p1[i] - p2[i]) >> 8;
+		gt = (p2[i] - p1[i]) >> 8;
 
-			r |= (lt - gt) & ~c;
-			c |= lt | gt;
-		}
+		r |= (lt - gt) & ~c;
+		c |= lt | gt;
 	}
 
 	return (r);
