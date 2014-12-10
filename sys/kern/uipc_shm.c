@@ -175,7 +175,7 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 	m = vm_page_grab(obj, idx, VM_ALLOC_NORMAL);
 	if (m->valid != VM_PAGE_BITS_ALL) {
 		if (vm_pager_has_page(obj, idx, NULL, NULL)) {
-			rv = vm_pager_get_pages(obj, &m, 1, 0);
+			rv = vm_pager_get_pages(obj, &m, 1, 0, VM_PROT_ALL);
 			m = vm_page_lookup(obj, idx);
 			if (m == NULL) {
 				printf(
@@ -455,7 +455,7 @@ retry:
 				} else if (m->valid != VM_PAGE_BITS_ALL) {
 					ma[0] = m;
 					rv = vm_pager_get_pages(object, ma, 1,
-					    0);
+					    0, VM_PROT_ALL);
 					m = vm_page_lookup(object, idx);
 				} else
 					/* A cached page was reactivated. */

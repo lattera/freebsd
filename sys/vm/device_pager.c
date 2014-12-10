@@ -59,7 +59,7 @@ static void dev_pager_init(void);
 static vm_object_t dev_pager_alloc(void *, vm_ooffset_t, vm_prot_t,
     vm_ooffset_t, struct ucred *);
 static void dev_pager_dealloc(vm_object_t);
-static int dev_pager_getpages(vm_object_t, vm_page_t *, int, int);
+static int dev_pager_getpages(vm_object_t, vm_page_t *, int, int, vm_prot_t);
 static void dev_pager_putpages(vm_object_t, vm_page_t *, int, 
 		boolean_t, int *);
 static boolean_t dev_pager_haspage(vm_object_t, vm_pindex_t, int *,
@@ -257,13 +257,14 @@ dev_pager_dealloc(object)
 }
 
 static int
-dev_pager_getpages(vm_object_t object, vm_page_t *ma, int count, int reqpage)
+dev_pager_getpages(vm_object_t object, vm_page_t *ma, int count, int reqpage,
+    vm_prot_t prot)
 {
 	int error, i;
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
 	error = object->un_pager.devp.ops->cdev_pg_fault(object,
-	    IDX_TO_OFF(ma[reqpage]->pindex), PROT_READ, &ma[reqpage]);
+	    IDX_TO_OFF(ma[reqpage]->pindex), prot, &ma[reqpage]);
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
 

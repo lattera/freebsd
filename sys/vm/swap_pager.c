@@ -360,7 +360,8 @@ static vm_object_t
 		swap_pager_alloc(void *handle, vm_ooffset_t size,
 		    vm_prot_t prot, vm_ooffset_t offset, struct ucred *);
 static void	swap_pager_dealloc(vm_object_t object);
-static int	swap_pager_getpages(vm_object_t, vm_page_t *, int, int);
+static int	swap_pager_getpages(vm_object_t, vm_page_t *, int, int,
+		    vm_prot_t);
 static void	swap_pager_putpages(vm_object_t, vm_page_t *, int, boolean_t, int *);
 static boolean_t
 		swap_pager_haspage(vm_object_t object, vm_pindex_t pindex, int *before, int *after);
@@ -611,7 +612,6 @@ swap_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 
 	pindex = OFF_TO_IDX(offset + PAGE_MASK + size);
 	if (handle) {
-		mtx_lock(&Giant);
 		/*
 		 * Reference existing named region or allocate new one.  There
 		 * should not be a race here against swp_pager_meta_build()
@@ -619,12 +619,13 @@ swap_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 		 * of the handle.
 		 */
 		sx_xlock(&sw_alloc_sx);
+		mtx_lock(&sw_alloc_mtx);
 		object = vm_pager_object_lookup(NOBJLIST(handle), handle);
+		mtx_unlock(&sw_alloc_mtx);
 		if (object == NULL) {
 			if (cred != NULL) {
 				if (!swap_reserve_by_cred(size, cred)) {
 					sx_xunlock(&sw_alloc_sx);
-					mtx_unlock(&Giant);
 					return (NULL);
 				}
 				crhold(cred);
@@ -640,7 +641,6 @@ swap_pager_alloc(void *handle, vm_ooffset_t size, vm_prot_t prot,
 			VM_OBJECT_WUNLOCK(object);
 		}
 		sx_xunlock(&sw_alloc_sx);
-		mtx_unlock(&Giant);
 	} else {
 		if (cred != NULL) {
 			if (!swap_reserve_by_cred(size, cred))
@@ -1104,7 +1104,8 @@ swap_pager_unswapped(vm_page_t m)
  *	left busy, but the others adjusted.
  */
 static int
-swap_pager_getpages(vm_object_t object, vm_page_t *m, int count, int reqpage)
+swap_pager_getpages(vm_object_t object, vm_page_t *m, int count, int reqpage,
+    vm_prot_t prot __unused)
 {
 	struct buf *bp;
 	vm_page_t mreq;
@@ -1734,7 +1735,7 @@ swp_pager_force_pagein(vm_object_t object, vm_pindex_t pindex)
 		return;
 	}
 
-	if (swap_pager_getpages(object, &m, 1, 0) != VM_PAGER_OK)
+	if (swap_pager_getpages(object, &m, 1, 0, VM_PROT_ALL) != VM_PAGER_OK)
 		panic("swap_pager_force_pagein: read from swap failed");/*XXX*/
 	vm_object_pip_wakeup(object);
 	vm_page_dirty(m);

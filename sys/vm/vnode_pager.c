@@ -82,7 +82,7 @@ static int vnode_pager_addr(struct vnode *vp, vm_ooffset_t address,
 static int vnode_pager_input_smlfs(vm_object_t object, vm_page_t m);
 static int vnode_pager_input_old(vm_object_t object, vm_page_t m);
 static void vnode_pager_dealloc(vm_object_t);
-static int vnode_pager_getpages(vm_object_t, vm_page_t *, int, int);
+static int vnode_pager_getpages(vm_object_t, vm_page_t *, int, int, vm_prot_t);
 static void vnode_pager_putpages(vm_object_t, vm_page_t *, int, int, int *);
 static boolean_t vnode_pager_haspage(vm_object_t, vm_pindex_t, int *, int *);
 static vm_object_t vnode_pager_alloc(void *, vm_ooffset_t, vm_prot_t,
@@ -649,7 +649,8 @@ vnode_pager_input_old(vm_object_t object, vm_page_t m)
  * backing vp's VOP_GETPAGES.
  */
 static int
-vnode_pager_getpages(vm_object_t object, vm_page_t *m, int count, int reqpage)
+vnode_pager_getpages(vm_object_t object, vm_page_t *m, int count, int reqpage,
+    vm_prot_t prot __unused)
 {
 	int rtval;
 	struct vnode *vp;

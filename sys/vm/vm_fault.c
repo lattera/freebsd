@@ -658,7 +658,7 @@ vnode_locked:
 
 			rv = faultcount ?
 			    vm_pager_get_pages(fs.object, marray, faultcount,
-				reqpage) : VM_PAGER_FAIL;
+				reqpage, prot) : VM_PAGER_FAIL;
 
 			if (rv == VM_PAGER_OK) {
 				/*

@@ -239,7 +239,7 @@ vm_imgact_hold_page(vm_object_t object, vm_ooffset_t offset)
 	m = vm_page_grab(object, pindex, VM_ALLOC_NORMAL);
 	if (m->valid != VM_PAGE_BITS_ALL) {
 		ma[0] = m;
-		rv = vm_pager_get_pages(object, ma, 1, 0);
+		rv = vm_pager_get_pages(object, ma, 1, 0, VM_PROT_ALL);
 		m = vm_page_lookup(object, pindex);
 		if (m == NULL)
 			goto out;
@@ -589,7 +589,8 @@ vm_thread_swapin(struct thread *td)
 				if (ma[j]->valid == VM_PAGE_BITS_ALL)
 					break;
 			}
-			rv = vm_pager_get_pages(ksobj, ma + i, j - i, 0);
+			rv = vm_pager_get_pages(ksobj, ma + i, j - i, 0,
+			    VM_PROT_ALL);
 			if (rv != VM_PAGER_OK)
 	panic("vm_thread_swapin: cannot get kstack for proc: %d",
 				    td->td_proc->p_pid);

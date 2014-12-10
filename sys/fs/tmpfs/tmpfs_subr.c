@@ -1367,7 +1367,8 @@ retry:
 					goto retry;
 				} else if (m->valid != VM_PAGE_BITS_ALL) {
 					ma[0] = m;
-					rv = vm_pager_get_pages(uobj, ma, 1, 0);
+					rv = vm_pager_get_pages(uobj, ma, 1, 0,
+					    VM_PROT_ALL);
 					m = vm_page_lookup(uobj, idx);
 				} else
 					/* A cached page was reactivated. */

@@ -56,7 +56,8 @@ __FBSDID("$FreeBSD$");
 static vm_object_t default_pager_alloc(void *, vm_ooffset_t, vm_prot_t,
     vm_ooffset_t, struct ucred *);
 static void default_pager_dealloc(vm_object_t);
-static int default_pager_getpages(vm_object_t, vm_page_t *, int, int);
+static int default_pager_getpages(vm_object_t, vm_page_t *, int, int,
+    vm_prot_t prot);
 static void default_pager_putpages(vm_object_t, vm_page_t *, int, 
 		boolean_t, int *);
 static boolean_t default_pager_haspage(vm_object_t, vm_pindex_t, int *, 
@@ -121,13 +122,11 @@ default_pager_dealloc(object)
  * see a vm_page with assigned swap here.
  */
 static int
-default_pager_getpages(object, m, count, reqpage)
-	vm_object_t object;
-	vm_page_t *m;
-	int count;
-	int reqpage;
+default_pager_getpages(vm_object_t object, vm_page_t *m, int count,
+    int reqpage, vm_prot_t prot __unused)
 {
-	return VM_PAGER_FAIL;
+
+	return (VM_PAGER_FAIL);
 }
 
 /*

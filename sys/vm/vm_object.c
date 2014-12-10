@@ -2047,7 +2047,7 @@ vm_object_populate(vm_object_t object, vm_pindex_t start, vm_pindex_t end)
 		m = vm_page_grab(object, pindex, VM_ALLOC_NORMAL);
 		if (m->valid != VM_PAGE_BITS_ALL) {
 			ma[0] = m;
-			rv = vm_pager_get_pages(object, ma, 1, 0);
+			rv = vm_pager_get_pages(object, ma, 1, 0, VM_PROT_ALL);
 			m = vm_page_lookup(object, pindex);
 			if (m == NULL)
 				break;

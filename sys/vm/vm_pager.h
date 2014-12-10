@@ -50,7 +50,7 @@ typedef void pgo_init_t(void);
 typedef vm_object_t pgo_alloc_t(void *, vm_ooffset_t, vm_prot_t, vm_ooffset_t,
     struct ucred *);
 typedef void pgo_dealloc_t(vm_object_t);
-typedef int pgo_getpages_t(vm_object_t, vm_page_t *, int, int);
+typedef int pgo_getpages_t(vm_object_t, vm_page_t *, int, int, vm_prot_t);
 typedef void pgo_putpages_t(vm_object_t, vm_page_t *, int, int, int *);
 typedef boolean_t pgo_haspage_t(vm_object_t, vm_pindex_t, int *, int *);
 typedef void pgo_pageunswapped_t(vm_page_t);
@@ -102,7 +102,8 @@ vm_object_t vm_pager_allocate(objtype_t, void *, vm_ooffset_t, vm_prot_t,
     vm_ooffset_t, struct ucred *);
 void vm_pager_bufferinit(void);
 void vm_pager_deallocate(vm_object_t);
-static __inline int vm_pager_get_pages(vm_object_t, vm_page_t *, int, int);
+static __inline int vm_pager_get_pages(vm_object_t, vm_page_t *, int, int,
+    vm_prot_t prot);
 static __inline boolean_t vm_pager_has_page(vm_object_t, vm_pindex_t, int *, int *);
 void vm_pager_init(void);
 vm_object_t vm_pager_object_lookup(struct pagerlst *, void *);
@@ -121,12 +122,14 @@ vm_pager_get_pages(
 	vm_object_t object,
 	vm_page_t *m,
 	int count,
-	int reqpage
+	int reqpage,
+	vm_prot_t prot
 ) {
 	int r;
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
-	r = (*pagertab[object->type]->pgo_getpages)(object, m, count, reqpage);
+	r = (*pagertab[object->type]->pgo_getpages)(object, m, count,
+	    reqpage, prot);
 	if (r == VM_PAGER_OK && m[reqpage]->valid != VM_PAGE_BITS_ALL) {
 		vm_page_zero_invalid(m[reqpage], TRUE);
 	}
